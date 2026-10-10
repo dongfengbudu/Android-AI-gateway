@@ -1,7 +1,7 @@
 name: Android Debug
 
 # 每次 push 自动构建 debug 包并上传为本次 run 的 artifact，不创建 Release、不占用 tag；也可手动触发。
-# debug 用构建工具自带的调试密钥签名，不需要任何仓库 secret；正式 release 包走本地 keystore.properties 流程。
+# debug 用仓库内置的固定调试密钥签名（debug.keystore），不需要任何仓库 secret；正式 release 包走本地 keystore.properties 流程。
 on:
   push:
   workflow_dispatch:

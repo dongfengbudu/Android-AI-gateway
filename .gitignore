@@ -7,6 +7,7 @@ local.properties
 captures/
 *.apk
 *.keystore
+!debug.keystore
 *.jks
 keystore.properties
 

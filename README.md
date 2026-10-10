@@ -70,7 +70,7 @@
 
 ## 构建
 
-本仓库用 GitHub Actions 出 debug 包（`.github/workflows/android-debug.yml`，每次 push 自动构建，也可 `gh workflow run` 手动触发）。debug 包由构建工具自动用调试密钥签名，不需要任何仓库 secret，产物可直接安装（applicationId 带 `.debug` 后缀，可与正式包同机共存）：
+本仓库用 GitHub Actions 出 debug 包（`.github/workflows/android-debug.yml`，每次 push 自动构建，也可 `gh workflow run` 手动触发）。debug 包用仓库内置的固定调试密钥签名（无需任何仓库 secret），包名与正式包一致，历次构建的包可直接覆盖升级；与正式签名的包签名不同，不能相互覆盖安装（换装需先卸载）：
 
 ```bash
 # 触发构建
@@ -89,7 +89,7 @@ curl -X POST -H "Authorization: token $GITHUB_TOKEN" \
 
 ```bash
 gradle :core:test                # 单元测试
-gradle :app:assembleDebug        # debug 包（可与 release 同机共存）
+gradle :app:assembleDebug        # debug 包（包名与 release 一致）
 gradle :cli:run --args="serve"   # 本机起网关做端到端联调
 ```
 

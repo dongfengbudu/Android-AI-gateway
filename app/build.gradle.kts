@@ -43,6 +43,16 @@ android {
     }
 
     signingConfigs {
+        // 固定调试密钥（仓库根目录 debug.keystore，PKCS12，标准调试口令，无保密性）：
+        // 签名跨次构建稳定，历次 CI debug 包可直接覆盖升级。
+        getByName("debug") {
+            storeFile = rootProject.file("debug.keystore")
+            storePassword = "android"
+            keyAlias = "androiddebugkey"
+            keyPassword = "android"
+            storeType = "PKCS12"
+        }
+
         // 只有存在 keystore.properties 时才创建 release 签名；
         // debug 包不依赖该文件。
         if (hasReleaseKeystore) {
@@ -62,12 +72,11 @@ android {
         // material-icons-extended 的 10660 个未使用图标类会被裁掉。
         // 裁剪后 debug 3.5MB / release 1.4MB（未开前 debug 是 16.8MB）。
         //
-        // debug = 开发包（本地与 CI）：applicationId 加 .debug 后缀、应用名加 Debug，
-        // 用 debug 签名，可与 release 包同机共存、互不覆盖。
+        // debug = 开发包（本地与 CI）：包名与 release 完全一致（dev.aigw.app），
+        // 用仓库固定的调试密钥签名。两者签名不同，不能同机共存，也不能相互覆盖安装（换装需先卸载）。
         debug {
             isMinifyEnabled = true
             isShrinkResources = true
-            applicationIdSuffix = ".debug"
             proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
         }
         // release = 本地备好 keystore.properties 后手动出包；CI 只构建 debug。
