@@ -229,4 +229,4 @@ Google 对同一个 refresh_token 的高频 token 换新有风控。0.1.53~0.1.5
 3. **新增供应商**：只需 ①core 加 `provider/<id>/` 实现 `Provider` 接口，②`ProviderBootstrap` 加一行，③app 加 `ProviderUi` 实现并在 `ProviderUiRegistry` 登记。框架自动获得账号池、Failover、代理分流、日志、保活。
 4. **测试要求**：`:core:test` 全绿才能出包。协议相关改动必须先加失败用例再修（复现→修→锁住）。
 5. **构建三坑**（aarch64 PRoot 容器）：JDK 必须 17；必须 `LD_PRELOAD=/opt/android-sdk/lib/libdelfix.so`；aapt2/zipalign 必须用 aarch64 静态版（备份在 `~/.aicode/backup/`）。详见全局记忆 `android-build-arm64-proot`。
-6. **版本纪律**：每次交付 versionCode+1 / versionName patch+1；出包后 `aapt2 dump badging` 核对；产物命名 `ai-gateway-<版本>-release.apk`。
+6. **版本纪律**：每次交付 versionCode+1 / versionName patch+1；出包后 `aapt2 dump badging` 核对；产物命名 `ai-gateway-<版本>-debug.apk`（CI debug 包；本地手动出的正式包为 `-release.apk`）。

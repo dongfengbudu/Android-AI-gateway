@@ -10,8 +10,8 @@ plugins {
 /**
  * release 签名：从 keystore.properties 读，仅在文件存在时装配。
  *
- * 本地开发只出 debug 包（见 buildTypes.debug），不需要 keystore.properties；
- * 云端发版时才由 CI 现生成该文件。文件缺失时不在配置阶段报错，
+ * debug 包（本地与 CI，见 .github/workflows/android-debug.yml）不需要 keystore.properties；
+ * 只有本地手动出 release 包时才提供该文件。文件缺失时不在配置阶段报错，
  * 但 release 构建会因无签名配置而失败——正是期望行为。
  */
 val keystoreProps = Properties().apply {
@@ -44,7 +44,7 @@ android {
 
     signingConfigs {
         // 只有存在 keystore.properties 时才创建 release 签名；
-        // 本地只出 debug 包时不依赖该文件。
+        // debug 包不依赖该文件。
         if (hasReleaseKeystore) {
             create("release") {
                 storeFile = file(keystoreValue("storeFile"))
@@ -62,7 +62,7 @@ android {
         // material-icons-extended 的 10660 个未使用图标类会被裁掉。
         // 裁剪后 debug 3.5MB / release 1.4MB（未开前 debug 是 16.8MB）。
         //
-        // debug = 本地开发包：applicationId 加 .debug 后缀、应用名加 Debug，
+        // debug = 开发包（本地与 CI）：applicationId 加 .debug 后缀、应用名加 Debug，
         // 用 debug 签名，可与 release 包同机共存、互不覆盖。
         debug {
             isMinifyEnabled = true
@@ -70,7 +70,7 @@ android {
             applicationIdSuffix = ".debug"
             proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
         }
-        // release = 仅由 GitHub Actions 云端构建并发版；本地不产出 release 包。
+        // release = 本地备好 keystore.properties 后手动出包；CI 只构建 debug。
         release {
             isMinifyEnabled = true
             isShrinkResources = true

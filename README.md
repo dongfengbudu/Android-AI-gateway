@@ -70,27 +70,20 @@
 
 ## 构建
 
-本仓库用 GitHub Actions 出包（`.github/workflows/android-release.yml`，`workflow_dispatch` 手动触发）。
-
-需要 4 个仓库 secret：
-
-| Secret | 说明 |
-|---|---|
-| `KEYSTORE_BASE64` | 签名密钥库的 base64 |
-| `KEYSTORE_PASSWORD` | 密钥库口令 |
-| `KEY_ALIAS` | 密钥别名 |
-| `KEY_PASSWORD` | 密钥口令 |
+本仓库用 GitHub Actions 出 debug 包（`.github/workflows/android-debug.yml`，每次 push 自动构建，也可 `gh workflow run` 手动触发）。debug 包由构建工具自动用调试密钥签名，不需要任何仓库 secret，产物可直接安装（applicationId 带 `.debug` 后缀，可与正式包同机共存）：
 
 ```bash
 # 触发构建
-gh workflow run android-release.yml
+gh workflow run android-debug.yml
 # 或
 curl -X POST -H "Authorization: token $GITHUB_TOKEN" \
-  "https://api.github.com/repos/<owner>/<repo>/actions/workflows/android-release.yml/dispatches" \
+  "https://api.github.com/repos/<owner>/<repo>/actions/workflows/android-debug.yml/dispatches" \
   -d '{"ref":"main"}'
 ```
 
-产物发布在 Releases，命名 `ai-gateway-<versionName>-release.apk`。
+产物在该次 run 页面的 Artifacts 中下载，APK 命名 `ai-gateway-<versionName>-debug.apk`。
+
+需要正式 release 包时，在本地放好 `keystore.properties` 后运行 `gradle :app:assembleRelease`（CI 不构建 release）。
 
 本地开发（需 JDK 17 + Android SDK）：
 
