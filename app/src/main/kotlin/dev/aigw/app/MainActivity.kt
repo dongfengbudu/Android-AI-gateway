@@ -300,7 +300,7 @@ private fun AppRoot(viewModel: AppViewModel, state: AppUiState) {
     ) {
         val info = state.updateInfo
         Text(
-            text = info?.notes.ifEmpty { "该版本没有提供更新说明。" },
+            text = info?.notes?.ifEmpty { null } ?: "该版本没有提供更新说明。",
             color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
             modifier = Modifier.fillMaxWidth().heightIn(max = 320.dp).verticalScroll(rememberScrollState()),
         )

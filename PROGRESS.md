@@ -32,6 +32,13 @@
   模型选择抽屉均去掉外层 if/let 门控），附带修复关闭无退场动画的问题；
 - 限速弹窗保存不再静默回退旧值，非法输入给错误提示；提取 DialogButtonRow 共享确认按钮行。
 
+CI 编译修复（同日）：
+- 919594e 编译失败根因：MainActivity 更新弹窗改为常驻组合时写成了
+  `info?.notes.ifEmpty { ... }`（可空接收者直接调 ifEmpty，非法 Kotlin）；
+  已改为 `info?.notes?.ifEmpty { null } ?: "…"`。此前粘贴的「WindowDialog 缺
+  NavigationEventDispatcherOwner」是运行时崩溃分析，与编译报错是两件事，后者已由
+  activity-compose 1.12.4 升级覆盖。
+
 ## 构建环境（aarch64 PRoot 容器）
 - Gradle 8.14.2 缓存已就绪；JDK: /opt/taixu/toolchains/android/jdk；AAPT2 ARM64 在 build-tools/35.0.0。
 - `gradle.properties` 需含 `android.builder.sdkDownload=false`；AAPT2 override 参数：`-Pandroid.aapt2FromMavenOverride=$TAIXU_AAPT2_PATH`。
