@@ -10,20 +10,22 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
-import androidx.compose.material.icons.filled.Add
-import androidx.compose.material3.Icon
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Text
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import dev.aigw.app.ui.providers.ProviderUiRegistry
+import top.yukonga.miuix.kmp.basic.Icon
+import top.yukonga.miuix.kmp.basic.Text
+import top.yukonga.miuix.kmp.icon.MiuixIcons
+import top.yukonga.miuix.kmp.icon.extended.Add
+import top.yukonga.miuix.kmp.icon.extended.ChevronForward
+import top.yukonga.miuix.kmp.theme.MiuixTheme
 
 /**
  * 供应商列表：每个供应商一张卡片（图标、说明、账号统计、启用开关），点进详情。
@@ -41,22 +43,28 @@ fun ProviderListScreen(
         subtitle = "共 ${state.providers.size} 个",
         actions = {
             Icon(
-                Icons.Filled.Add,
+                MiuixIcons.Add,
                 contentDescription = "添加自定义供应商",
-                tint = MaterialTheme.colorScheme.primary,
+                tint = MiuixTheme.colorScheme.primary,
                 modifier = Modifier.clickable(onClick = onAddCustom).padding(6.dp),
             )
         },
     ) {
+        item {
+            Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
         if (state.providers.isEmpty()) {
-            SectionCard {
+            SectionCard(modifier = Modifier.padding(bottom = 12.dp)) {
                 EmptyHint("还没有供应商", "内置供应商会在启动时自动登记；自定义供应商可点右上角「+」添加。")
             }
-            return@PageScaffold
-        }
+        } else {
         for ((index, provider) in state.providers.withIndex()) {
             val ui = ProviderUiRegistry.of(provider.id)
-            SectionCard(modifier = Modifier.staggeredAppear(index).clickable { onOpen(provider.id) }) {
+            SectionCard(
+                modifier = Modifier
+                    .padding(bottom = 12.dp)
+                    .staggeredAppear(index)
+                    .clickable { onOpen(provider.id) },
+            ) {
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     verticalAlignment = Alignment.CenterVertically,
@@ -66,12 +74,12 @@ fun ProviderListScreen(
                     Box(
                         modifier = Modifier
                             .size(48.dp)
-                            .clip(MaterialTheme.shapes.medium)
+                            .clip(RoundedCornerShape(10.dp))
                             .background(
                                 Brush.linearGradient(
                                     listOf(
-                                        MaterialTheme.colorScheme.primaryContainer,
-                                        MaterialTheme.colorScheme.secondaryContainer,
+                                        MiuixTheme.colorScheme.primaryContainer,
+                                        MiuixTheme.colorScheme.secondaryContainer,
                                     ),
                                 ),
                             ),
@@ -82,55 +90,58 @@ fun ProviderListScreen(
                     Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(3.dp)) {
                         Text(
                             text = provider.displayName,
-                            style = MaterialTheme.typography.titleMedium,
+                            style = MiuixTheme.textStyles.headline2,
                             fontWeight = FontWeight.SemiBold,
                         )
                         Text(
                             text = ui?.description() ?: provider.id,
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            style = MiuixTheme.textStyles.footnote1,
+                            color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
                         )
                         // 账号统计胶囊
                         Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                             AccountBadge(
                                 text = "账号 ${provider.accountCount}",
-                                color = MaterialTheme.colorScheme.surfaceVariant,
-                                textColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                                color = MiuixTheme.colorScheme.surfaceVariant,
+                                textColor = MiuixTheme.colorScheme.onSurfaceVariantSummary,
                             )
                             if (provider.usableCount > 0) {
                                 AccountBadge(
                                     text = "可用 ${provider.usableCount}",
-                                    color = MaterialTheme.colorScheme.tertiaryContainer,
-                                    textColor = MaterialTheme.colorScheme.onTertiaryContainer,
+                                    color = MiuixTheme.colorScheme.tertiaryContainer,
+                                    textColor = MiuixTheme.colorScheme.onTertiaryContainer,
                                 )
                             } else {
                                 AccountBadge(
                                     text = "不可用",
-                                    color = MaterialTheme.colorScheme.errorContainer,
-                                    textColor = MaterialTheme.colorScheme.onErrorContainer,
+                                    color = MiuixTheme.colorScheme.errorContainer,
+                                    textColor = MiuixTheme.colorScheme.onErrorContainer,
                                 )
                             }
                         }
                     }
                     Icon(
-                        Icons.AutoMirrored.Filled.KeyboardArrowRight,
+                        MiuixIcons.ChevronForward,
                         contentDescription = null,
-                        tint = MaterialTheme.colorScheme.primary,
+                        tint = MiuixTheme.colorScheme.primary,
                     )
                 }
+            }
+        }
+        }
             }
         }
     }
 }
 
 @Composable
-private fun AccountBadge(text: String, color: androidx.compose.ui.graphics.Color, textColor: androidx.compose.ui.graphics.Color) {
+private fun AccountBadge(text: String, color: Color, textColor: Color) {
     Box(
         modifier = Modifier
             .clip(CircleShape)
             .background(color)
             .padding(horizontal = 8.dp, vertical = 3.dp),
     ) {
-        Text(text, style = MaterialTheme.typography.labelSmall, color = textColor)
+        Text(text, style = MiuixTheme.textStyles.footnote2, color = textColor)
     }
 }

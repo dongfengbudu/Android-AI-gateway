@@ -11,13 +11,6 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.filled.Edit
-import androidx.compose.material3.Icon
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Switch
-import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -30,6 +23,12 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import dev.aigw.app.ui.providers.ProviderUiActions
 import dev.aigw.app.ui.providers.ProviderUiRegistry
+import top.yukonga.miuix.kmp.basic.Icon
+import top.yukonga.miuix.kmp.basic.Switch
+import top.yukonga.miuix.kmp.basic.Text
+import top.yukonga.miuix.kmp.icon.MiuixIcons
+import top.yukonga.miuix.kmp.icon.extended.Edit
+import top.yukonga.miuix.kmp.theme.MiuixTheme
 /**
  * 供应商详情：登录入口 + 账号列表 + 专属设置。
  *
@@ -124,21 +123,14 @@ fun ProviderDetailScreen(
         title = info?.displayName ?: providerId,
         subtitle = "${accounts.size} 个账号 · 可用 ${accounts.count { it.usable }}",
         leading = {
-            Icon(
-                Icons.AutoMirrored.Filled.ArrowBack,
-                contentDescription = "返回",
-                tint = MaterialTheme.colorScheme.onBackground,
-                modifier = Modifier
-                    .clickable(onClick = onBack)
-                    .padding(6.dp),
-            )
+            BackButton(onBack)
         },
         actions = {
             if (providerId.startsWith(ProviderUiRegistry.CUSTOM_PREFIX)) {
                 Icon(
-                    Icons.Filled.Edit,
+                    MiuixIcons.Edit,
                     contentDescription = "编辑供应商",
-                    tint = MaterialTheme.colorScheme.primary,
+                    tint = MiuixTheme.colorScheme.primary,
                     modifier = Modifier
                         .clickable { onEditCustom(providerId) }
                         .padding(6.dp),
@@ -146,6 +138,8 @@ fun ProviderDetailScreen(
             }
         },
     ) {
+        item {
+            Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
         // LoginEntry 自带卡片，这里不再包一层，避免双层卡片
         ui.LoginEntry(accounts, actions)
 
@@ -162,6 +156,8 @@ fun ProviderDetailScreen(
 
         ui.SettingsSection(viewModel.providerSettings(providerId)) { updated ->
             viewModel.updateProviderSettings(providerId, updated)
+        }
+            }
         }
     }
 }
@@ -184,14 +180,14 @@ private fun AccountRow(
             Column(Modifier.weight(1f)) {
                 Text(
                     text = account.nickname.ifEmpty { account.uid },
-                    style = MaterialTheme.typography.titleSmall,
+                    style = MiuixTheme.textStyles.body2,
                     fontWeight = FontWeight.SemiBold,
                 )
                 // 额度与明细交给各供应商自己的组件展示（它们知道该怎么解读），这里只报状态
                 Text(
                     text = accountStatusText(account),
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    style = MiuixTheme.textStyles.footnote1,
+                    color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
                 )
             }
             Switch(
@@ -212,8 +208,8 @@ private fun AccountRow(
 private fun LinkText(text: String, onClick: () -> Unit) {
     Text(
         text = text,
-        style = MaterialTheme.typography.labelLarge,
-        color = MaterialTheme.colorScheme.primary,
+        style = MiuixTheme.textStyles.footnote1,
+        color = MiuixTheme.colorScheme.primary,
         modifier = Modifier.clickable(onClick = onClick),
     )
 }

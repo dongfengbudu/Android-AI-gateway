@@ -2,15 +2,12 @@ package dev.aigw.app.ui
 
 import android.widget.Toast
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.ui.unit.dp
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.Switch
-import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -21,6 +18,9 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.AnnotatedString
+import top.yukonga.miuix.kmp.basic.Switch
+import top.yukonga.miuix.kmp.basic.Text
+import top.yukonga.miuix.kmp.basic.TextField
 
 /** 接入设置：客户端要用的地址、端口与网关鉴权 Key。 */
 @OptIn(ExperimentalLayoutApi::class)
@@ -37,6 +37,8 @@ fun ApiSettingsScreen(state: AppUiState, viewModel: AppViewModel, onBack: () -> 
         subtitle = "端口与 API Key",
         leading = { BackButton(onBack) },
     ) {
+        item {
+            Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
         SectionCard(enterIndex = 0) {
             SectionLabel("接入地址")
             AddressTile(state.localUrl.ifEmpty { "http://127.0.0.1:${settings.port}/v1" }) {
@@ -53,10 +55,10 @@ fun ApiSettingsScreen(state: AppUiState, viewModel: AppViewModel, onBack: () -> 
 
         SectionCard(enterIndex = 1) {
             SectionLabel("端口")
-            OutlinedTextField(
+            TextField(
                 value = port,
                 onValueChange = { port = it.filter(Char::isDigit).take(5) },
-                label = { Text("监听端口") },
+                label = "监听端口",
                 singleLine = true,
                 modifier = Modifier.fillMaxWidth(),
             )
@@ -74,10 +76,10 @@ fun ApiSettingsScreen(state: AppUiState, viewModel: AppViewModel, onBack: () -> 
 
         SectionCard(enterIndex = 2) {
             SectionLabel("API Key")
-            OutlinedTextField(
+            TextField(
                 value = apiKey,
                 onValueChange = { apiKey = it },
-                label = { Text("网关鉴权 Key（留空表示不校验）") },
+                label = "网关鉴权 Key（留空表示不校验）",
                 singleLine = true,
                 modifier = Modifier.fillMaxWidth(),
             )
@@ -119,6 +121,8 @@ fun ApiSettingsScreen(state: AppUiState, viewModel: AppViewModel, onBack: () -> 
                     viewModel.updateSettings(settings.copy(port = parsed, apiKey = apiKey.trim()))
                     viewModel.notice("已保存；端口改动需重启服务生效")
                 }
+            }
+        }
             }
         }
     }

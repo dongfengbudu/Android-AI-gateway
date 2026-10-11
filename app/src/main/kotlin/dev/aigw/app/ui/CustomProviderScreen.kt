@@ -1,15 +1,10 @@
 package dev.aigw.app.ui
 
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material3.Icon
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.Switch
-import androidx.compose.material3.Text
+import androidx.compose.foundation.layout.padding
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -18,11 +13,11 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
-import androidx.compose.foundation.clickable
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.padding
 import dev.aigw.core.gateway.CustomProviderConfig
+import top.yukonga.miuix.kmp.basic.Switch
+import top.yukonga.miuix.kmp.basic.Text
+import top.yukonga.miuix.kmp.basic.TextField
+import top.yukonga.miuix.kmp.theme.MiuixTheme
 
 /**
  * 自定义供应商的新建/编辑。
@@ -45,49 +40,54 @@ fun CustomProviderScreen(
         title = if (existing == null) "新建供应商" else "编辑供应商",
         subtitle = "OpenAI 兼容接口",
         leading = {
-            Icon(
-                Icons.AutoMirrored.Filled.ArrowBack,
-                contentDescription = "返回",
-                tint = MaterialTheme.colorScheme.onBackground,
-                modifier = Modifier.clickable(onClick = onBack).padding(6.dp),
-            )
+            BackButton(onBack)
         },
     ) {
+        item {
+            Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
         SectionCard {
             SectionLabel("基本信息")
-            OutlinedTextField(
+            TextField(
                 value = name,
                 onValueChange = { name = it },
-                label = { Text("名称") },
+                label = "名称",
                 singleLine = true,
-                modifier = Modifier.fillMaxWidth(),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(top = 12.dp),
             )
-            OutlinedTextField(
+            TextField(
                 value = key,
                 onValueChange = { key = it.trim() },
-                label = { Text("短名（用于模型前缀 custom:<短名>）") },
+                label = "短名（用于模型前缀 custom:<短名>）",
                 singleLine = true,
                 enabled = existing == null,
-                modifier = Modifier.fillMaxWidth(),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(top = 10.dp),
             )
-            OutlinedTextField(
+            TextField(
                 value = baseUrl,
                 onValueChange = { baseUrl = it.trim() },
-                label = { Text("接口地址（到 /v1，或直接写 /v1/chat/completions）") },
+                label = "接口地址（到 /v1，或直接写 /v1/chat/completions）",
                 singleLine = true,
-                modifier = Modifier.fillMaxWidth(),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(top = 10.dp),
             )
             Row(
-                modifier = Modifier.fillMaxWidth(),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(top = 12.dp),
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(12.dp),
             ) {
-                Text("启用", style = MaterialTheme.typography.bodyMedium)
+                Text("启用", style = MiuixTheme.textStyles.body2)
                 Switch(checked = enabled, onCheckedChange = { enabled = it })
             }
         }
 
-        SectionCard {
+        SectionCard(modifier = Modifier.padding(top = 12.dp)) {
             OutlineActionButton("保存") {
                 onSave(
                     CustomProviderConfig(
@@ -101,7 +101,9 @@ fun CustomProviderScreen(
                 )
             }
             if (existing != null && onDelete != null) {
-                OutlineActionButton("删除该供应商") { onDelete(existing.key) }
+                OutlineActionButton("删除该供应商", modifier = Modifier.padding(top = 10.dp)) { onDelete(existing.key) }
+            }
+        }
             }
         }
     }

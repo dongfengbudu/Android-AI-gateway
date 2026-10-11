@@ -13,30 +13,16 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.CloudDownload
-import androidx.compose.material.icons.filled.Dns
-import androidx.compose.material.icons.filled.ExpandLess
-import androidx.compose.material.icons.filled.ExpandMore
-import androidx.compose.material3.Button
-import androidx.compose.material3.Checkbox
-import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.Icon
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.ModalBottomSheet
-import androidx.compose.material3.OutlinedButton
-import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.Switch
-import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
 import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.state.ToggleableState
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import dev.aigw.app.ui.ChoiceChip
@@ -48,6 +34,21 @@ import dev.aigw.app.ui.accountStatusText
 import dev.aigw.app.ui.providers.ProviderUi
 import dev.aigw.app.ui.providers.ProviderUiActions
 import dev.aigw.core.pool.AccountStatus
+import top.yukonga.miuix.kmp.basic.Button
+import top.yukonga.miuix.kmp.basic.ButtonDefaults
+import top.yukonga.miuix.kmp.basic.Checkbox
+import top.yukonga.miuix.kmp.basic.Icon
+import top.yukonga.miuix.kmp.basic.Switch
+import top.yukonga.miuix.kmp.basic.Text
+import top.yukonga.miuix.kmp.basic.TextButton
+import top.yukonga.miuix.kmp.basic.TextField
+import top.yukonga.miuix.kmp.icon.MiuixIcons
+import top.yukonga.miuix.kmp.icon.extended.Download
+import top.yukonga.miuix.kmp.icon.extended.ExpandLess
+import top.yukonga.miuix.kmp.icon.extended.ExpandMore
+import top.yukonga.miuix.kmp.icon.extended.Layers
+import top.yukonga.miuix.kmp.theme.MiuixTheme
+import top.yukonga.miuix.kmp.window.WindowBottomSheet
 
 class CustomUi(override val id: String) : ProviderUi {
 
@@ -59,9 +60,9 @@ class CustomUi(override val id: String) : ProviderUi {
     @Composable
     override fun Icon(modifier: Modifier) {
         Icon(
-            Icons.Filled.Dns,
+            MiuixIcons.Layers,
             contentDescription = null,
-            tint = MaterialTheme.colorScheme.primary,
+            tint = MiuixTheme.colorScheme.primary,
             modifier = modifier,
         )
     }
@@ -85,29 +86,36 @@ class CustomUi(override val id: String) : ProviderUi {
                 Button(
                     onClick = { expanded = true },
                     modifier = Modifier.fillMaxWidth(),
+                    colors = ButtonDefaults.buttonColorsPrimary(),
                 ) { Text("添加账号") }
                 return@SectionCard
             }
             SectionLabel("添加账号")
             var nickname by remember { mutableStateOf("") }
             var apiKey by remember { mutableStateOf("") }
-            OutlinedTextField(
+            TextField(
                 value = nickname,
                 onValueChange = { nickname = it },
-                label = { Text("名称（可选，默认用供应商名）") },
+                label = "名称（可选，默认用供应商名）",
                 singleLine = true,
-                modifier = Modifier.fillMaxWidth(),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(top = 12.dp),
             )
-            OutlinedTextField(
+            TextField(
                 value = apiKey,
                 onValueChange = { apiKey = it },
-                label = { Text("API Key") },
+                label = "API Key",
                 singleLine = true,
-                modifier = Modifier.fillMaxWidth(),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(top = 10.dp),
             )
             ModelsSection(accounts, actions, apiKey.trim(), models, onFetched = { fetchedModels = it }) { models = it }
             Row(
-                modifier = Modifier.fillMaxWidth(),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(top = 12.dp),
                 horizontalArrangement = Arrangement.spacedBy(10.dp),
             ) {
                 Button(
@@ -124,11 +132,13 @@ class CustomUi(override val id: String) : ProviderUi {
                     },
                     enabled = apiKey.isNotBlank(),
                     modifier = Modifier.weight(1f),
+                    colors = ButtonDefaults.buttonColorsPrimary(),
                 ) { Text("添加账号") }
-                OutlinedButton(
+                TextButton(
+                    text = "取消",
                     onClick = { expanded = false },
                     modifier = Modifier.weight(1f),
-                ) { Text("取消") }
+                )
             }
         }
         fetchedModels?.let { fetched ->
@@ -157,7 +167,9 @@ class CustomUi(override val id: String) : ProviderUi {
     ) {
         var loading by remember { mutableStateOf(false) }
         Row(
-            modifier = Modifier.fillMaxWidth(),
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(top = 12.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
             SectionLabel("模型")
@@ -190,29 +202,30 @@ class CustomUi(override val id: String) : ProviderUi {
                 horizontalArrangement = Arrangement.spacedBy(6.dp),
             ) {
                 Icon(
-                    Icons.Filled.CloudDownload,
+                    MiuixIcons.Download,
                     contentDescription = null,
-                    tint = MaterialTheme.colorScheme.primary,
+                    tint = MiuixTheme.colorScheme.primary,
                     modifier = Modifier.size(20.dp),
                 )
                 Text(
                     text = if (loading) "拉取中..." else "拉取模型",
-                    style = MaterialTheme.typography.labelLarge,
-                    color = MaterialTheme.colorScheme.primary,
+                    style = MiuixTheme.textStyles.footnote1,
+                    color = MiuixTheme.colorScheme.primary,
                 )
             }
         }
-        OutlinedTextField(
+        TextField(
             value = models,
             onValueChange = onModelsChange,
-            label = { Text("一行一个模型 id（随账号一起保存）") },
+            label = "一行一个模型 id（随账号一起保存）",
             minLines = 3,
-            modifier = Modifier.fillMaxWidth(),
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(top = 10.dp),
         )
     }
 
     /** 拉取成功后的模型勾选弹层：搜索过滤、整行点选，保存时把选中项写回模型输入框。 */
-    @OptIn(ExperimentalMaterial3Api::class)
     @Composable
     private fun ModelPickerSheet(
         fetched: List<String>,
@@ -227,38 +240,35 @@ class CustomUi(override val id: String) : ProviderUi {
         var search by remember { mutableStateOf("") }
         val selectedCount = selected.values.count { it }
         val filtered = fetched.filter { it.contains(search, ignoreCase = true) }
-        ModalBottomSheet(onDismissRequest = onDismiss) {
+        WindowBottomSheet(
+            show = true,
+            title = "选择模型",
+            endAction = {
+                Text(
+                    text = "已选 $selectedCount 个",
+                    style = MiuixTheme.textStyles.footnote1,
+                    color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
+                )
+            },
+            onDismissRequest = onDismiss,
+        ) {
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(horizontal = 20.dp)
-                    .padding(bottom = 24.dp),
+                    .padding(top = 4.dp),
             ) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Text(
-                        text = "选择模型",
-                        style = MaterialTheme.typography.titleMedium,
-                        fontWeight = FontWeight.SemiBold,
-                    )
-                    Spacer(Modifier.weight(1f))
-                    Text(
-                        text = "已选 $selectedCount 个",
-                        style = MaterialTheme.typography.labelMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                }
-                OutlinedTextField(
+                TextField(
                     value = search,
                     onValueChange = { search = it },
-                    label = { Text("搜索模型") },
+                    label = "搜索模型",
                     singleLine = true,
                     modifier = Modifier.fillMaxWidth(),
                 )
                 LazyColumn(
                     modifier = Modifier
-                        .weight(1f)
                         .fillMaxWidth()
-                        .heightIn(min = 240.dp),
+                        .padding(top = 10.dp)
+                        .heightIn(min = 240.dp, max = 420.dp),
                 ) {
                     if (filtered.isEmpty()) {
                         item { EmptyHint("没有匹配的模型", "换个关键词试试") }
@@ -270,10 +280,10 @@ class CustomUi(override val id: String) : ProviderUi {
                                     .clickable { selected[model] = !(selected[model] ?: false) },
                                 verticalAlignment = Alignment.CenterVertically,
                             ) {
-                                Text(model, style = MaterialTheme.typography.titleSmall, modifier = Modifier.weight(1f))
+                                Text(model, style = MiuixTheme.textStyles.body2, modifier = Modifier.weight(1f))
                                 Checkbox(
-                                    checked = selected[model] == true,
-                                    onCheckedChange = { checked -> selected[model] = checked },
+                                    state = ToggleableState(selected[model] == true),
+                                    onClick = { selected[model] = !(selected[model] ?: false) },
                                 )
                             }
                         }
@@ -284,6 +294,7 @@ class CustomUi(override val id: String) : ProviderUi {
                     onClick = { onConfirm(selected.filterValues { it }.keys.sorted()) },
                     enabled = selectedCount > 0,
                     modifier = Modifier.fillMaxWidth(),
+                    colors = ButtonDefaults.buttonColorsPrimary(),
                 ) { Text("保存所选 $selectedCount 个") }
             }
         }
@@ -303,19 +314,19 @@ class CustomUi(override val id: String) : ProviderUi {
                 Column(Modifier.weight(1f)) {
                     Text(
                         text = account.nickname.ifEmpty { account.uid },
-                        style = MaterialTheme.typography.titleSmall,
+                        style = MiuixTheme.textStyles.body2,
                         fontWeight = FontWeight.SemiBold,
                     )
                     Text(
                         text = accountStatusText(account),
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        style = MiuixTheme.textStyles.footnote1,
+                        color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
                     )
                 }
                 Icon(
-                    if (expanded) Icons.Filled.ExpandLess else Icons.Filled.ExpandMore,
+                    if (expanded) MiuixIcons.ExpandLess else MiuixIcons.ExpandMore,
                     contentDescription = if (expanded) "收起" else "展开",
-                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                    tint = MiuixTheme.colorScheme.onSurfaceVariantSummary,
                 )
             }
             if (expanded) {
@@ -329,10 +340,10 @@ class CustomUi(override val id: String) : ProviderUi {
         var nickname by remember(account.uid, account.nickname) { mutableStateOf(account.nickname) }
 
         Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            OutlinedTextField(
+            TextField(
                 value = nickname,
                 onValueChange = { nickname = it },
-                label = { Text("名称") },
+                label = "名称",
                 singleLine = true,
                 modifier = Modifier.fillMaxWidth(),
             )
@@ -352,14 +363,14 @@ class CustomUi(override val id: String) : ProviderUi {
             }
             Text(
                 text = "额度 ${if (account.creditsKnown) account.credits.toString() else "—"}",
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.primary,
+                style = MiuixTheme.textStyles.body2,
+                color = MiuixTheme.colorScheme.primary,
             )
             if (account.detail.isNotEmpty()) {
                 Text(
                     text = account.detail,
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    style = MiuixTheme.textStyles.footnote1,
+                    color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
                 )
             }
             Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {

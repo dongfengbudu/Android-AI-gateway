@@ -15,14 +15,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Refresh
-import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.ModalBottomSheet
-import androidx.compose.material3.Text
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -41,6 +34,13 @@ import androidx.compose.ui.unit.dp
 import dev.aigw.core.usage.CallRecord
 import dev.aigw.core.usage.CallStatus
 import kotlinx.coroutines.delay
+import top.yukonga.miuix.kmp.basic.Icon
+import top.yukonga.miuix.kmp.basic.IconButton
+import top.yukonga.miuix.kmp.basic.Text
+import top.yukonga.miuix.kmp.icon.MiuixIcons
+import top.yukonga.miuix.kmp.icon.extended.Refresh
+import top.yukonga.miuix.kmp.theme.MiuixTheme
+import top.yukonga.miuix.kmp.window.WindowBottomSheet
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
@@ -51,7 +51,6 @@ private enum class StatusFilter(val label: String) {
     ALL("全部"), SUCCESS("成功"), FAILED("失败"), ABORTED("中断"),
 }
 
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun LogsScreen(state: AppUiState, viewModel: AppViewModel) {
     var tab by remember { mutableStateOf(LogTab.Calls) }
@@ -80,13 +79,13 @@ fun LogsScreen(state: AppUiState, viewModel: AppViewModel) {
     // 本页自带骨架：筛选区固定在顶部，列表用 LazyColumn 懒加载。
     // 记录最多数百条、每条含大段原文，一次性组合全部卡片会明显卡顿；
     // 而 LazyColumn 不能嵌在 PageScaffold 的 verticalScroll 里（无限高度约束会崩），所以这里不走 PageScaffold。
-    Column(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
+    Column(Modifier.fillMaxSize().background(MiuixTheme.colorScheme.background)) {
         PageHeader(
             title = "记录",
             subtitle = "调用与请求日志",
             actions = {
                 IconButton(onClick = { viewModel.refresh() }) {
-                    Icon(Icons.Filled.Refresh, contentDescription = "刷新")
+                    Icon(MiuixIcons.Refresh, contentDescription = "刷新")
                 }
                 StatusChip(state.running)
             },
@@ -103,7 +102,7 @@ fun LogsScreen(state: AppUiState, viewModel: AppViewModel) {
             if (tab == LogTab.Calls) {
                 Text(
                     text = "共 ${state.calls.size} 条记录",
-                    style = MaterialTheme.typography.titleMedium,
+                    style = MiuixTheme.textStyles.headline2,
                     fontWeight = FontWeight.SemiBold,
                 )
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -113,19 +112,19 @@ fun LogsScreen(state: AppUiState, viewModel: AppViewModel) {
                 }
                 Text(
                     text = "点卡片看原文 · 长按删除 · 停留本页自动刷新",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    style = MiuixTheme.textStyles.footnote1,
+                    color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
                 )
             } else {
                 Text(
                     text = "共 ${state.logs.size} 条日志",
-                    style = MaterialTheme.typography.titleMedium,
+                    style = MiuixTheme.textStyles.headline2,
                     fontWeight = FontWeight.SemiBold,
                 )
                 Text(
                     text = "网关与上游交互的流水，仅保留最近若干条。",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    style = MiuixTheme.textStyles.footnote1,
+                    color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
                 )
             }
         }
@@ -164,8 +163,7 @@ fun LogsScreen(state: AppUiState, viewModel: AppViewModel) {
                         SectionCard {
                             Text(
                                 text = line.render(),
-                                style = MaterialTheme.typography.bodySmall,
-                                fontFamily = FontFamily.Monospace,
+                                style = MiuixTheme.textStyles.footnote1.copy(fontFamily = FontFamily.Monospace),
                                 modifier = Modifier.fillMaxWidth().padding(vertical = 2.dp),
                             )
                         }
@@ -175,8 +173,12 @@ fun LogsScreen(state: AppUiState, viewModel: AppViewModel) {
         }
     }
 
-    detail?.let { record ->
-        ModalBottomSheet(onDismissRequest = { detail = null }) {
+    WindowBottomSheet(
+        show = detail != null,
+        title = "调用详情",
+        onDismissRequest = { detail = null },
+    ) {
+        detail?.let { record ->
             CallDetailSheet(record)
         }
     }
@@ -195,12 +197,12 @@ private fun CallRow(record: CallRecord, onClick: () -> Unit, onLongClick: () -> 
         Row(verticalAlignment = Alignment.CenterVertically) {
             Text(
                 text = record.model.ifEmpty { "未指定模型" },
-                style = MaterialTheme.typography.titleMedium,
+                style = MiuixTheme.textStyles.headline2,
                 modifier = Modifier.weight(1f),
             )
             Text(
                 text = statusLabel(record.status),
-                style = MaterialTheme.typography.labelSmall,
+                style = MiuixTheme.textStyles.footnote2,
                 color = statusColor(record.status),
             )
         }
@@ -214,14 +216,14 @@ private fun CallRow(record: CallRecord, onClick: () -> Unit, onLongClick: () -> 
                 if (record.pointsConsumed > 0) append(" · 消耗 ${record.pointsConsumed} 积分")
                 if (record.accountNickname.isNotEmpty()) append(" · ${record.accountNickname}")
             },
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            style = MiuixTheme.textStyles.footnote1,
+            color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
         )
         if (record.error.isNotEmpty()) {
             Text(
                 text = record.error,
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.error,
+                style = MiuixTheme.textStyles.footnote1,
+                color = MiuixTheme.colorScheme.error,
                 maxLines = 2,
             )
         }
@@ -235,11 +237,11 @@ private fun CallDetailSheet(record: CallRecord) {
         modifier = Modifier.fillMaxWidth().padding(horizontal = 20.dp).padding(bottom = 28.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
-        Text(record.id, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
+        Text(record.id, style = MiuixTheme.textStyles.headline2, fontWeight = FontWeight.SemiBold)
         Text(
             text = "${TIME_FORMAT.format(Date(record.startedAtMillis))} · ${statusLabel(record.status)} · HTTP ${record.httpStatus}",
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            style = MiuixTheme.textStyles.footnote1,
+            color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
         )
         DetailBlock("请求原文", record.requestBody) { clipboard.setText(AnnotatedString(record.requestBody)) }
         DetailBlock("响应原文", record.responseBody) { clipboard.setText(AnnotatedString(record.responseBody)) }
@@ -254,26 +256,25 @@ private fun CallDetailSheet(record: CallRecord) {
 private fun DetailBlock(title: String, body: String, onCopy: () -> Unit) {
     Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
         Row(verticalAlignment = Alignment.CenterVertically) {
-            Text(title, style = MaterialTheme.typography.titleSmall, modifier = Modifier.weight(1f))
+            Text(title, style = MiuixTheme.textStyles.body2, modifier = Modifier.weight(1f))
             Text(
                 text = "复制",
-                style = MaterialTheme.typography.labelMedium,
-                color = MaterialTheme.colorScheme.primary,
+                style = MiuixTheme.textStyles.footnote1,
+                color = MiuixTheme.colorScheme.primary,
                 modifier = Modifier
                     .clip(CircleShape)
-                    .background(MaterialTheme.colorScheme.surfaceVariant)
+                    .background(MiuixTheme.colorScheme.surfaceVariant)
                     .clickable(onClick = onCopy)
                     .padding(horizontal = 10.dp, vertical = 4.dp),
             )
         }
         Text(
             text = body.ifEmpty { "（空）" },
-            style = MaterialTheme.typography.bodySmall,
-            fontFamily = FontFamily.Monospace,
+            style = MiuixTheme.textStyles.footnote1.copy(fontFamily = FontFamily.Monospace),
             modifier = Modifier
                 .fillMaxWidth()
-                .clip(MaterialTheme.shapes.medium)
-                .background(MaterialTheme.colorScheme.surfaceVariant)
+                .clip(RoundedCornerShape(10.dp))
+                .background(MiuixTheme.colorScheme.surfaceVariant)
                 .padding(12.dp),
         )
     }
@@ -287,8 +288,8 @@ private fun statusLabel(status: CallStatus): String = when (status) {
 
 @Composable
 private fun statusColor(status: CallStatus): Color = when (status) {
-    CallStatus.SUCCESS -> MaterialTheme.colorScheme.tertiary
-    CallStatus.FAILED -> MaterialTheme.colorScheme.error
+    CallStatus.SUCCESS -> MiuixTheme.colorScheme.onTertiaryContainer
+    CallStatus.FAILED -> MiuixTheme.colorScheme.error
     CallStatus.ABORTED -> Color(0xFFC97F0A)
 }
 

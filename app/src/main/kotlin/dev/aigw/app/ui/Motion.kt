@@ -22,7 +22,6 @@ import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.gestures.waitForUpOrCancellation
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -38,6 +37,8 @@ import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.unit.dp
+
+import top.yukonga.miuix.kmp.theme.MiuixTheme
 
 /** 全局动效参数：一处调整全局生效。 */
 object Motion {
@@ -155,8 +156,8 @@ fun Modifier.bouncyClick(
 @Composable
 fun Modifier.shimmer(
     shape: Shape = RoundedCornerShape(4.dp),
-    baseColor: Color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.45f),
-    highlightColor: Color = MaterialTheme.colorScheme.surface.copy(alpha = 0.85f),
+    baseColor: Color = MiuixTheme.colorScheme.surfaceVariant.copy(alpha = 0.45f),
+    highlightColor: Color = MiuixTheme.colorScheme.surface.copy(alpha = 0.85f),
 ): Modifier {
     val transition = rememberInfiniteTransition(label = "shimmerTransition")
     val translateAnim by transition.animateFloat(

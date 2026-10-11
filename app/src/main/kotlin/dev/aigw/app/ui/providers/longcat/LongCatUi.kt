@@ -1,17 +1,9 @@
 package dev.aigw.app.ui.providers.longcat
 
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Pets
-import androidx.compose.material3.Button
-import androidx.compose.material3.Icon
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
-import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.Text
+import androidx.compose.foundation.layout.padding
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -26,6 +18,15 @@ import dev.aigw.app.ui.accountStatusText
 import dev.aigw.app.ui.providers.ProviderUi
 import dev.aigw.app.ui.providers.ProviderUiActions
 import dev.aigw.core.pool.AccountStatus
+import top.yukonga.miuix.kmp.basic.Button
+import top.yukonga.miuix.kmp.basic.ButtonDefaults
+import top.yukonga.miuix.kmp.basic.Icon
+import top.yukonga.miuix.kmp.basic.Text
+import top.yukonga.miuix.kmp.basic.TextButton
+import top.yukonga.miuix.kmp.basic.TextField
+import top.yukonga.miuix.kmp.icon.MiuixIcons
+import top.yukonga.miuix.kmp.icon.extended.Favorites
+import top.yukonga.miuix.kmp.theme.MiuixTheme
 
 /**
  * LongCat（美团龙猫）界面组件。
@@ -44,9 +45,9 @@ object LongCatUi : ProviderUi {
     @Composable
     override fun Icon(modifier: Modifier) {
         Icon(
-            Icons.Filled.Pets,
+            MiuixIcons.Favorites,
             contentDescription = null,
-            tint = MaterialTheme.colorScheme.primary,
+            tint = MiuixTheme.colorScheme.primary,
             modifier = modifier,
         )
     }
@@ -71,10 +72,12 @@ object LongCatUi : ProviderUi {
                     actions.onImport(id, """{"cookie":"","nickname":"免登录通道","uid":"anonymous"}""")
                 },
                 modifier = Modifier.fillMaxWidth(),
+                colors = ButtonDefaults.buttonColorsPrimary(),
             ) { Text("添加免登录账号") }
 
             if (!expanded) {
-                OutlinedButton(
+                TextButton(
+                    text = "网页登录（推荐）",
                     onClick = {
                         // 内嵌网页登录：打开 longcat.chat，用户登录完由宿主读 Cookie
                         actions.onCookieLogin(
@@ -84,12 +87,17 @@ object LongCatUi : ProviderUi {
                             "登录 LongCat",
                         )
                     },
-                    modifier = Modifier.fillMaxWidth(),
-                ) { Text("网页登录（推荐）") }
-                OutlinedButton(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(top = 10.dp),
+                )
+                TextButton(
+                    text = "手动粘贴 Cookie",
                     onClick = { expanded = true },
-                    modifier = Modifier.fillMaxWidth(),
-                ) { Text("手动粘贴 Cookie") }
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(top = 10.dp),
+                )
                 return@SectionCard
             }
 
@@ -97,19 +105,24 @@ object LongCatUi : ProviderUi {
             Text(
                 "浏览器打开 longcat.chat 登录后，从开发者工具里复制整段 Cookie " +
                     "（至少要有 passport_token_key）。",
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                style = MiuixTheme.textStyles.footnote1,
+                color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
+                modifier = Modifier.padding(top = 12.dp),
             )
-            OutlinedTextField(
+            TextField(
                 value = cookie,
                 onValueChange = { cookie = it },
-                label = { Text("Cookie") },
+                label = "Cookie",
                 minLines = 3,
                 maxLines = 8,
-                modifier = Modifier.fillMaxWidth(),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(top = 10.dp),
             )
             Row(
-                modifier = Modifier.fillMaxWidth(),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(top = 12.dp),
                 horizontalArrangement = Arrangement.spacedBy(10.dp),
             ) {
                 Button(
@@ -120,11 +133,13 @@ object LongCatUi : ProviderUi {
                     },
                     enabled = cookie.isNotBlank(),
                     modifier = Modifier.weight(1f),
+                    colors = ButtonDefaults.buttonColorsPrimary(),
                 ) { Text("导入") }
-                OutlinedButton(
+                TextButton(
+                    text = "取消",
                     onClick = { expanded = false },
                     modifier = Modifier.weight(1f),
-                ) { Text("取消") }
+                )
             }
         }
     }
@@ -134,33 +149,37 @@ object LongCatUi : ProviderUi {
         SectionCard {
             Text(
                 status.nickname.ifEmpty { status.uid },
-                style = MaterialTheme.typography.titleSmall,
+                style = MiuixTheme.textStyles.body2,
             )
             Text(
                 accountStatusText(status),
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                style = MiuixTheme.textStyles.footnote1,
+                color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
             )
             val region = actions.regionOf(id, status.uid)
             if (region.isNotEmpty()) {
                 Text(
                     if (region == "cn") "通道：Cookie 登录" else "通道：免登录",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    style = MiuixTheme.textStyles.footnote1,
+                    color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
                 )
             }
             Row(
-                modifier = Modifier.fillMaxWidth(),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(top = 12.dp),
                 horizontalArrangement = Arrangement.spacedBy(10.dp),
             ) {
-                OutlinedButton(
+                TextButton(
+                    text = "刷新",
                     onClick = { actions.onRefreshCredits(id, status.uid) },
                     modifier = Modifier.weight(1f),
-                ) { Text("刷新") }
-                OutlinedButton(
+                )
+                TextButton(
+                    text = "删除",
                     onClick = { actions.onRemoveAccount(id, status.uid) },
                     modifier = Modifier.weight(1f),
-                ) { Text("删除") }
+                )
             }
         }
     }

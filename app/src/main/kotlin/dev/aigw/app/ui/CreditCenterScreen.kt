@@ -5,17 +5,17 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
-import androidx.compose.material3.Icon
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import top.yukonga.miuix.kmp.basic.Icon
+import top.yukonga.miuix.kmp.basic.Text
+import top.yukonga.miuix.kmp.icon.MiuixIcons
+import top.yukonga.miuix.kmp.icon.extended.ChevronForward
+import top.yukonga.miuix.kmp.theme.MiuixTheme
 
 /**
  * 额度中心：列出有账号的供应商，点进去看该供应商各账号的额度包明细。
@@ -27,14 +27,14 @@ fun CreditCenterScreen(state: AppUiState, onOpen: (String) -> Unit, onBack: () -
         subtitle = "按供应商查看额度包",
         leading = { BackButton(onBack) },
     ) {
+        item {
+            Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
         val providers = state.providers.filter { state.accountsOf(it.id).isNotEmpty() }
         if (providers.isEmpty()) {
             SectionCard(enterIndex = 0) {
                 EmptyHint("还没有账号", "先去「供应商」页添加账号。")
             }
-            return@PageScaffold
-        }
-
+        } else {
         for (info in providers) {
             val accounts = state.accountsOf(info.id)
             val known = accounts.filter { it.creditsKnown }
@@ -46,22 +46,25 @@ fun CreditCenterScreen(state: AppUiState, onOpen: (String) -> Unit, onBack: () -
                     Column(Modifier.weight(1f)) {
                         Text(
                             text = info.displayName,
-                            style = MaterialTheme.typography.titleMedium,
+                            style = MiuixTheme.textStyles.headline2,
                             fontWeight = FontWeight.SemiBold,
                         )
                         Text(
                             text = "${accounts.size} 个账号 · 额度合计 " +
                                 if (known.isEmpty()) "—" else known.sumOf { it.credits }.toString(),
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            style = MiuixTheme.textStyles.footnote1,
+                            color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
                         )
                     }
                     Icon(
-                        Icons.AutoMirrored.Filled.KeyboardArrowRight,
+                        MiuixIcons.ChevronForward,
                         contentDescription = null,
-                        tint = MaterialTheme.colorScheme.outline,
+                        tint = MiuixTheme.colorScheme.outline,
                     )
                 }
+            }
+        }
+        }
             }
         }
     }
@@ -88,21 +91,21 @@ fun ProviderCreditsScreen(
         subtitle = "额度包明细",
         leading = { BackButton(onBack) },
     ) {
+        item {
+            Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
         if (accounts.isEmpty()) {
             SectionCard(enterIndex = 1) {
                 EmptyHint("还没有账号", "先去该供应商页添加账号。")
             }
-            return@PageScaffold
-        }
-
+        } else {
         for (account in accounts) {
             val packs = state.creditPacks["$providerId/${account.uid}"].orEmpty()
             SectionCard(enterIndex = 2) {
                 SectionLabel(account.nickname.ifEmpty { account.uid })
                 Text(
                     text = "余额 ${if (account.creditsKnown) account.credits.toString() else "—"} · ${accountStatusText(account)}",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    style = MiuixTheme.textStyles.footnote1,
+                    color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
                 )
                 if (packs.isEmpty()) {
                     Text(
@@ -112,15 +115,15 @@ fun ProviderCreditsScreen(
                         } else {
                             "没有额度包明细"
                         },
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        style = MiuixTheme.textStyles.footnote1,
+                        color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
                     )
                 } else {
                     for (pack in packs) {
                         Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
                             Text(
                                 text = if (pack.group.isEmpty()) pack.name else "${pack.name}（${pack.group}）",
-                                style = MaterialTheme.typography.bodyMedium,
+                                style = MiuixTheme.textStyles.body2,
                             )
                             Text(
                                 text = buildString {
@@ -133,8 +136,8 @@ fun ProviderCreditsScreen(
                                     if (pack.limit > 0) append(" / ").append(pack.limit)
                                     if (pack.used > 0) append(" · 已用 ").append(pack.used)
                                 },
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                style = MiuixTheme.textStyles.footnote1,
+                                color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
                             )
                         }
                     }
@@ -143,6 +146,9 @@ fun ProviderCreditsScreen(
                     viewModel.refreshCredits(providerId, account.uid)
                     viewModel.loadCreditPacks(providerId, account.uid)
                 }
+            }
+        }
+        }
             }
         }
     }

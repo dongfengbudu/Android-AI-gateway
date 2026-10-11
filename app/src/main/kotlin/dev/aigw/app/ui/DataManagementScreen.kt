@@ -5,10 +5,6 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.text.KeyboardOptions
-import androidx.compose.material3.HorizontalDivider
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -22,6 +18,10 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import dev.aigw.core.gateway.GatewaySettings
 import dev.aigw.core.usage.StorageAudit
+import top.yukonga.miuix.kmp.basic.HorizontalDivider
+import top.yukonga.miuix.kmp.basic.Text
+import top.yukonga.miuix.kmp.basic.TextField
+import top.yukonga.miuix.kmp.theme.MiuixTheme
 
 /**
  * 数据管理：存储与清理。
@@ -44,23 +44,25 @@ fun DataManagementScreen(state: AppUiState, viewModel: AppViewModel, onBack: () 
         subtitle = "存储与清理",
         leading = { BackButton(onBack) },
     ) {
+        item {
+            Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
         SectionCard(enterIndex = 0) {
-            Text("使用记录", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
+            Text("使用记录", style = MiuixTheme.textStyles.headline2, fontWeight = FontWeight.SemiBold)
             Text(
                 text = "记录会保存每次请求的输入/输出/思考链，是应用数据体积的主要来源；服务运行时按保留天数每日自动清理。",
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                style = MiuixTheme.textStyles.footnote1,
+                color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
             )
             RetentionField(retention) { viewModel.setLogRetentionDays(it) }
-            HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+            HorizontalDivider(color = MiuixTheme.colorScheme.dividerLine)
             Text(
                 text = "当前占用 ${StorageAudit.formatSize(records)} · ${state.storedCalls} 条记录",
-                style = MaterialTheme.typography.bodyMedium,
+                style = MiuixTheme.textStyles.body2,
             )
             Text(
                 text = "自动保留 $retention 天，服务运行时会每日自动清理",
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                style = MiuixTheme.textStyles.footnote1,
+                color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
             )
         }
 
@@ -72,6 +74,8 @@ fun DataManagementScreen(state: AppUiState, viewModel: AppViewModel, onBack: () 
             }
             OutlineActionButton("截断超长记录内容") { viewModel.truncateLongRecords() }
             OutlineActionButton("清理过期记录") { viewModel.purgeExpiredRecords() }
+        }
+            }
         }
     }
 }
@@ -91,23 +95,28 @@ private fun RetentionField(current: Int, onCommit: (Int) -> Unit) {
 
     Text(
         text = "保留天数（${GatewaySettings.MIN_RETENTION_DAYS}-${GatewaySettings.MAX_RETENTION_DAYS}）",
-        style = MaterialTheme.typography.bodyMedium,
-        color = MaterialTheme.colorScheme.onSurfaceVariant,
+        style = MiuixTheme.textStyles.body2,
+        color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
     )
-    OutlinedTextField(
+    TextField(
         value = text,
         onValueChange = { input -> text = input.filter(Char::isDigit).take(4) },
         modifier = Modifier.fillMaxWidth(),
         singleLine = true,
-        isError = text.isNotEmpty() && !valid,
         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-        supportingText = {
-            when {
-                text.isEmpty() -> Text("不能为空")
-                !valid -> Text("需在 ${GatewaySettings.MIN_RETENTION_DAYS}-${GatewaySettings.MAX_RETENTION_DAYS} 之间")
-            }
-        },
     )
+    when {
+        text.isEmpty() -> Text(
+            text = "不能为空",
+            style = MiuixTheme.textStyles.footnote1,
+            color = MiuixTheme.colorScheme.error,
+        )
+        !valid -> Text(
+            text = "需在 ${GatewaySettings.MIN_RETENTION_DAYS}-${GatewaySettings.MAX_RETENTION_DAYS} 之间",
+            style = MiuixTheme.textStyles.footnote1,
+            color = MiuixTheme.colorScheme.error,
+        )
+    }
     if (changed) {
         OutlineActionButton("保存保留天数") { onCommit(parsed) }
     }
@@ -124,26 +133,26 @@ private fun StorageDetail(state: AppUiState) {
             report.entries.forEach { entry ->
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Column(Modifier.weight(1f)) {
-                        Text(entry.name, style = MaterialTheme.typography.bodyMedium)
+                        Text(entry.name, style = MiuixTheme.textStyles.body2)
                         Text(
                             text = "${entry.detail} · ${entry.items} 项",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            style = MiuixTheme.textStyles.footnote1,
+                            color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
                         )
                     }
                     Text(
                         text = StorageAudit.formatSize(entry.chars),
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.primary,
+                        style = MiuixTheme.textStyles.body2,
+                        color = MiuixTheme.colorScheme.primary,
                     )
                 }
             }
         }
-        HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+        HorizontalDivider(color = MiuixTheme.colorScheme.dividerLine)
         Text(
             text = "统计在应用内完成，不联网；「账号与凭证」含 token，请勿外传。",
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            style = MiuixTheme.textStyles.footnote1,
+            color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
         )
     }
 }

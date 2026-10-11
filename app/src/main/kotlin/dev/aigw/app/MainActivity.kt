@@ -15,29 +15,12 @@ import androidx.compose.animation.AnimatedContent
 import androidx.activity.enableEdgeToEdge
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.History
-import androidx.compose.material.icons.filled.Home
-import androidx.compose.material.icons.filled.Person
-import androidx.compose.material.icons.filled.Settings
-import androidx.compose.material.icons.filled.Storage
-import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.Icon
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.NavigationBar
-import androidx.compose.material3.NavigationBarItem
-import androidx.compose.material3.NavigationBarItemDefaults
-import androidx.compose.material3.Scaffold
-import androidx.compose.material3.SnackbarHost
-import androidx.compose.material3.SnackbarHostState
-import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -45,14 +28,28 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
-import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.unit.dp
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
+import top.yukonga.miuix.kmp.basic.ButtonDefaults
+import top.yukonga.miuix.kmp.basic.NavigationBar
+import top.yukonga.miuix.kmp.basic.NavigationBarDefaults
+import top.yukonga.miuix.kmp.basic.NavigationBarItem
+import top.yukonga.miuix.kmp.basic.Scaffold
+import top.yukonga.miuix.kmp.basic.SnackbarHost
+import top.yukonga.miuix.kmp.basic.SnackbarHostState
+import top.yukonga.miuix.kmp.basic.Text
+import top.yukonga.miuix.kmp.basic.TextButton
+import top.yukonga.miuix.kmp.icon.MiuixIcons
+import top.yukonga.miuix.kmp.icon.extended.Contacts
+import top.yukonga.miuix.kmp.icon.extended.GridView
+import top.yukonga.miuix.kmp.icon.extended.Home
+import top.yukonga.miuix.kmp.icon.extended.Recent
+import top.yukonga.miuix.kmp.icon.extended.Settings
+import top.yukonga.miuix.kmp.theme.MiuixTheme
+import top.yukonga.miuix.kmp.window.WindowDialog
 import dev.aigw.app.service.GatewayTileService
 import dev.aigw.app.ui.pushPopSpec
 import dev.aigw.app.ui.tabContentSpec
@@ -169,11 +166,11 @@ class MainActivity : ComponentActivity() {
 }
 
 private enum class Tab(val label: String, val icon: ImageVector) {
-    Home("首页", Icons.Filled.Home),
-    Providers("供应商", Icons.Filled.Person),
-    Models("模型", Icons.Filled.Storage),
-    Logs("记录", Icons.Filled.History),
-    Me("我的", Icons.Filled.Settings),
+    Home("首页", MiuixIcons.Home),
+    Providers("供应商", MiuixIcons.Contacts),
+    Models("模型", MiuixIcons.GridView),
+    Logs("记录", MiuixIcons.Recent),
+    Me("我的", MiuixIcons.Settings),
 }
 
 @Composable
@@ -203,11 +200,10 @@ private fun AppRoot(viewModel: AppViewModel, state: AppUiState) {
     }
 
     Scaffold(
-        containerColor = MaterialTheme.colorScheme.background,
         snackbarHost = { SnackbarHost(snackbarHostState) },
         bottomBar = {
             val selectedGold = LocalAppColors.current.goldStart
-            NavigationBar(containerColor = MaterialTheme.colorScheme.surface) {
+            NavigationBar {
                 Tab.entries.forEach { item ->
                     NavigationBarItem(
                         selected = subPage == null && tab == item,
@@ -216,14 +212,11 @@ private fun AppRoot(viewModel: AppViewModel, state: AppUiState) {
                             tab = item
                             if (item == Tab.Models) viewModel.refreshModels()
                         },
-                        icon = { Icon(item.icon, contentDescription = item.label) },
-                        label = { Text(item.label) },
-                        colors = NavigationBarItemDefaults.colors(
-                            indicatorColor = Color.Transparent,
-                            selectedIconColor = selectedGold,
-                            selectedTextColor = selectedGold,
-                            unselectedIconColor = Color(0xFF777777),
-                            unselectedTextColor = Color(0xFF777777),
+                        icon = item.icon,
+                        label = item.label,
+                        colors = NavigationBarDefaults.navigationBarItemColors(
+                            unselectedContentColor = MiuixTheme.colorScheme.onSurfaceContainerVariant,
+                            selectedContentColor = selectedGold,
                         ),
                     )
                 }
@@ -297,42 +290,33 @@ private fun AppRoot(viewModel: AppViewModel, state: AppUiState) {
     }
 
     state.updateInfo?.let { info ->
-        AlertDialog(
+        WindowDialog(
+            show = true,
+            title = "发现新版本 ${info.version}",
             onDismissRequest = { viewModel.dismissUpdate() },
-            title = { Text("发现新版本 ${info.version}") },
-            text = {
-                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Text(
-                        "更新日志",
-                        style = MaterialTheme.typography.labelMedium,
-                        fontWeight = FontWeight.SemiBold,
-                    )
-                    if (info.notes.isEmpty()) {
-                        Text(
-                            "该版本没有提供更新说明。",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        )
-                    } else {
-                        Text(
-                            text = info.notes,
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            modifier = Modifier.heightIn(max = 320.dp).verticalScroll(rememberScrollState()),
-                        )
-                    }
-                }
-            },
-            confirmButton = {
-                TextButton(onClick = {
-                    viewModel.openReleasePage(info.url)
-                    viewModel.dismissUpdate()
-                }) { Text("前往下载") }
-            },
-            dismissButton = {
-                TextButton(onClick = { viewModel.dismissUpdate() }) { Text("稍后") }
-            },
-        )
+        ) {
+            Text(
+                text = info.notes.ifEmpty { "该版本没有提供更新说明。" },
+                color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
+                modifier = Modifier.fillMaxWidth().heightIn(max = 320.dp).verticalScroll(rememberScrollState()),
+            )
+            Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                TextButton(
+                    text = "稍后",
+                    onClick = { viewModel.dismissUpdate() },
+                    modifier = Modifier.weight(1f),
+                )
+                TextButton(
+                    text = "前往下载",
+                    onClick = {
+                        viewModel.openReleasePage(info.url)
+                        viewModel.dismissUpdate()
+                    },
+                    modifier = Modifier.weight(1f),
+                    colors = ButtonDefaults.textButtonColorsPrimary(),
+                )
+            }
+        }
     }
 }
 

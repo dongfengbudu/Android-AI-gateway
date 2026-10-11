@@ -4,13 +4,7 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.SmartToy
-import androidx.compose.material3.Button
-import androidx.compose.material3.Icon as MaterialIcon
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.Text
+import androidx.compose.foundation.layout.padding
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -27,6 +21,14 @@ import dev.aigw.app.ui.providers.ProviderUi
 import dev.aigw.app.ui.providers.ProviderUiActions
 import dev.aigw.core.pool.AccountStatus
 import dev.aigw.core.provider.ACTION_CHECKIN
+import top.yukonga.miuix.kmp.basic.Button
+import top.yukonga.miuix.kmp.basic.ButtonDefaults
+import top.yukonga.miuix.kmp.basic.Icon
+import top.yukonga.miuix.kmp.basic.Text
+import top.yukonga.miuix.kmp.basic.TextField
+import top.yukonga.miuix.kmp.icon.MiuixIcons
+import top.yukonga.miuix.kmp.icon.extended.MindMap
+import top.yukonga.miuix.kmp.theme.MiuixTheme
 
 object TraeUi : ProviderUi {
 
@@ -36,10 +38,10 @@ object TraeUi : ProviderUi {
 
     @Composable
     override fun Icon(modifier: Modifier) {
-        MaterialIcon(
-            imageVector = Icons.Filled.SmartToy,
+        Icon(
+            imageVector = MiuixIcons.MindMap,
             contentDescription = null,
-            tint = MaterialTheme.colorScheme.primary,
+            tint = MiuixTheme.colorScheme.primary,
             modifier = modifier,
         )
     }
@@ -55,6 +57,7 @@ object TraeUi : ProviderUi {
                 Button(
                     onClick = { actions.onWebLogin(id) },
                     modifier = Modifier.fillMaxWidth(),
+                    colors = ButtonDefaults.buttonColorsPrimary(),
                 ) {
                     Text("在浏览器中打开 Trae 登录页")
                 }
@@ -62,13 +65,15 @@ object TraeUi : ProviderUi {
                     text = if (expanded) "收起粘贴导入" else "粘贴凭证 JSON 导入",
                 ) { expanded = !expanded }
                 if (expanded) {
-                    OutlinedTextField(
+                    TextField(
                         value = raw,
                         onValueChange = { raw = it },
-                        modifier = Modifier.fillMaxWidth(),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(top = 10.dp),
                         minLines = 3,
                         maxLines = 8,
-                        label = { Text("回调链接 / 凭证 JSON") },
+                        label = "回调链接 / 凭证 JSON",
                     )
                     Button(
                         onClick = {
@@ -76,7 +81,10 @@ object TraeUi : ProviderUi {
                             raw = ""
                         },
                         enabled = raw.isNotBlank(),
-                        modifier = Modifier.fillMaxWidth(),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(top = 10.dp),
+                        colors = ButtonDefaults.buttonColorsPrimary(),
                     ) {
                         Text("导入")
                     }
@@ -91,16 +99,16 @@ object TraeUi : ProviderUi {
         var manual by remember(status.uid) { mutableStateOf("") }
 
         Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-            Text("额度", style = MaterialTheme.typography.titleSmall)
+            Text("额度", style = MiuixTheme.textStyles.body2)
             Text(
                 text = if (status.creditsKnown) status.credits.toString() else "—",
-                style = MaterialTheme.typography.bodyMedium,
+                style = MiuixTheme.textStyles.body2,
             )
             if (status.detail.isNotEmpty()) {
                 Text(
                     text = status.detail,
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    style = MiuixTheme.textStyles.footnote1,
+                    color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
                 )
             }
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -108,25 +116,25 @@ object TraeUi : ProviderUi {
                     actions.onAction(id, status.uid, ACTION_CHECKIN, JsonObject())
                 }
             }
-            Text("设备指纹", style = MaterialTheme.typography.titleSmall)
+            Text("设备指纹", style = MiuixTheme.textStyles.body2)
             Text(
                 text = deviceId.ifEmpty { "—" },
-                style = MaterialTheme.typography.bodyMedium,
+                style = MiuixTheme.textStyles.body2,
             )
             Text(
                 text = "设备指纹用于签到校验，非数字格式会被上游拒绝。",
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                style = MiuixTheme.textStyles.footnote1,
+                color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
             )
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 ChoiceChip("重新生成", false) { actions.onRegenerateDeviceId(id, status.uid) }
             }
-            OutlinedTextField(
+            TextField(
                 value = manual,
                 onValueChange = { manual = it },
                 modifier = Modifier.fillMaxWidth(),
                 singleLine = true,
-                label = { Text("手动填写设备指纹") },
+                label = "手动填写设备指纹",
             )
             Button(
                 onClick = {
@@ -135,6 +143,7 @@ object TraeUi : ProviderUi {
                 },
                 enabled = manual.isNotBlank(),
                 modifier = Modifier.fillMaxWidth(),
+                colors = ButtonDefaults.buttonColorsPrimary(),
             ) {
                 Text("保存")
             }

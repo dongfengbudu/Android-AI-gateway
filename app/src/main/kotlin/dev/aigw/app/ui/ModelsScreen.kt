@@ -30,15 +30,6 @@ import androidx.compose.foundation.lazy.LazyListScope
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.ContentCopy
-import androidx.compose.material.icons.filled.ExpandLess
-import androidx.compose.material.icons.filled.ExpandMore
-import androidx.compose.material.icons.filled.Refresh
-import androidx.compose.material3.Icon
-import androidx.compose.material3.LinearProgressIndicator
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.derivedStateOf
@@ -57,6 +48,16 @@ import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import dev.aigw.core.provider.RoutedModel
+import top.yukonga.miuix.kmp.basic.Icon
+import top.yukonga.miuix.kmp.basic.LinearProgressIndicator
+import top.yukonga.miuix.kmp.basic.ProgressIndicatorDefaults
+import top.yukonga.miuix.kmp.basic.Text
+import top.yukonga.miuix.kmp.icon.MiuixIcons
+import top.yukonga.miuix.kmp.icon.extended.Copy
+import top.yukonga.miuix.kmp.icon.extended.Refresh
+import top.yukonga.miuix.kmp.icon.extended.ExpandLess
+import top.yukonga.miuix.kmp.icon.extended.ExpandMore
+import top.yukonga.miuix.kmp.theme.MiuixTheme
 
 /** 模型页：汇总所有供应商的模型（id 带 `provider/` 前缀），按供应商分组展示与流式更新。 */
 @Composable
@@ -115,7 +116,7 @@ fun ModelsScreen(state: AppUiState, viewModel: AppViewModel) {
 
     // 本页自带骨架（不走 PageScaffold）：模型量大，LazyColumn 懒加载避免整页一次性组合；
     // PageScaffold 的 verticalScroll 与 LazyColumn 不兼容（无限高度约束会崩）。
-    Column(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
+    Column(Modifier.fillMaxSize().background(MiuixTheme.colorScheme.background)) {
         PageHeader(
             title = "模型",
             subtitle = subtitleText,
@@ -125,11 +126,11 @@ fun ModelsScreen(state: AppUiState, viewModel: AppViewModel) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Text(
                         if (only) "只看可用" else "全部模型",
-                        style = MaterialTheme.typography.labelMedium,
-                        color = if (only) MaterialTheme.colorScheme.primary
-                        else MaterialTheme.colorScheme.onSurfaceVariant,
+                        style = MiuixTheme.textStyles.footnote1,
+                        color = if (only) MiuixTheme.colorScheme.primary
+                        else MiuixTheme.colorScheme.onSurfaceVariantSummary,
                         modifier = Modifier
-                            .clip(MaterialTheme.shapes.small)
+                            .clip(RoundedCornerShape(8.dp))
                             .clickable {
                                 viewModel.updateSettings(
                                     state.settings.copy(onlyUsableModels = !only),
@@ -138,9 +139,9 @@ fun ModelsScreen(state: AppUiState, viewModel: AppViewModel) {
                             .padding(horizontal = 8.dp, vertical = 6.dp),
                     )
                     Icon(
-                        Icons.Filled.Refresh,
+                        MiuixIcons.Refresh,
                         contentDescription = "刷新",
-                        tint = MaterialTheme.colorScheme.primary,
+                        tint = MiuixTheme.colorScheme.primary,
                         modifier = Modifier
                             .bouncyClick { viewModel.refreshModels() }
                             .padding(6.dp)
@@ -160,12 +161,12 @@ fun ModelsScreen(state: AppUiState, viewModel: AppViewModel) {
                 exit = fadeOut(tween(200)) + shrinkVertically(tween(200)),
             ) {
                 LinearProgressIndicator(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .clip(MaterialTheme.shapes.small)
-                        .height(3.dp),
-                    color = MaterialTheme.colorScheme.primary,
-                    trackColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.12f),
+                    modifier = Modifier.fillMaxWidth(),
+                    colors = ProgressIndicatorDefaults.progressIndicatorColors(
+                        foregroundColor = MiuixTheme.colorScheme.primary,
+                        backgroundColor = MiuixTheme.colorScheme.primary.copy(alpha = 0.12f),
+                    ),
+                    height = 3.dp,
                 )
             }
 
@@ -173,8 +174,8 @@ fun ModelsScreen(state: AppUiState, viewModel: AppViewModel) {
                 SectionCard(enterIndex = 0, modifier = Modifier.padding(top = 14.dp)) {
                     Text(
                         text = "拉取模型目录时有报错：${state.modelsError}",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.error,
+                        style = MiuixTheme.textStyles.footnote1,
+                        color = MiuixTheme.colorScheme.error,
                     )
                 }
             }
@@ -250,7 +251,7 @@ private fun ModelRow(
         Column(
             modifier = Modifier
                 .weight(1f)
-                .clip(MaterialTheme.shapes.small)
+                .clip(RoundedCornerShape(8.dp))
                 .clickable(onClick = onCopy)
                 .padding(vertical = 4.dp),
         ) {
@@ -260,13 +261,13 @@ private fun ModelRow(
             ) {
                 Text(
                     text = model.fullId,
-                    style = MaterialTheme.typography.titleSmall,
+                    style = MiuixTheme.textStyles.body2,
                     fontWeight = FontWeight.SemiBold,
                 )
                 Icon(
-                    Icons.Filled.ContentCopy,
+                    MiuixIcons.Copy,
                     contentDescription = "复制",
-                    tint = MaterialTheme.colorScheme.primary.copy(alpha = 0.6f),
+                    tint = MiuixTheme.colorScheme.primary.copy(alpha = 0.6f),
                     modifier = Modifier.size(13.dp),
                 )
             }
@@ -277,8 +278,8 @@ private fun ModelRow(
                         append(" · 上下文 ${model.model.contextWindow}")
                     }
                 },
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                style = MiuixTheme.textStyles.footnote1,
+                color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
             )
             // 能力标记：只有上游明确给了才显示
             val tags = buildList {
@@ -292,8 +293,8 @@ private fun ModelRow(
             if (tags.isNotEmpty()) {
                 Text(
                     text = tags.joinToString(" · "),
-                    style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.75f),
+                    style = MiuixTheme.textStyles.footnote2,
+                    color = MiuixTheme.colorScheme.onSurfaceVariantSummary.copy(alpha = 0.75f),
                 )
             }
             // 倍率：不是所有上游都有公开数据，没有就整行不渲染（不要编造）
@@ -306,14 +307,14 @@ private fun ModelRow(
                 ) {
                     Text(
                         text = "倍率 $rateLabel",
-                        style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.primary,
+                        style = MiuixTheme.textStyles.footnote2,
+                        color = MiuixTheme.colorScheme.primary,
                     )
                     if (!rateDiscount.isNullOrEmpty()) {
                         Text(
                             text = "限时 $rateDiscount",
-                            style = MaterialTheme.typography.labelSmall,
-                            color = MaterialTheme.colorScheme.tertiary,
+                            style = MiuixTheme.textStyles.footnote2,
+                            color = MiuixTheme.colorScheme.onTertiaryContainer,
                         )
                     }
                 }
@@ -325,15 +326,15 @@ private fun ModelRow(
             is ModelTestStatus.Testing -> {
                 Text(
                     text = "测试中...",
-                    style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    style = MiuixTheme.textStyles.footnote2,
+                    color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
                 )
             }
             is ModelTestStatus.Success -> {
                 val isFast = testStatus.latencyMs < 5000
                 Text(
                     text = "${testStatus.latencyMs}ms",
-                    style = MaterialTheme.typography.labelMedium,
+                    style = MiuixTheme.textStyles.footnote1,
                     fontWeight = FontWeight.Bold,
                     color = if (isFast) Color(0xFF2E7D32) else Color(0xFFEF6C00),
                 )
@@ -341,9 +342,9 @@ private fun ModelRow(
             is ModelTestStatus.Timeout -> {
                 Text(
                     text = "超时",
-                    style = MaterialTheme.typography.labelMedium,
+                    style = MiuixTheme.textStyles.footnote1,
                     fontWeight = FontWeight.Bold,
-                    color = MaterialTheme.colorScheme.error,
+                    color = MiuixTheme.colorScheme.error,
                 )
             }
             null -> Unit
@@ -353,16 +354,16 @@ private fun ModelRow(
         Box(
             modifier = Modifier
                 .bouncyClick(enabled = testStatus !is ModelTestStatus.Testing, onClick = onTest)
-                .clip(MaterialTheme.shapes.small)
-                .background(MaterialTheme.colorScheme.primaryContainer)
+                .clip(RoundedCornerShape(8.dp))
+                .background(MiuixTheme.colorScheme.primaryContainer)
                 .padding(horizontal = 12.dp, vertical = 6.dp),
             contentAlignment = Alignment.Center,
         ) {
             Text(
                 text = "测试",
-                style = MaterialTheme.typography.labelMedium,
+                style = MiuixTheme.textStyles.footnote1,
                 fontWeight = FontWeight.SemiBold,
-                color = MaterialTheme.colorScheme.onPrimaryContainer,
+                color = MiuixTheme.colorScheme.onPrimaryContainer,
             )
         }
     }
@@ -382,20 +383,20 @@ private fun ModelSkeletonCard(
         ) {
             Text(
                 text = providerName,
-                style = MaterialTheme.typography.titleSmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                style = MiuixTheme.textStyles.body2,
+                color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
                 modifier = Modifier.padding(start = 4.dp, top = 4.dp),
             )
             Box(
                 modifier = Modifier
                     .clip(CircleShape)
-                    .background(MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.5f))
+                    .background(MiuixTheme.colorScheme.primaryContainer.copy(alpha = 0.5f))
                     .padding(horizontal = 8.dp, vertical = 2.dp),
             ) {
                 Text(
                     text = "加载中",
-                    style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.primary,
+                    style = MiuixTheme.textStyles.footnote2,
+                    color = MiuixTheme.colorScheme.primary,
                 )
             }
         }
@@ -427,7 +428,7 @@ private fun ModelSkeletonCard(
                 Box(
                     modifier = Modifier
                         .size(width = 46.dp, height = 26.dp)
-                        .shimmer(MaterialTheme.shapes.small),
+                        .shimmer(RoundedCornerShape(8.dp)),
                 )
             }
         }
@@ -461,8 +462,8 @@ private fun LazyListScope.modelGroupSection(
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .clip(MaterialTheme.shapes.large)
-                .background(MaterialTheme.colorScheme.surface)
+                .clip(RoundedCornerShape(16.dp))
+                .background(MiuixTheme.colorScheme.surface)
                 // 标题栏不用 bouncyClick：那是给按钮用的超弹动画（spring damping 0.36），
                 // 放在会滚动的列表项上每帧都要跑插值，是折叠发卡的另一个原因。
                 .clickable {
@@ -478,9 +479,9 @@ private fun LazyListScope.modelGroupSection(
                 horizontalArrangement = Arrangement.spacedBy(6.dp),
             ) {
                 Icon(
-                    imageVector = if (isCollapsed) Icons.Filled.ExpandMore else Icons.Filled.ExpandLess,
+                    imageVector = if (isCollapsed) MiuixIcons.ExpandMore else MiuixIcons.ExpandLess,
                     contentDescription = if (isCollapsed) "展开" else "折叠",
-                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                    tint = MiuixTheme.colorScheme.onSurfaceVariantSummary,
                     modifier = Modifier.size(18.dp),
                 )
                 SectionLabel(title)
@@ -488,13 +489,13 @@ private fun LazyListScope.modelGroupSection(
             Box(
                 modifier = Modifier
                     .clip(CircleShape)
-                    .background(MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.6f))
+                    .background(MiuixTheme.colorScheme.secondaryContainer.copy(alpha = 0.6f))
                     .padding(horizontal = 8.dp, vertical = 2.dp),
             ) {
                 Text(
                     text = "${models.size} 款",
-                    style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.onSecondaryContainer,
+                    style = MiuixTheme.textStyles.footnote2,
+                    color = MiuixTheme.colorScheme.onSecondaryContainer,
                 )
             }
         }

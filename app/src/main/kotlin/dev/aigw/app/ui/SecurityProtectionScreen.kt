@@ -12,16 +12,8 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
-import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.HorizontalDivider
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.ModalBottomSheet
-import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.Switch
-import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -40,6 +32,15 @@ import dev.aigw.core.security.OutboundEvidence
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
+import top.yukonga.miuix.kmp.basic.ButtonDefaults
+import top.yukonga.miuix.kmp.basic.HorizontalDivider
+import top.yukonga.miuix.kmp.basic.Switch
+import top.yukonga.miuix.kmp.basic.Text
+import top.yukonga.miuix.kmp.basic.TextButton
+import top.yukonga.miuix.kmp.basic.TextField
+import top.yukonga.miuix.kmp.theme.MiuixTheme
+import top.yukonga.miuix.kmp.window.WindowBottomSheet
+import top.yukonga.miuix.kmp.window.WindowDialog
 
 /**
  * 安全防护与风控设置页：
@@ -59,6 +60,8 @@ fun SecurityProtectionScreen(
         subtitle = "反审核脱敏与账号限速",
         leading = { BackButton(onBack) },
     ) {
+        item {
+            Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
         // 组件 1：反审核脱敏模块
         DesensitizationComponent(
             state = state,
@@ -74,6 +77,8 @@ fun SecurityProtectionScreen(
             state = state,
             onOpenEdit = { showRateLimitDialog = true },
         )
+            }
+        }
     }
 
     if (showEvidenceSheet) {
@@ -121,12 +126,12 @@ fun DesensitizationComponent(
             horizontalArrangement = Arrangement.SpaceBetween,
         ) {
             Column(Modifier.weight(1f)) {
-                Text("开启脱敏", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
+                Text("开启脱敏", style = MiuixTheme.textStyles.headline2, fontWeight = FontWeight.SemiBold)
                 Spacer(Modifier.height(4.dp))
                 Text(
                     text = "客户端的合规声明里常有 DoS / exploit 等词，会被上游误拦。开启后在这些词内部插零宽空格，只改 system 消息，不影响用户输入",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    style = MiuixTheme.textStyles.footnote1,
+                    color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
                 )
             }
             Switch(
@@ -158,22 +163,22 @@ fun RateLimitComponent(
     SectionLabel("账号级限速")
     SectionCard(enterIndex = 1) {
         Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-            Text("最小间隔", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold)
+            Text("最小间隔", style = MiuixTheme.textStyles.body2, fontWeight = FontWeight.SemiBold)
             Text(
                 text = "${state.security.minIntervalMillis} 毫秒（同一账号两次上游请求的最短间隔）",
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                style = MiuixTheme.textStyles.footnote1,
+                color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
             )
         }
 
-        HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+        HorizontalDivider(color = MiuixTheme.colorScheme.dividerLine)
 
         Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-            Text("抖动幅度", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold)
+            Text("抖动幅度", style = MiuixTheme.textStyles.body2, fontWeight = FontWeight.SemiBold)
             Text(
                 text = "${state.security.jitterMillis} 毫秒（避免固定节拍本身成为特征）",
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                style = MiuixTheme.textStyles.footnote1,
+                color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
             )
         }
 
@@ -188,7 +193,6 @@ fun RateLimitComponent(
 // 出网取证详情底部抽屉
 // ==============================================================================
 
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun EvidenceSheet(
     evidences: List<OutboundEvidence>,
@@ -198,32 +202,27 @@ private fun EvidenceSheet(
     val clipboard = LocalClipboardManager.current
     val timeFormat = remember { SimpleDateFormat("HH:mm:ss", Locale.getDefault()) }
 
-    ModalBottomSheet(onDismissRequest = onDismiss) {
+    WindowBottomSheet(
+        show = true,
+        title = "出网取证",
+        onDismissRequest = onDismiss,
+        endAction = {
+            if (evidences.isNotEmpty()) {
+                TextButton(text = "清空", onClick = onClear)
+            }
+        },
+    ) {
         Column(
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(horizontal = 20.dp)
                 .padding(bottom = 32.dp),
         ) {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.SpaceBetween,
-            ) {
-                Column {
-                    Text("出网取证", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
-                    Text(
-                        text = "共 ${evidences.size} 条脱敏证据（只展示 system 改写）",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                }
-                if (evidences.isNotEmpty()) {
-                    TextButton(onClick = onClear) {
-                        Text("清空")
-                    }
-                }
-            }
+            Text(
+                text = "共 ${evidences.size} 条脱敏证据（只展示 system 改写）",
+                style = MiuixTheme.textStyles.footnote1,
+                color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
+            )
 
             Spacer(Modifier.height(12.dp))
 
@@ -238,8 +237,8 @@ private fun EvidenceSheet(
                         Column(
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .clip(MaterialTheme.shapes.medium)
-                                .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f))
+                                .clip(RoundedCornerShape(10.dp))
+                                .background(MiuixTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f))
                                 .padding(12.dp),
                             verticalArrangement = Arrangement.spacedBy(6.dp),
                         ) {
@@ -250,16 +249,16 @@ private fun EvidenceSheet(
                             ) {
                                 Text(
                                     text = "${timeFormat.format(Date(item.atMillis))} · ${item.model}",
-                                    style = MaterialTheme.typography.labelMedium,
+                                    style = MiuixTheme.textStyles.footnote1,
                                     fontWeight = FontWeight.SemiBold,
                                 )
                                 Text(
                                     text = "复制",
-                                    style = MaterialTheme.typography.labelSmall,
-                                    color = MaterialTheme.colorScheme.primary,
+                                    style = MiuixTheme.textStyles.footnote2,
+                                    color = MiuixTheme.colorScheme.primary,
                                     modifier = Modifier
                                         .clip(CircleShape)
-                                        .background(MaterialTheme.colorScheme.surfaceVariant)
+                                        .background(MiuixTheme.colorScheme.surfaceVariant)
                                         .clickable {
                                             clipboard.setText(AnnotatedString(item.sanitizedSnippet))
                                         }
@@ -269,31 +268,31 @@ private fun EvidenceSheet(
 
                             Text(
                                 text = "命中词汇：${item.matchedTerms.joinToString(", ")}",
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.error,
+                                style = MiuixTheme.textStyles.footnote1,
+                                color = MiuixTheme.colorScheme.error,
                                 fontWeight = FontWeight.Medium,
                             )
 
                             Text(
                                 text = "脱敏前片段：",
-                                style = MaterialTheme.typography.labelSmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                style = MiuixTheme.textStyles.footnote2,
+                                color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
                             )
                             Text(
                                 text = item.originalSnippet,
-                                style = MaterialTheme.typography.bodySmall,
+                                style = MiuixTheme.textStyles.footnote1,
                                 fontFamily = FontFamily.Monospace,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
                             )
 
                             Text(
                                 text = "脱敏后（已注入零宽空格）：",
-                                style = MaterialTheme.typography.labelSmall,
-                                color = MaterialTheme.colorScheme.primary,
+                                style = MiuixTheme.textStyles.footnote2,
+                                color = MiuixTheme.colorScheme.primary,
                             )
                             Text(
                                 text = item.sanitizedSnippet,
-                                style = MaterialTheme.typography.bodySmall,
+                                style = MiuixTheme.textStyles.footnote1,
                                 fontFamily = FontFamily.Monospace,
                             )
                         }
@@ -318,47 +317,49 @@ private fun RateLimitEditDialog(
     var minText by remember { mutableStateOf(currentMin.toString()) }
     var jitterText by remember { mutableStateOf(currentJitter.toString()) }
 
-    AlertDialog(
+    WindowDialog(
+        show = true,
+        title = "修改账号限速参数",
         onDismissRequest = onDismiss,
-        title = { Text("修改账号限速参数") },
-        text = {
-            Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                OutlinedTextField(
-                    value = minText,
-                    onValueChange = { minText = it.filter(Char::isDigit).take(5) },
-                    label = { Text("最小间隔（毫秒）") },
-                    singleLine = true,
-                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                    modifier = Modifier.fillMaxWidth(),
-                )
-                OutlinedTextField(
-                    value = jitterText,
-                    onValueChange = { jitterText = it.filter(Char::isDigit).take(5) },
-                    label = { Text("抖动幅度（毫秒）") },
-                    singleLine = true,
-                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                    modifier = Modifier.fillMaxWidth(),
-                )
-                Text(
-                    text = "同一账号连续请求将强制按“最小间隔 + 随机抖动”节拍等待，建议 1000~3000ms。",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-            }
-        },
-        confirmButton = {
-            TextButton(
-                onClick = {
-                    val min = minText.toLongOrNull() ?: currentMin
-                    val jitter = jitterText.toLongOrNull() ?: currentJitter
-                    onConfirm(min.coerceIn(0L, 60_000L), jitter.coerceIn(0L, 10_000L))
-                },
+    ) {
+        Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+            TextField(
+                value = minText,
+                onValueChange = { minText = it.filter(Char::isDigit).take(5) },
+                label = "最小间隔（毫秒）",
+                singleLine = true,
+                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                modifier = Modifier.fillMaxWidth(),
+            )
+            TextField(
+                value = jitterText,
+                onValueChange = { jitterText = it.filter(Char::isDigit).take(5) },
+                label = "抖动幅度（毫秒）",
+                singleLine = true,
+                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                modifier = Modifier.fillMaxWidth(),
+            )
+            Text(
+                text = "同一账号连续请求将强制按“最小间隔 + 随机抖动”节拍等待，建议 1000~3000ms。",
+                style = MiuixTheme.textStyles.footnote1,
+                color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
+            )
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(12.dp),
             ) {
-                Text("保存")
+                TextButton(text = "取消", onClick = onDismiss, modifier = Modifier.weight(1f))
+                TextButton(
+                    text = "保存",
+                    onClick = {
+                        val min = minText.toLongOrNull() ?: currentMin
+                        val jitter = jitterText.toLongOrNull() ?: currentJitter
+                        onConfirm(min.coerceIn(0L, 60_000L), jitter.coerceIn(0L, 10_000L))
+                    },
+                    modifier = Modifier.weight(1f),
+                    colors = ButtonDefaults.textButtonColorsPrimary(),
+                )
             }
-        },
-        dismissButton = {
-            TextButton(onClick = onDismiss) { Text("取消") }
-        },
-    )
+        }
+    }
 }

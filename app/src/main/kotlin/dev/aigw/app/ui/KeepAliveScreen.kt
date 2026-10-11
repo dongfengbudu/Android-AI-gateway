@@ -7,16 +7,17 @@ import android.os.Build
 import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import dev.aigw.app.data.KeepAlive
+import top.yukonga.miuix.kmp.basic.Text
+import top.yukonga.miuix.kmp.theme.MiuixTheme
 
 /**
  * 保活与权限：把网关在后台持续运行所需的系统条件逐项检测出来，并给出一键跳转。
@@ -38,25 +39,27 @@ fun KeepAliveScreen(state: AppUiState, viewModel: AppViewModel, onBack: () -> Un
         subtitle = "让网关在后台持续运行",
         leading = { BackButton(onBack) },
     ) {
+        item {
+            Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
         SectionCard(enterIndex = 0) {
             Row(verticalAlignment = Alignment.CenterVertically) {
-                Text("保活状态", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold, modifier = Modifier.weight(1f))
+                Text("保活状态", style = MiuixTheme.textStyles.headline2, fontWeight = FontWeight.SemiBold, modifier = Modifier.weight(1f))
                 Text(
                     text = if (status?.allGood == true) "已就绪" else "有待处理",
-                    style = MaterialTheme.typography.titleMedium,
-                    color = if (status?.allGood == true) MaterialTheme.colorScheme.tertiary else MaterialTheme.colorScheme.error,
+                    style = MiuixTheme.textStyles.headline2,
+                    color = if (status?.allGood == true) MiuixTheme.colorScheme.onTertiaryContainer else MiuixTheme.colorScheme.error,
                 )
             }
             Text(
                 text = "通知权限 + 电池优化白名单 + 不被限制后台，这几项都满足后才能锁屏稳定可用。",
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                style = MiuixTheme.textStyles.footnote1,
+                color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
             )
             if (!state.running) {
                 Text(
                     text = "当前服务未启动：先去首页启动，否则锁屏后没有进程监听端口。",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.error,
+                    style = MiuixTheme.textStyles.footnote1,
+                    color = MiuixTheme.colorScheme.error,
                 )
             }
         }
@@ -108,12 +111,12 @@ fun KeepAliveScreen(state: AppUiState, viewModel: AppViewModel, onBack: () -> Un
         }
 
         SectionCard(enterIndex = 2) {
-            Text("厂商后台管理页", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
+            Text("厂商后台管理页", style = MiuixTheme.textStyles.headline2, fontWeight = FontWeight.SemiBold)
             Text(
                 text = "国产系统默认会限制第三方应用后台。下面的入口会尝试直接打开厂商的后台管理页；" +
                     "打不开就按提示手动设置。",
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                style = MiuixTheme.textStyles.footnote1,
+                color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
             )
             ChoiceChip("打开厂商后台设置", false) {
                 val opened = KeepAlive.autoStartIntents().any { launch(context, it, null) }
@@ -124,8 +127,8 @@ fun KeepAliveScreen(state: AppUiState, viewModel: AppViewModel, onBack: () -> Un
             }
             Text(
                 text = KeepAlive.manualHint(Build.MANUFACTURER),
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                style = MiuixTheme.textStyles.footnote1,
+                color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
             )
         }
 
@@ -133,9 +136,11 @@ fun KeepAliveScreen(state: AppUiState, viewModel: AppViewModel, onBack: () -> Un
             text = "说明：本应用用「常驻通知」保持进程存活，不需要额外的唤醒锁（唤醒锁更耗电且没必要）。" +
                 "如果系统把本应用放进电池优化名单或限制后台，锁屏一段时间后进程会被冻结，客户端就会连接失败——" +
                 "按上面的检测项逐条处理即可。",
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            style = MiuixTheme.textStyles.footnote1,
+            color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
         )
+            }
+        }
     }
 }
 
@@ -149,11 +154,11 @@ private fun StatusRow(
 ) {
     Row(verticalAlignment = Alignment.CenterVertically) {
         Column(Modifier.weight(1f)) {
-            Text(title, style = MaterialTheme.typography.bodyLarge)
+            Text(title, style = MiuixTheme.textStyles.main)
             Text(
                 text = detail,
-                style = MaterialTheme.typography.bodySmall,
-                color = if (ok) MaterialTheme.colorScheme.onSurfaceVariant else MaterialTheme.colorScheme.error,
+                style = MiuixTheme.textStyles.footnote1,
+                color = if (ok) MiuixTheme.colorScheme.onSurfaceVariantSummary else MiuixTheme.colorScheme.error,
             )
         }
         ChoiceChip(actionLabel, selected = false, onClick = onAction)

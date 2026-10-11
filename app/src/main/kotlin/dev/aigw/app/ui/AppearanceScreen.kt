@@ -18,14 +18,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Check
-import androidx.compose.material3.HorizontalDivider
-import androidx.compose.material3.Icon
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.Switch
-import androidx.compose.material3.Text
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -47,6 +40,14 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import dev.aigw.app.ui.theme.LocalAppColors
+import top.yukonga.miuix.kmp.basic.HorizontalDivider
+import top.yukonga.miuix.kmp.basic.Icon
+import top.yukonga.miuix.kmp.basic.Switch
+import top.yukonga.miuix.kmp.basic.Text
+import top.yukonga.miuix.kmp.basic.TextField
+import top.yukonga.miuix.kmp.icon.MiuixIcons
+import top.yukonga.miuix.kmp.icon.basic.Check
+import top.yukonga.miuix.kmp.theme.MiuixTheme
 import dev.aigw.app.ui.theme.ThemeMode
 import dev.aigw.app.ui.theme.formatHex
 import dev.aigw.app.ui.theme.parseHexColor
@@ -81,17 +82,19 @@ fun AppearanceThemeScreen(state: AppUiState, viewModel: AppViewModel, onBack: ()
         subtitle = "明暗模式 · 配色方案 · 金色文字",
         leading = { BackButton(onBack) },
     ) {
+        item {
+            Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
         // ---------------------------------------------------------- 01 明暗模式
         EditorialGroupHeader("01", "明暗模式 · DISPLAY MODE", meta = "RADIO LIST")
         SectionCard(enterIndex = 0) {
             ModeRow("自动 · 跟随系统", "跟随 Android 系统的深浅色设置自适应切换", state.themeMode == ThemeMode.System) {
                 viewModel.setThemeMode(ThemeMode.System)
             }
-            HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+            HorizontalDivider(color = MiuixTheme.colorScheme.dividerLine)
             ModeRow("深色模式", "经典黑金暗色调，适合弱光与长时夜间使用", state.themeMode == ThemeMode.Dark) {
                 viewModel.setThemeMode(ThemeMode.Dark)
             }
-            HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+            HorizontalDivider(color = MiuixTheme.colorScheme.dividerLine)
             ModeRow("浅色模式", "极简明亮排版，高对比度呈现黑金理性层次", state.themeMode == ThemeMode.Light) {
                 viewModel.setThemeMode(ThemeMode.Light)
             }
@@ -102,8 +105,8 @@ fun AppearanceThemeScreen(state: AppUiState, viewModel: AppViewModel, onBack: ()
         SectionCard(enterIndex = 1) {
             Text(
                 text = "预设黑金系调色基调，切换后仅替换页面底色（卡片/表面色不变）：",
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                style = MiuixTheme.textStyles.footnote1,
+                color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
             )
             Row(
                 modifier = Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
@@ -137,8 +140,8 @@ fun AppearanceThemeScreen(state: AppUiState, viewModel: AppViewModel, onBack: ()
         SectionCard(enterIndex = 2) {
             Text(
                 text = "应用主色渐变由起始色与结束色插值生成，可拖动色相环或直接输入代码：",
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                style = MiuixTheme.textStyles.footnote1,
+                color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
             )
             Row(
                 modifier = Modifier.fillMaxWidth(),
@@ -169,11 +172,11 @@ fun AppearanceThemeScreen(state: AppUiState, viewModel: AppViewModel, onBack: ()
                 horizontalArrangement = Arrangement.spacedBy(12.dp),
             ) {
                 Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
-                    Text("动态取色", style = MaterialTheme.typography.titleSmall)
+                    Text("动态取色", style = MiuixTheme.textStyles.body2)
                     Text(
                         text = "从系统壁纸提取配色，开启后配色方案不再生效",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        style = MiuixTheme.textStyles.footnote1,
+                        color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
                     )
                 }
                 Switch(
@@ -188,18 +191,20 @@ fun AppearanceThemeScreen(state: AppUiState, viewModel: AppViewModel, onBack: ()
             modifier = Modifier
                 .fillMaxWidth()
                 .pressScale()
-                .clip(MaterialTheme.shapes.medium)
-                .border(1.dp, MaterialTheme.colorScheme.onSurface, MaterialTheme.shapes.medium)
+                .clip(RoundedCornerShape(10.dp))
+                .border(1.dp, MiuixTheme.colorScheme.onSurface, RoundedCornerShape(10.dp))
                 .clickable { viewModel.resetAppearance() }
                 .padding(vertical = 15.dp),
             contentAlignment = Alignment.Center,
         ) {
             Text(
                 text = "重置默认",
-                style = MaterialTheme.typography.labelLarge,
+                style = MiuixTheme.textStyles.footnote1,
                 fontWeight = FontWeight.SemiBold,
-                color = MaterialTheme.colorScheme.onSurface,
+                color = MiuixTheme.colorScheme.onSurface,
             )
+        }
+            }
         }
     }
 }
@@ -217,14 +222,14 @@ private fun ModeRow(title: String, subtitle: String, selected: Boolean, onClick:
         Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
             Text(
                 text = title,
-                style = MaterialTheme.typography.titleSmall,
+                style = MiuixTheme.textStyles.body2,
                 fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal,
-                color = if (selected) goldText else MaterialTheme.colorScheme.onSurface,
+                color = if (selected) goldText else MiuixTheme.colorScheme.onSurface,
             )
             Text(
                 text = subtitle,
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                style = MiuixTheme.textStyles.footnote1,
+                color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
             )
         }
         Box(Modifier.size(22.dp), contentAlignment = Alignment.Center) {
@@ -234,14 +239,14 @@ private fun ModeRow(title: String, subtitle: String, selected: Boolean, onClick:
                     contentAlignment = Alignment.Center,
                 ) {
                     Icon(
-                        Icons.Filled.Check,
+                        MiuixIcons.Basic.Check,
                         contentDescription = null,
                         tint = Color.White,
                         modifier = Modifier.size(14.dp),
                     )
                 }
             } else {
-                Box(Modifier.size(18.dp).clip(CircleShape).border(1.5.dp, MaterialTheme.colorScheme.outline, CircleShape))
+                Box(Modifier.size(18.dp).clip(CircleShape).border(1.5.dp, MiuixTheme.colorScheme.outline, CircleShape))
             }
         }
     }
@@ -256,8 +261,8 @@ private fun PresetChip(label: String, dotColor: Color, selected: Boolean, onClic
         modifier = Modifier
             .pressScale()
             .clip(CircleShape)
-            .background(if (selected) gold.copy(alpha = 0.12f) else MaterialTheme.colorScheme.surfaceVariant)
-            .border(if (selected) 1.5.dp else 1.dp, if (selected) gold else MaterialTheme.colorScheme.outline, CircleShape)
+            .background(if (selected) gold.copy(alpha = 0.12f) else MiuixTheme.colorScheme.surfaceVariant)
+            .border(if (selected) 1.5.dp else 1.dp, if (selected) gold else MiuixTheme.colorScheme.outline, CircleShape)
             .clickable(onClick = onClick)
             .padding(horizontal = 14.dp, vertical = 10.dp),
         verticalAlignment = Alignment.CenterVertically,
@@ -266,9 +271,9 @@ private fun PresetChip(label: String, dotColor: Color, selected: Boolean, onClic
         Box(Modifier.size(12.dp).clip(CircleShape).background(dotColor))
         Text(
             text = label,
-            style = MaterialTheme.typography.labelLarge,
+            style = MiuixTheme.textStyles.footnote1,
             fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal,
-            color = if (selected) goldText else MaterialTheme.colorScheme.onSurface,
+            color = if (selected) goldText else MiuixTheme.colorScheme.onSurface,
         )
     }
 }
@@ -284,19 +289,29 @@ private fun HexField(
 ) {
     var text by remember(value) { mutableStateOf(value.removePrefix("#").uppercase()) }
     Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-        OutlinedTextField(
+        TextField(
             value = text,
             onValueChange = { input ->
                 val cleaned = input.filter { it.isLetterOrDigit() }.take(6).uppercase()
                 text = cleaned
                 if (cleaned.length == 6 && parseHexColor(cleaned) != null) onCommit("#$cleaned")
             },
-            label = { Text(label) },
-            prefix = { Text("#", fontFamily = FontFamily.Monospace) },
-            leadingIcon = if (swatch != null) {
-                { Box(Modifier.size(20.dp).clip(MaterialTheme.shapes.extraSmall).background(swatch)) }
-            } else {
-                null
+            label = label,
+            leadingIcon = {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(6.dp),
+                ) {
+                    if (swatch != null) {
+                        Box(Modifier.size(20.dp).clip(RoundedCornerShape(6.dp)).background(swatch))
+                    }
+                    Text(
+                        text = "#",
+                        style = MiuixTheme.textStyles.main,
+                        fontFamily = FontFamily.Monospace,
+                        color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
+                    )
+                }
             },
             singleLine = true,
             textStyle = TextStyle(fontFamily = FontFamily.Monospace, fontWeight = FontWeight.Medium),
@@ -305,7 +320,7 @@ private fun HexField(
         if (onClear != null) {
             Text(
                 text = "清除覆盖",
-                style = MaterialTheme.typography.labelSmall,
+                style = MiuixTheme.textStyles.footnote2,
                 color = LocalAppColors.current.goldText,
                 modifier = Modifier.clickable(onClick = onClear).padding(horizontal = 4.dp, vertical = 2.dp),
             )
@@ -331,16 +346,16 @@ private fun WheelColumn(
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(6.dp),
         ) {
-            Box(Modifier.size(8.dp).clip(MaterialTheme.shapes.extraSmall).background(color))
+            Box(Modifier.size(8.dp).clip(RoundedCornerShape(6.dp)).background(color))
             Text(
                 text = title,
-                style = MaterialTheme.typography.labelSmall,
+                style = MiuixTheme.textStyles.footnote2,
                 fontWeight = FontWeight.SemiBold,
                 modifier = Modifier.weight(1f),
             )
             Text(
                 text = "${hueOf(color)}°",
-                style = MaterialTheme.typography.labelSmall,
+                style = MiuixTheme.textStyles.footnote2,
                 color = LocalAppColors.current.goldText,
             )
         }
@@ -406,18 +421,18 @@ private fun GradientPreview(start: Color, end: Color) {
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
             Text(
                 text = "0% START (${formatHex(start)})",
-                style = MaterialTheme.typography.labelSmall.copy(fontFamily = FontFamily.Monospace),
+                style = MiuixTheme.textStyles.footnote2.copy(fontFamily = FontFamily.Monospace),
                 color = start,
             )
             Text(
                 text = "100% END (${formatHex(end)})",
-                style = MaterialTheme.typography.labelSmall.copy(fontFamily = FontFamily.Monospace),
+                style = MiuixTheme.textStyles.footnote2.copy(fontFamily = FontFamily.Monospace),
                 color = end,
             )
         }
         Text(
             text = "AI-GATEWAY · PRESTIGE 黑金渐变文字",
-            style = MaterialTheme.typography.headlineSmall.copy(
+            style = MiuixTheme.textStyles.headline1.copy(
                 brush = Brush.horizontalGradient(listOf(start, end)),
                 fontWeight = FontWeight.Light,
                 letterSpacing = 1.sp,

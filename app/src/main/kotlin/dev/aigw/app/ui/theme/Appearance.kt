@@ -52,6 +52,9 @@ fun parseHexColor(input: String): Color? {
     return Color(0xFF000000L or value)
 }
 
+/** 成功/运行态绿色：Miuix scheme 无独立 tertiary 单色，语义色固定不随主题。 */
+val SuccessGreen = Color(0xFF10B981)
+
 /** 输出 `#RRGGBB`（大写）。 */
 fun formatHex(color: Color): String =
     String.format(Locale.US, "#%06X", color.toArgb() and 0xFFFFFF)

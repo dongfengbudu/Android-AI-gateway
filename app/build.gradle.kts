@@ -68,9 +68,7 @@ android {
     buildTypes {
         // 两个变体都开 R8。注意 AGP 对 debuggable 构建会禁用「优化与混淆」
         // （构建时会提示 “All code optimizations and obfuscation are disabled for
-        // debuggable builds”），但**代码裁剪照常生效**——这才是体积的大头：
-        // material-icons-extended 的 10660 个未使用图标类会被裁掉。
-        // 裁剪后 debug 3.5MB / release 1.4MB（未开前 debug 是 16.8MB）。
+        // debuggable builds”），但**代码裁剪照常生效**——这才是体积的大头。
         //
         // debug = 开发包（本地与 CI）：包名与 release 完全一致（dev.aigw.app），
         // 用仓库固定的调试密钥签名。两者签名不同，不能同机共存，也不能相互覆盖安装（换装需先卸载）。
@@ -121,8 +119,11 @@ dependencies {
     implementation("androidx.lifecycle:lifecycle-runtime-compose:2.8.7")
     implementation("androidx.lifecycle:lifecycle-viewmodel-compose:2.8.7")
     implementation("androidx.compose.ui:ui")
-    implementation("androidx.compose.material3:material3")
-    implementation("androidx.compose.material:material-icons-extended")
+
+    // Miuix（HyperOS 风格 UI 库）；金色 accent 通过 MiuixTheme 自定义 Colors 注入
+    implementation("top.yukonga.miuix.kmp:miuix-ui-android:0.9.4")
+    implementation("top.yukonga.miuix.kmp:miuix-preference-android:0.9.4")
+    implementation("top.yukonga.miuix.kmp:miuix-icons-android:0.9.4")
     implementation("androidx.security:security-crypto:1.1.0-alpha06")
 
     debugImplementation("androidx.compose.ui:ui-tooling")

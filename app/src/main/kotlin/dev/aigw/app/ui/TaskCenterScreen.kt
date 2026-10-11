@@ -4,14 +4,15 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.material3.Button
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
-import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import top.yukonga.miuix.kmp.basic.Button
+import top.yukonga.miuix.kmp.basic.ButtonDefaults
+import top.yukonga.miuix.kmp.basic.Text
+import top.yukonga.miuix.kmp.basic.TextButton
+import top.yukonga.miuix.kmp.theme.MiuixTheme
 
 /**
  * 任务中心：批量签到与额度维护。
@@ -26,6 +27,8 @@ fun TaskCenterScreen(state: AppUiState, viewModel: AppViewModel, onBack: () -> U
         subtitle = "签到与额度",
         leading = { BackButton(onBack) },
     ) {
+        item {
+            Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
         SectionCard(enterIndex = 0) {
             SectionLabel("批量操作")
             Row(
@@ -35,27 +38,26 @@ fun TaskCenterScreen(state: AppUiState, viewModel: AppViewModel, onBack: () -> U
                 Button(
                     onClick = { viewModel.checkinAll() },
                     modifier = Modifier.weight(1f),
+                    colors = ButtonDefaults.buttonColorsPrimary(),
                 ) {
                     Text("批量签到")
                 }
-                OutlinedButton(
+                TextButton(
+                    text = "批量任务",
                     onClick = { viewModel.runAllTasks() },
                     modifier = Modifier.weight(1f),
-                ) {
-                    Text("批量任务")
-                }
+                )
             }
-            OutlinedButton(
+            TextButton(
+                text = "刷新全部额度",
                 onClick = { viewModel.refreshAllCredits() },
                 modifier = Modifier.fillMaxWidth(),
-            ) {
-                Text("刷新全部额度")
-            }
+            )
             Text(
                 text = "签到作用于 Trae 与 WorkBuddy 国内版（国际版没有签到制度，自动跳过）；" +
                     "任务作用于 Loomy 的新手任务；额度刷新作用于全部账号。",
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                style = MiuixTheme.textStyles.footnote1,
+                color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
             )
         }
 
@@ -63,7 +65,6 @@ fun TaskCenterScreen(state: AppUiState, viewModel: AppViewModel, onBack: () -> U
             SectionCard(enterIndex = 1) {
                 EmptyHint("还没有账号", "先去「供应商」页添加账号，再回来签到。")
             }
-            return@PageScaffold
         }
 
         for (info in state.providers) {
@@ -75,7 +76,7 @@ fun TaskCenterScreen(state: AppUiState, viewModel: AppViewModel, onBack: () -> U
                     Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
                         Text(
                             text = account.nickname.ifEmpty { account.uid },
-                            style = MaterialTheme.typography.titleSmall,
+                            style = MiuixTheme.textStyles.body2,
                             fontWeight = FontWeight.SemiBold,
                         )
                         Text(
@@ -85,18 +86,20 @@ fun TaskCenterScreen(state: AppUiState, viewModel: AppViewModel, onBack: () -> U
                                 append(" · ")
                                 append(accountStatusText(account))
                             },
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            style = MiuixTheme.textStyles.footnote1,
+                            color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
                         )
                         if (account.detail.isNotEmpty()) {
                             Text(
                                 text = account.detail,
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                style = MiuixTheme.textStyles.footnote1,
+                                color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
                             )
                         }
                     }
                 }
+            }
+        }
             }
         }
     }

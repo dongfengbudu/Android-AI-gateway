@@ -9,37 +9,26 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Language
-import androidx.compose.material.icons.filled.Refresh
-import androidx.compose.material3.Button
-import androidx.compose.material3.Icon
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Surface
-import androidx.compose.material3.Switch
-import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
 import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import androidx.compose.foundation.layout.padding
 import com.google.gson.JsonObject
 import dev.aigw.app.ui.ChoiceChip
 import dev.aigw.app.ui.OutlineActionButton
 import dev.aigw.app.ui.SectionCard
 import dev.aigw.app.ui.SectionLabel
-import dev.aigw.app.ui.bouncyClick
 import dev.aigw.app.ui.accountStatusText
 import dev.aigw.app.ui.providers.ProviderUi
 import dev.aigw.app.ui.providers.ProviderUiActions
@@ -49,6 +38,16 @@ import dev.aigw.core.provider.ProviderTask
 import dev.aigw.core.provider.ACTION_CHECKIN
 import dev.aigw.core.provider.ACTION_TASKS
 import dev.aigw.core.provider.codebuddy.CodeBuddyProvider
+import top.yukonga.miuix.kmp.basic.Button
+import top.yukonga.miuix.kmp.basic.ButtonDefaults
+import top.yukonga.miuix.kmp.basic.Icon
+import top.yukonga.miuix.kmp.basic.Surface
+import top.yukonga.miuix.kmp.basic.Switch
+import top.yukonga.miuix.kmp.basic.Text
+import top.yukonga.miuix.kmp.icon.MiuixIcons
+import top.yukonga.miuix.kmp.icon.extended.Link
+import top.yukonga.miuix.kmp.icon.extended.Refresh
+import top.yukonga.miuix.kmp.theme.MiuixTheme
 
 object CodeBuddyUi : ProviderUi {
 
@@ -62,9 +61,9 @@ object CodeBuddyUi : ProviderUi {
     @Composable
     override fun Icon(modifier: Modifier) {
         Icon(
-            Icons.Filled.Language,
+            MiuixIcons.Link,
             contentDescription = null,
-            tint = MaterialTheme.colorScheme.primary,
+            tint = MiuixTheme.colorScheme.primary,
             modifier = modifier,
         )
     }
@@ -86,9 +85,9 @@ object CodeBuddyUi : ProviderUi {
                     horizontalArrangement = Arrangement.spacedBy(8.dp),
                 ) {
                     Icon(
-                        Icons.Filled.Language,
+                        MiuixIcons.Link,
                         contentDescription = null,
-                        tint = MaterialTheme.colorScheme.primary,
+                        tint = MiuixTheme.colorScheme.primary,
                         modifier = Modifier.size(20.dp),
                     )
                     SectionLabel("服务区域")
@@ -121,6 +120,7 @@ object CodeBuddyUi : ProviderUi {
                 Button(
                     onClick = { actions.onDeviceLogin(id, region) },
                     modifier = Modifier.fillMaxWidth(),
+                    colors = ButtonDefaults.buttonColorsPrimary(),
                 ) {
                     Text(if (global) "打开国际版登录页" else "打开国内版登录页")
                 }
@@ -139,8 +139,8 @@ object CodeBuddyUi : ProviderUi {
                     SectionLabel("账号")
                     Text(
                         text = if (global) "还没有国际版账号，先登录" else "还没有国内版账号，先登录",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        style = MiuixTheme.textStyles.footnote1,
+                        color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
                     )
                 }
                 return
@@ -162,13 +162,13 @@ object CodeBuddyUi : ProviderUi {
                 Column(Modifier.weight(1f)) {
                     Text(
                         text = status.nickname.ifEmpty { status.uid },
-                        style = MaterialTheme.typography.titleSmall,
+                        style = MiuixTheme.textStyles.body2,
                         fontWeight = FontWeight.SemiBold,
                     )
                     Text(
                         text = accountStatusText(status),
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        style = MiuixTheme.textStyles.footnote1,
+                        color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
                     )
                 }
                 Switch(
@@ -177,18 +177,18 @@ object CodeBuddyUi : ProviderUi {
                 )
             }
             Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                Text("额度", style = MaterialTheme.typography.bodyMedium, modifier = Modifier.weight(1f))
+                Text("额度", style = MiuixTheme.textStyles.body2, modifier = Modifier.weight(1f))
                 Text(
                     text = if (status.creditsKnown) status.credits.toString() else "—",
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.primary,
+                    style = MiuixTheme.textStyles.body2,
+                    color = MiuixTheme.colorScheme.primary,
                 )
             }
             if (status.detail.isNotEmpty()) {
                 Text(
                     text = status.detail,
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    style = MiuixTheme.textStyles.footnote1,
+                    color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
                 )
             }
             // 国际版（workbuddy.ai）没有签到制度与成长中心，只给国内账号渲染这两个入口
@@ -227,9 +227,9 @@ object CodeBuddyUi : ProviderUi {
         Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
             SectionLabel("任务中心")
             Icon(
-                Icons.Filled.Refresh,
+                MiuixIcons.Refresh,
                 contentDescription = "刷新任务列表",
-                tint = MaterialTheme.colorScheme.primary,
+                tint = MiuixTheme.colorScheme.primary,
                 modifier = Modifier
                     .clickable { actions.onLoadTaskList(id, status.uid) }
                     .padding(start = 8.dp, top = 2.dp, bottom = 2.dp, end = 2.dp),
@@ -240,27 +240,27 @@ object CodeBuddyUi : ProviderUi {
             view == null ->
                 Text(
                     text = "正在加载任务列表…",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    style = MiuixTheme.textStyles.footnote1,
+                    color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
                 )
             view.error.isNotEmpty() && view.tasks.isEmpty() ->
                 Text(
                     text = "加载任务失败：${view.error}",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.error,
+                    style = MiuixTheme.textStyles.footnote1,
+                    color = MiuixTheme.colorScheme.error,
                 )
             view.tasks.isEmpty() ->
                 Text(
                     text = if (view.inPeriod) "该账号没有返回任何任务" else "成长活动未开启，暂无可查看的任务",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    style = MiuixTheme.textStyles.footnote1,
+                    color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
                 )
             else -> {
                 val done = view.tasks.count { it.completed }
                 Text(
                     text = "共 ${view.tasks.size} 个任务 · 已完成 $done 个",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    style = MiuixTheme.textStyles.footnote1,
+                    color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
                 )
                 for (task in view.tasks) {
                     TaskRow(task, status.uid, actions)
@@ -275,13 +275,13 @@ object CodeBuddyUi : ProviderUi {
             Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                 Text(
                     text = task.title,
-                    style = MaterialTheme.typography.bodyMedium,
+                    style = MiuixTheme.textStyles.body2,
                     fontWeight = FontWeight.SemiBold,
                     modifier = Modifier.weight(1f),
                 )
                 Text(
                     text = taskStatusText(task),
-                    style = MaterialTheme.typography.labelSmall,
+                    style = MiuixTheme.textStyles.footnote2,
                     color = taskStatusColor(task),
                 )
             }
@@ -299,8 +299,8 @@ object CodeBuddyUi : ProviderUi {
             if (meta.isNotEmpty()) {
                 Text(
                     text = meta,
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    style = MiuixTheme.textStyles.footnote1,
+                    color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
                 )
             }
             if (task.claimable) {
@@ -320,10 +320,11 @@ object CodeBuddyUi : ProviderUi {
 
     @Composable
     private fun taskStatusColor(task: ProviderTask) = when {
-        task.claimed -> MaterialTheme.colorScheme.onSurfaceVariant
-        task.completed -> MaterialTheme.colorScheme.tertiary
-        task.locked -> MaterialTheme.colorScheme.outline
-        else -> MaterialTheme.colorScheme.error
+        task.claimed -> MiuixTheme.colorScheme.onSurfaceVariantSummary
+        // miuix 无 tertiary 语义色：已完成沿用三级容器文字色（绿）
+        task.completed -> MiuixTheme.colorScheme.onTertiaryContainer
+        task.locked -> MiuixTheme.colorScheme.outline
+        else -> MiuixTheme.colorScheme.error
     }
 
     /**
@@ -339,7 +340,7 @@ object CodeBuddyUi : ProviderUi {
     ) {
         Surface(
             shape = CircleShape,
-            color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.6f),
+            color = MiuixTheme.colorScheme.surfaceVariant.copy(alpha = 0.6f),
             modifier = Modifier.clip(CircleShape),
         ) {
             Row(
@@ -358,7 +359,7 @@ object CodeBuddyUi : ProviderUi {
                         modifier = Modifier
                             .clip(CircleShape)
                             .background(
-                                MaterialTheme.colorScheme.primary.copy(alpha = animProgress),
+                                MiuixTheme.colorScheme.primary.copy(alpha = animProgress),
                             )
                             .clickable { onSelectGlobal(index == 1) }
                             .padding(horizontal = 12.dp, vertical = 4.dp),
@@ -366,9 +367,9 @@ object CodeBuddyUi : ProviderUi {
                     ) {
                         Text(
                             text = label,
-                            style = MaterialTheme.typography.labelMedium,
+                            style = MiuixTheme.textStyles.footnote1,
                             fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal,
-                            color = if (selected) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurfaceVariant,
+                            color = if (selected) MiuixTheme.colorScheme.onPrimary else MiuixTheme.colorScheme.onSurfaceVariantSummary,
                         )
                     }
                 }

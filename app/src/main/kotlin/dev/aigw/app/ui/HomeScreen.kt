@@ -22,8 +22,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Text
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.ui.Alignment
@@ -49,11 +48,14 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import dev.aigw.app.ui.theme.LocalAppColors
+import dev.aigw.app.ui.theme.SuccessGreen
 import dev.aigw.core.usage.UsageStats
 import dev.aigw.core.util.startOfDay
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
+import top.yukonga.miuix.kmp.basic.Text
+import top.yukonga.miuix.kmp.theme.MiuixTheme
 
 /** 趋势图展示天数。 */
 private const val TREND_DAYS = 14
@@ -94,70 +96,90 @@ fun HomeScreen(
         subtitle = "本地 OpenAI 兼容网关",
         actions = { StatusChip(state.running) },
     ) {
-        ConsoleCard(
-            state = state,
-            lanUrl = lanUrl,
-            onStart = { startWithNotificationPermission() },
-            onStop = { viewModel.stopGateway() },
-            onRefreshCredits = { viewModel.refreshAllCredits() },
-            onCopy = { text, message ->
-                clipboard.setText(AnnotatedString(text))
-                Toast.makeText(context, message, Toast.LENGTH_SHORT).show()
-            },
-        )
+        item {
+            Box(Modifier.padding(bottom = 12.dp)) {
+                ConsoleCard(
+                    state = state,
+                    lanUrl = lanUrl,
+                    onStart = { startWithNotificationPermission() },
+                    onStop = { viewModel.stopGateway() },
+                    onRefreshCredits = { viewModel.refreshAllCredits() },
+                    onCopy = { text, message ->
+                        clipboard.setText(AnnotatedString(text))
+                        Toast.makeText(context, message, Toast.LENGTH_SHORT).show()
+                    },
+                )
+            }
+        }
 
-        TelemetryGrid(state, Modifier.staggeredAppear(1))
+        item {
+            Box(Modifier.padding(bottom = 12.dp)) {
+                TelemetryGrid(state, Modifier.staggeredAppear(1))
+            }
+        }
 
-        TrendCard(state)
+        item {
+            Box(Modifier.padding(bottom = 12.dp)) {
+                TrendCard(state)
+            }
+        }
 
-        SectionCard(modifier = Modifier.staggeredAppear(3)) {
-            SectionHeader("快捷操作 · ACTIONS")
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(10.dp),
-            ) {
-                Box(
-                    modifier = Modifier
-                        .weight(1f)
-                        .clip(MaterialTheme.shapes.medium)
-                        .background(MaterialTheme.colorScheme.onSurface)
-                        .clickable { viewModel.checkinAll() }
-                        .padding(vertical = 12.dp),
-                    contentAlignment = Alignment.Center,
-                ) {
+        item {
+            Box(Modifier.padding(bottom = 12.dp)) {
+                SectionCard(modifier = Modifier.staggeredAppear(3)) {
+                    SectionHeader("快捷操作 · ACTIONS")
                     Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(6.dp),
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(10.dp),
                     ) {
-                        Box(Modifier.size(6.dp).clip(CircleShape).background(gold))
-                        Text(
-                            "批量签到",
-                            style = MaterialTheme.typography.labelLarge,
-                            color = MaterialTheme.colorScheme.surface,
-                            fontWeight = FontWeight.SemiBold,
-                        )
+                        Box(
+                            modifier = Modifier
+                                .weight(1f)
+                                .clip(RoundedCornerShape(10.dp))
+                                .background(MiuixTheme.colorScheme.onSurface)
+                                .clickable { viewModel.checkinAll() }
+                                .padding(vertical = 12.dp),
+                            contentAlignment = Alignment.Center,
+                        ) {
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(6.dp),
+                            ) {
+                                Box(Modifier.size(6.dp).clip(CircleShape).background(gold))
+                                Text(
+                                    "批量签到",
+                                    style = MiuixTheme.textStyles.footnote1,
+                                    color = MiuixTheme.colorScheme.surface,
+                                    fontWeight = FontWeight.SemiBold,
+                                )
+                            }
+                        }
+                        Box(
+                            modifier = Modifier
+                                .weight(1f)
+                                .clip(RoundedCornerShape(10.dp))
+                                .border(1.dp, gold, RoundedCornerShape(10.dp))
+                                .clickable { openTaskCenter() }
+                                .padding(vertical = 12.dp),
+                            contentAlignment = Alignment.Center,
+                        ) {
+                            Text(
+                                "任务中心",
+                                style = MiuixTheme.textStyles.footnote1,
+                                color = goldText,
+                                fontWeight = FontWeight.SemiBold,
+                            )
+                        }
                     }
-                }
-                Box(
-                    modifier = Modifier
-                        .weight(1f)
-                        .clip(MaterialTheme.shapes.medium)
-                        .border(1.dp, gold, MaterialTheme.shapes.medium)
-                        .clickable { openTaskCenter() }
-                        .padding(vertical = 12.dp),
-                    contentAlignment = Alignment.Center,
-                ) {
-                    Text(
-                        "任务中心",
-                        style = MaterialTheme.typography.labelLarge,
-                        color = goldText,
-                        fontWeight = FontWeight.SemiBold,
-                    )
                 }
             }
         }
 
-        AntigravityQuotaSection(state, viewModel, baseIndex = 4)
+        item {
+            Box(Modifier.padding(bottom = 12.dp)) {
+                AntigravityQuotaSection(state, viewModel, baseIndex = 4)
+            }
+        }
     }
 }
 
@@ -182,24 +204,24 @@ private fun ConsoleCard(
             Spacer(Modifier.width(10.dp))
             Text(
                 text = if (state.running) "SERVICE ACTIVE" else "SERVICE STOPPED",
-                style = MaterialTheme.typography.headlineSmall,
+                style = MiuixTheme.textStyles.headline1,
                 fontWeight = FontWeight.Light,
                 letterSpacing = 0.5.sp,
-                color = MaterialTheme.colorScheme.onSurface,
+                color = MiuixTheme.colorScheme.onSurface,
                 maxLines = 1,
             )
             Spacer(Modifier.weight(1f))
             Column(horizontalAlignment = Alignment.End) {
                 Text(
                     text = "LISTEN PORT",
-                    style = MaterialTheme.typography.labelSmall,
+                    style = MiuixTheme.textStyles.footnote2,
                     letterSpacing = 0.8.sp,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
                 )
                 Text(
                     text = ":${state.port}",
-                    style = MaterialTheme.typography.titleMedium.copy(fontFamily = FontFamily.Monospace),
-                    color = MaterialTheme.colorScheme.onSurface,
+                    style = MiuixTheme.textStyles.headline2.copy(fontFamily = FontFamily.Monospace),
+                    color = MiuixTheme.colorScheme.onSurface,
                 )
             }
         }
@@ -219,8 +241,8 @@ private fun ConsoleCard(
             Box(
                 modifier = Modifier
                     .weight(1f)
-                    .clip(MaterialTheme.shapes.medium)
-                    .background(MaterialTheme.colorScheme.onSurface)
+                    .clip(RoundedCornerShape(10.dp))
+                    .background(MiuixTheme.colorScheme.onSurface)
                     .clickable { if (state.running) onStop() else onStart() }
                     .padding(vertical = 12.dp),
                 contentAlignment = Alignment.Center,
@@ -232,8 +254,8 @@ private fun ConsoleCard(
                     Box(Modifier.size(6.dp).clip(CircleShape).background(gold))
                     Text(
                         text = if (state.running) "停止网关服务" else "启动网关服务",
-                        style = MaterialTheme.typography.labelLarge,
-                        color = MaterialTheme.colorScheme.surface,
+                        style = MiuixTheme.textStyles.footnote1,
+                        color = MiuixTheme.colorScheme.surface,
                         fontWeight = FontWeight.SemiBold,
                     )
                 }
@@ -241,17 +263,17 @@ private fun ConsoleCard(
             Box(
                 modifier = Modifier
                     .weight(1f)
-                    .clip(MaterialTheme.shapes.medium)
-                    .background(MaterialTheme.colorScheme.surface)
-                    .border(1.dp, MaterialTheme.colorScheme.onSurface, MaterialTheme.shapes.medium)
+                    .clip(RoundedCornerShape(10.dp))
+                    .background(MiuixTheme.colorScheme.surface)
+                    .border(1.dp, MiuixTheme.colorScheme.onSurface, RoundedCornerShape(10.dp))
                     .clickable(onClick = onRefreshCredits)
                     .padding(vertical = 12.dp),
                 contentAlignment = Alignment.Center,
             ) {
                 Text(
                     "刷新全部额度",
-                    style = MaterialTheme.typography.labelLarge,
-                    color = MaterialTheme.colorScheme.onSurface,
+                    style = MiuixTheme.textStyles.footnote1,
+                    color = MiuixTheme.colorScheme.onSurface,
                     fontWeight = FontWeight.SemiBold,
                 )
             }
@@ -264,13 +286,13 @@ private fun ConsoleCard(
 private fun StatusDot(running: Boolean) {
     Box(contentAlignment = Alignment.Center) {
         if (running) {
-            Box(Modifier.size(16.dp).clip(CircleShape).background(MaterialTheme.colorScheme.tertiary.copy(alpha = 0.18f)))
+            Box(Modifier.size(16.dp).clip(CircleShape).background(SuccessGreen.copy(alpha = 0.18f)))
         }
         Box(
             Modifier
                 .size(9.dp)
                 .clip(CircleShape)
-                .background(if (running) MaterialTheme.colorScheme.tertiary else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.45f)),
+                .background(if (running) SuccessGreen else MiuixTheme.colorScheme.onSurfaceVariantSummary.copy(alpha = 0.45f)),
         )
     }
 }
@@ -281,23 +303,23 @@ private fun AddressRow(label: String, value: String, onCopy: (() -> Unit)?) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .clip(MaterialTheme.shapes.small)
-            .background(MaterialTheme.colorScheme.surfaceVariant)
-            .border(1.dp, MaterialTheme.colorScheme.surfaceContainerHighest, MaterialTheme.shapes.small)
+            .clip(RoundedCornerShape(8.dp))
+            .background(MiuixTheme.colorScheme.surfaceVariant)
+            .border(1.dp, MiuixTheme.colorScheme.surfaceContainerHighest, RoundedCornerShape(8.dp))
             .padding(horizontal = 12.dp, vertical = 10.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(8.dp),
     ) {
         Text(
             text = label,
-            style = MaterialTheme.typography.labelSmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            style = MiuixTheme.textStyles.footnote2,
+            color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
             modifier = Modifier.width(40.dp),
         )
         Text(
             text = value,
-            style = MaterialTheme.typography.bodySmall.copy(fontFamily = FontFamily.Monospace),
-            color = MaterialTheme.colorScheme.onSurface,
+            style = MiuixTheme.textStyles.footnote1.copy(fontFamily = FontFamily.Monospace),
+            color = MiuixTheme.colorScheme.onSurface,
             maxLines = 1,
             overflow = TextOverflow.Ellipsis,
             modifier = Modifier.weight(1f),
@@ -305,15 +327,15 @@ private fun AddressRow(label: String, value: String, onCopy: (() -> Unit)?) {
         if (onCopy != null) {
             Box(
                 modifier = Modifier
-                    .clip(MaterialTheme.shapes.extraSmall)
-                    .background(MaterialTheme.colorScheme.onSurface)
+                    .clip(RoundedCornerShape(6.dp))
+                    .background(MiuixTheme.colorScheme.onSurface)
                     .clickable(onClick = onCopy)
                     .padding(horizontal = 8.dp, vertical = 4.dp),
             ) {
                 Text(
                     "复制",
-                    style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.surface,
+                    style = MiuixTheme.textStyles.footnote2,
+                    color = MiuixTheme.colorScheme.surface,
                 )
             }
         }
@@ -335,13 +357,13 @@ private fun TrendCard(state: AppUiState) {
                 horizontalArrangement = Arrangement.spacedBy(16.dp),
             ) {
                 LegendDot(gold, "输入")
-                LegendDot(Color(0xFF0D0D0D), "输出")
+                LegendDot(MiuixTheme.colorScheme.onSurface, "输出")
             }
         } else {
             Text(
                 text = "暂无足够历史，累积几天后显示趋势",
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                style = MiuixTheme.textStyles.footnote1,
+                color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
                 modifier = Modifier.padding(vertical = 24.dp),
             )
         }
@@ -355,16 +377,16 @@ private fun LegendDot(color: Color, text: String) {
         horizontalArrangement = Arrangement.spacedBy(6.dp),
     ) {
         Box(Modifier.size(8.dp).clip(CircleShape).background(color))
-        Text(text, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        Text(text, style = MiuixTheme.textStyles.footnote2, color = MiuixTheme.colorScheme.onSurfaceVariantSummary)
     }
 }
 
 @Composable
 private fun TrendChart(daily: List<UsageStats>, todayStart: Long) {
     val gold = LocalAppColors.current.goldStart
-    val dark = Color(0xFF0D0D0D)
-    val gridColor = MaterialTheme.colorScheme.surfaceContainerHighest
-    val labelColor = MaterialTheme.colorScheme.onSurfaceVariant
+    val output = MiuixTheme.colorScheme.onSurface
+    val gridColor = MiuixTheme.colorScheme.surfaceContainerHighest
+    val labelColor = MiuixTheme.colorScheme.onSurfaceVariantSummary
     val n = daily.size
     val maxValue = daily.maxOf { maxOf(it.promptTokens, it.completionTokens) }.coerceAtLeast(1L)
     val labels = List(n) { index -> dayLabel(todayStart - (n - 1 - index) * 86_400_000L) }
@@ -383,7 +405,7 @@ private fun TrendChart(daily: List<UsageStats>, todayStart: Long) {
 
         drawLine(gridColor, Offset(gutterLeft, originY), Offset(gutterLeft + chartWidth, originY), strokeWidth = 1f)
         drawSeries(xs, inY, originY, gold)
-        drawSeries(xs, outY, originY, dark)
+        drawSeries(xs, outY, originY, output)
 
         drawIntoCanvas { canvas ->
             val paint = android.graphics.Paint().apply {
@@ -445,17 +467,17 @@ private fun Tile(modifier: Modifier, label: String, content: @Composable ColumnS
     Column(
         modifier = modifier
             .height(112.dp)
-            .clip(MaterialTheme.shapes.large)
-            .background(MaterialTheme.colorScheme.surface)
-            .border(1.dp, MaterialTheme.colorScheme.outline, MaterialTheme.shapes.large)
+            .clip(RoundedCornerShape(16.dp))
+            .background(MiuixTheme.colorScheme.surface)
+            .border(1.dp, MiuixTheme.colorScheme.outline, RoundedCornerShape(16.dp))
             .padding(12.dp),
         verticalArrangement = Arrangement.spacedBy(6.dp),
     ) {
         Text(
             text = label,
-            style = MaterialTheme.typography.labelSmall,
+            style = MiuixTheme.textStyles.footnote2,
             letterSpacing = 0.8.sp,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
             maxLines = 1,
         )
         content()
@@ -468,9 +490,9 @@ private fun BigNumber(value: String, suffix: String? = null, color: Color = Colo
     Row(verticalAlignment = Alignment.Bottom, horizontalArrangement = Arrangement.spacedBy(3.dp)) {
         Text(
             text = value,
-            style = MaterialTheme.typography.headlineSmall,
+            style = MiuixTheme.textStyles.headline1,
             fontWeight = FontWeight.Light,
-            color = if (color != Color.Unspecified) color else MaterialTheme.colorScheme.onSurface,
+            color = if (color != Color.Unspecified) color else MiuixTheme.colorScheme.onSurface,
             maxLines = 1,
             softWrap = false,
             overflow = TextOverflow.Ellipsis,
@@ -478,8 +500,8 @@ private fun BigNumber(value: String, suffix: String? = null, color: Color = Colo
         if (suffix != null) {
             Text(
                 text = suffix,
-                style = MaterialTheme.typography.labelSmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                style = MiuixTheme.textStyles.footnote2,
+                color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
                 modifier = Modifier.padding(bottom = 4.dp),
             )
         }
@@ -491,8 +513,8 @@ private fun BigNumber(value: String, suffix: String? = null, color: Color = Colo
 private fun TileNote(text: String) {
     Text(
         text = text,
-        style = MaterialTheme.typography.labelSmall,
-        color = MaterialTheme.colorScheme.onSurfaceVariant,
+        style = MiuixTheme.textStyles.footnote2,
+        color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
         maxLines = 1,
         overflow = TextOverflow.Ellipsis,
     )
@@ -528,7 +550,7 @@ private fun ReadinessTile(state: AppUiState, modifier: Modifier) {
 @Composable
 private fun ReadinessRing(percent: Int, fraction: Float) {
     val ringColor = LocalAppColors.current.goldStart
-    val trackColor = MaterialTheme.colorScheme.surfaceContainerHighest
+    val trackColor = MiuixTheme.colorScheme.surfaceContainerHighest
     Box(modifier = Modifier.size(44.dp), contentAlignment = Alignment.Center) {
         Canvas(Modifier.fillMaxWidth().height(44.dp)) {
             val strokeWidth = 4.dp.toPx()
@@ -557,8 +579,8 @@ private fun ReadinessRing(percent: Int, fraction: Float) {
         }
         Text(
             text = "$percent%",
-            style = MaterialTheme.typography.labelSmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            style = MiuixTheme.textStyles.footnote2,
+            color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
         )
     }
 }
@@ -587,8 +609,8 @@ private fun RequestsTile(state: AppUiState, modifier: Modifier) {
             val delta = (state.today.requests - yesterday.requests).toDouble() / yesterday.requests * 100
             Text(
                 text = (if (delta >= 0) "↑ " else "↓ ") + String.format(Locale.US, "%.1f%%", kotlin.math.abs(delta)) + " 较昨日",
-                style = MaterialTheme.typography.labelSmall,
-                color = if (delta >= 0) MaterialTheme.colorScheme.tertiary else MaterialTheme.colorScheme.error,
+                style = MiuixTheme.textStyles.footnote2,
+                color = if (delta >= 0) SuccessGreen else MiuixTheme.colorScheme.error,
                 maxLines = 1,
             )
         }
@@ -610,7 +632,7 @@ private fun CreditsTile(state: AppUiState, modifier: Modifier) {
     Tile(modifier, "已知额度 · TOTAL CREDITS") {
         BigNumber(
             value = if (known) formatCount(state.pool.totalCredits) else "—",
-            color = if (known) goldText else MaterialTheme.colorScheme.onSurfaceVariant,
+            color = if (known) goldText else MiuixTheme.colorScheme.onSurfaceVariantSummary,
         )
         TileNote(if (known) "已同步 ${state.pool.creditsKnown} 个账号" else "尚未同步额度")
     }
@@ -634,15 +656,15 @@ private fun AntigravityQuotaSection(state: AppUiState, viewModel: AppViewModel, 
             if (accounts.size > 1) {
                 Text(
                     text = account.nickname.ifEmpty { account.uid },
-                    style = MaterialTheme.typography.bodyMedium,
+                    style = MiuixTheme.textStyles.body2,
                     fontWeight = FontWeight.SemiBold,
                 )
             }
             if (packs.isEmpty()) {
                 Text(
                     text = if (account.detail.isNotEmpty()) account.detail else "尚未拉取配额",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    style = MiuixTheme.textStyles.footnote1,
+                    color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
                 )
             } else {
                 Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {

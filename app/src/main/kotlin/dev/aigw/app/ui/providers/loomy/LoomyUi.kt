@@ -4,16 +4,9 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.text.KeyboardOptions
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Sms
-import androidx.compose.material3.Button
-import androidx.compose.material3.Icon as MaterialIcon
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
-import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -35,6 +28,15 @@ import dev.aigw.app.ui.providers.ProviderUiActions
 import dev.aigw.core.pool.AccountStatus
 import dev.aigw.core.provider.ACTION_TASKS
 import dev.aigw.core.provider.loomy.LoomyProvider
+import top.yukonga.miuix.kmp.basic.Button
+import top.yukonga.miuix.kmp.basic.ButtonDefaults
+import top.yukonga.miuix.kmp.basic.Icon
+import top.yukonga.miuix.kmp.basic.Text
+import top.yukonga.miuix.kmp.basic.TextButton
+import top.yukonga.miuix.kmp.basic.TextField
+import top.yukonga.miuix.kmp.icon.MiuixIcons
+import top.yukonga.miuix.kmp.icon.extended.Messages
+import top.yukonga.miuix.kmp.theme.MiuixTheme
 
 object LoomyUi : ProviderUi {
 
@@ -47,10 +49,10 @@ object LoomyUi : ProviderUi {
 
     @Composable
     override fun Icon(modifier: Modifier) {
-        MaterialIcon(
-            imageVector = Icons.Filled.Sms,
+        Icon(
+            imageVector = MiuixIcons.Messages,
             contentDescription = null,
-            tint = MaterialTheme.colorScheme.primary,
+            tint = MiuixTheme.colorScheme.primary,
             modifier = modifier,
         )
     }
@@ -79,7 +81,7 @@ object LoomyUi : ProviderUi {
                     horizontalArrangement = Arrangement.spacedBy(8.dp),
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
-                    OutlinedTextField(
+                    TextField(
                         value = ccode,
                         onValueChange = { value ->
                             // 国家码只留数字，最多 4 位（最长的是 +1 区外的三位码）
@@ -88,27 +90,33 @@ object LoomyUi : ProviderUi {
                         modifier = Modifier.width(88.dp),
                         singleLine = true,
                         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                        label = { Text("国家码") },
+                        label = "国家码",
                     )
-                    OutlinedTextField(
+                    TextField(
                         value = phone,
                         onValueChange = { phone = it.filter(Char::isDigit).take(15) },
                         modifier = Modifier.weight(1f),
                         singleLine = true,
                         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Phone),
-                        label = { Text("手机号") },
+                        label = "手机号",
                     )
                 }
-                OutlinedTextField(
+                TextField(
                     value = code,
                     onValueChange = { code = it },
-                    modifier = Modifier.fillMaxWidth(),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(top = 10.dp),
                     singleLine = true,
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                    label = { Text("验证码") },
+                    label = "验证码",
                 )
-                Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                    OutlinedButton(
+                Row(
+                    modifier = Modifier.padding(top = 12.dp),
+                    horizontalArrangement = Arrangement.spacedBy(10.dp),
+                ) {
+                    TextButton(
+                        text = if (countdown > 0) "${countdown} 秒后重发" else "发送验证码",
                         onClick = {
                             // 先开倒计时，按钮立刻有反馈；发送失败再恢复可点
                             countdown = RESEND_SECONDS
@@ -118,13 +126,12 @@ object LoomyUi : ProviderUi {
                         },
                         enabled = phone.isNotBlank() && countdown == 0,
                         modifier = Modifier.weight(1f),
-                    ) {
-                        Text(if (countdown > 0) "${countdown} 秒后重发" else "发送验证码")
-                    }
+                    )
                     Button(
                         onClick = { actions.onSmsLogin(id, phone.trim(), code.trim(), ccode.trim()) { } },
                         enabled = phone.isNotBlank() && code.isNotBlank(),
                         modifier = Modifier.weight(1f),
+                        colors = ButtonDefaults.buttonColorsPrimary(),
                     ) {
                         Text("登录")
                     }
@@ -142,23 +149,23 @@ object LoomyUi : ProviderUi {
             if (status.detail.isNotEmpty()) {
                 Text(
                     text = status.detail,
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    style = MiuixTheme.textStyles.body2,
+                    color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
                 )
             }
 
-            OutlinedTextField(
+            TextField(
                 value = invite,
                 onValueChange = { invite = it },
                 modifier = Modifier.fillMaxWidth(),
                 singleLine = true,
-                label = { Text("兑换邀请码") },
+                label = "兑换邀请码",
             )
             Text(
                 text = "邀请码是双向的：填了双方都得积分。已预填一个，可直接用；" +
                     "也可以改成自己的——自己的码在 Loomy 官方 App / 网页的「邀请好友」页面里。",
-                style = MaterialTheme.typography.labelSmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                style = MiuixTheme.textStyles.footnote2,
+                color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
             )
             Button(
                 onClick = {
@@ -174,21 +181,22 @@ object LoomyUi : ProviderUi {
                 },
                 enabled = invite.isNotBlank(),
                 modifier = Modifier.fillMaxWidth(),
+                colors = ButtonDefaults.buttonColorsPrimary(),
             ) {
                 Text("兑换邀请码")
             }
 
-            OutlinedTextField(
+            TextField(
                 value = code,
                 onValueChange = { code = it },
                 modifier = Modifier.fillMaxWidth(),
                 singleLine = true,
-                label = { Text("兑换码") },
+                label = "兑换码",
             )
             Text(
                 text = "兑换码由讯飞官方发放（节日活动、发布会、官方社群福利），App 里不生成。",
-                style = MaterialTheme.typography.labelSmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                style = MiuixTheme.textStyles.footnote2,
+                color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
             )
             Button(
                 onClick = {
@@ -203,6 +211,7 @@ object LoomyUi : ProviderUi {
                 },
                 enabled = code.isNotBlank(),
                 modifier = Modifier.fillMaxWidth(),
+                colors = ButtonDefaults.buttonColorsPrimary(),
             ) {
                 Text("兑换码")
             }

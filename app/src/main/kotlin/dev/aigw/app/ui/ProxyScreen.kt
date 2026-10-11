@@ -6,15 +6,6 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
-import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.Icon
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.Switch
-import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -25,6 +16,15 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import dev.aigw.core.gateway.ProxyType
+import top.yukonga.miuix.kmp.basic.Icon
+import top.yukonga.miuix.kmp.basic.Switch
+import top.yukonga.miuix.kmp.basic.Text
+import top.yukonga.miuix.kmp.basic.TextButton
+import top.yukonga.miuix.kmp.basic.TextField
+import top.yukonga.miuix.kmp.icon.MiuixIcons
+import top.yukonga.miuix.kmp.icon.extended.ChevronForward
+import top.yukonga.miuix.kmp.theme.MiuixTheme
+import top.yukonga.miuix.kmp.window.WindowDialog
 
 /**
  * 代理设置：境外供应商（如 Antigravity）需要走代理。
@@ -48,6 +48,8 @@ fun ProxyScreen(state: AppUiState, viewModel: AppViewModel, onBack: () -> Unit) 
         subtitle = if (settings.usable) "已启用 ${settings.host}:${settings.port}" else "未启用",
         leading = { BackButton(onBack) },
     ) {
+        item {
+            Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
         SectionCard(enterIndex = 0) {
             SectionLabel("代理")
             Row(
@@ -69,57 +71,55 @@ fun ProxyScreen(state: AppUiState, viewModel: AppViewModel, onBack: () -> Unit) 
                 Text("代理类型", modifier = Modifier.weight(1f))
                 Text(
                     text = settings.type.label,
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    style = MiuixTheme.textStyles.body2,
+                    color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
                 )
                 Icon(
-                    Icons.AutoMirrored.Filled.KeyboardArrowRight,
+                    MiuixIcons.ChevronForward,
                     contentDescription = null,
-                    tint = MaterialTheme.colorScheme.outline,
+                    tint = MiuixTheme.colorScheme.outline,
                 )
             }
-            OutlinedTextField(
+            TextField(
                 value = host,
                 onValueChange = { host = it.trim() },
-                label = { Text("代理地址") },
+                label = "代理地址",
                 singleLine = true,
                 modifier = Modifier.fillMaxWidth(),
             )
-            OutlinedTextField(
+            TextField(
                 value = port,
                 onValueChange = { port = it.filter(Char::isDigit).take(5) },
-                label = { Text("端口") },
+                label = "端口",
                 singleLine = true,
                 modifier = Modifier.fillMaxWidth(),
             )
-            OutlinedTextField(
+            TextField(
                 value = username,
                 onValueChange = { username = it },
-                label = { Text("用户名（可选）") },
+                label = "用户名（可选）",
                 singleLine = true,
                 modifier = Modifier.fillMaxWidth(),
             )
-            OutlinedTextField(
+            TextField(
                 value = password,
                 onValueChange = { password = it },
-                label = { Text("密码（可选）") },
+                label = "密码（可选）",
                 singleLine = true,
                 modifier = Modifier.fillMaxWidth(),
             )
-            OutlinedTextField(
+            TextField(
                 value = excludedText,
                 onValueChange = { excludedText = it },
-                label = { Text("不走代理的地址") },
+                label = "不走代理的地址",
                 minLines = 2,
                 maxLines = 5,
                 modifier = Modifier.fillMaxWidth(),
-                supportingText = {
-                    Text(
-                        text = "逗号分隔；支持通配符 *、host:port、CIDR 网段",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                },
+            )
+            Text(
+                text = "逗号分隔；支持通配符 *、host:port、CIDR 网段",
+                style = MiuixTheme.textStyles.footnote1,
+                color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
             )
             OutlineActionButton("保存") {
                 val parsed = port.toIntOrNull()
@@ -159,13 +159,13 @@ fun ProxyScreen(state: AppUiState, viewModel: AppViewModel, onBack: () -> Unit) 
                         Column(Modifier.weight(1f)) {
                             Text(
                                 text = info.displayName,
-                                style = MaterialTheme.typography.bodyMedium,
+                                style = MiuixTheme.textStyles.body2,
                                 fontWeight = FontWeight.SemiBold,
                             )
                             Text(
                                 text = info.id,
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                style = MiuixTheme.textStyles.footnote1,
+                                color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
                             )
                         }
                         Switch(
@@ -183,10 +183,13 @@ fun ProxyScreen(state: AppUiState, viewModel: AppViewModel, onBack: () -> Unit) 
                 }
             }
         }
+            }
+        }
     }
 
     if (showTypeDialog) {
         ProxyTypeDialog(
+            show = showTypeDialog,
             current = settings.type,
             onSelect = { selected ->
                 showTypeDialog = false
@@ -200,35 +203,39 @@ fun ProxyScreen(state: AppUiState, viewModel: AppViewModel, onBack: () -> Unit) 
 
 @Composable
 private fun ProxyTypeDialog(
+    show: Boolean,
     current: ProxyType,
     onSelect: (ProxyType) -> Unit,
     onDismiss: () -> Unit,
 ) {
-    AlertDialog(
+    WindowDialog(
+        show = show,
+        title = "代理类型",
         onDismissRequest = onDismiss,
-        title = { Text("代理类型") },
-        text = {
-            Column(Modifier.fillMaxWidth()) {
-                for (type in ProxyType.entries) {
-                    Text(
-                        text = type.label,
-                        style = MaterialTheme.typography.bodyLarge,
-                        fontWeight = if (type == current) FontWeight.SemiBold else null,
-                        color = if (type == current) {
-                            MaterialTheme.colorScheme.primary
-                        } else {
-                            MaterialTheme.colorScheme.onSurface
-                        },
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .clickable { onSelect(type) }
-                            .padding(vertical = 12.dp),
-                    )
-                }
+    ) {
+        Column(Modifier.fillMaxWidth()) {
+            for (type in ProxyType.entries) {
+                Text(
+                    text = type.label,
+                    style = MiuixTheme.textStyles.main,
+                    fontWeight = if (type == current) FontWeight.SemiBold else null,
+                    color = if (type == current) {
+                        MiuixTheme.colorScheme.primary
+                    } else {
+                        MiuixTheme.colorScheme.onSurface
+                    },
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clickable { onSelect(type) }
+                        .padding(vertical = 12.dp),
+                )
             }
-        },
-        confirmButton = {
-            TextButton(onClick = onDismiss) { Text("取消") }
-        },
-    )
+            Row(
+                modifier = Modifier.fillMaxWidth().padding(top = 12.dp),
+                horizontalArrangement = Arrangement.spacedBy(12.dp),
+            ) {
+                TextButton(text = "取消", onClick = onDismiss, modifier = Modifier.weight(1f))
+            }
+        }
+    }
 }
