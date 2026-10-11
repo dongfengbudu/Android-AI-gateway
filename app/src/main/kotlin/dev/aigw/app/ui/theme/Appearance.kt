@@ -28,10 +28,10 @@ data class AppColors(
     /** 统计数据六色：首尾两项跟随自定义金，中间四项是固定语义色。 */
     fun statColors(): List<Color> = listOf(
         goldStart,          // 金——可用供应商
-        Color(0xFF3B82F6),  // 蓝——账号
-        Color(0xFF10B981),  // 绿——可用账号
-        Color(0xFFF59E0B),  // 橙——今日请求
-        Color(0xFF888888),  // 灰——今日 tokens
+        Color(0xFF3B82F6),  // 蓝——账号  // miuix-lint:allow 主题/品牌色定义
+        Color(0xFF10B981),  // 绿——可用账号  // miuix-lint:allow 主题/品牌色定义
+        Color(0xFFF59E0B),  // 橙——今日请求  // miuix-lint:allow 主题/品牌色定义
+        Color(0xFF888888),  // 灰——今日 tokens  // miuix-lint:allow 主题/品牌色定义
         goldEnd,            // 深金——额度
     )
 }
@@ -49,11 +49,14 @@ fun parseHexColor(input: String): Color? {
     val raw = input.trim().removePrefix("#")
     if (raw.length != 6) return null
     val value = raw.toLongOrNull(16) ?: return null
-    return Color(0xFF000000L or value)
+    return Color(0xFF000000L or value)  // miuix-lint:allow 主题/品牌色定义
 }
 
 /** 成功/运行态绿色：Miuix scheme 无独立 tertiary 单色，语义色固定不随主题。 */
-val SuccessGreen = Color(0xFF10B981)
+val SuccessGreen = Color(0xFF10B981)  // miuix-lint:allow 主题/品牌色定义
+
+/** 警示/降速橙：请求中止、额度紧张、慢速账号等中间态（成功态见 [SuccessGreen]）。 */
+val WarnAmber = Color(0xFFEF6C00)  // miuix-lint:allow 主题/品牌色定义  // miuix-lint:allow 主题/品牌色定义
 
 /** 输出 `#RRGGBB`（大写）。 */
 fun formatHex(color: Color): String =

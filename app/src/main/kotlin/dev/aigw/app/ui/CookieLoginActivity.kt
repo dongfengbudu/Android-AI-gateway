@@ -227,6 +227,9 @@ class CookieLoginActivity : Activity() {
         if (builder.isEmpty()) {
             if (!fromAuto) {
                 Toast.makeText(this, "还没读到登录信息，请先在页面里完成登录", Toast.LENGTH_LONG).show()
+            } else {
+                // 自动确认路径：Cookie 可能还没落盘，重试几次
+                web?.postDelayed({ collectAndFinish(hosts, true) }, 800L)
             }
             return
         }
@@ -271,7 +274,7 @@ class CookieLoginActivity : Activity() {
         const val EXTRA_SUCCESS_COOKIE = "success_cookie"
 
         /** 自动确认后等多久再收尾，给 Set-Cookie 落盘留时间。 */
-        private const val AUTO_CONFIRM_DELAY_MS = 600L
+        private const val AUTO_CONFIRM_DELAY_MS = 1500L
         const val REQUEST_CODE = 8803
     }
 }

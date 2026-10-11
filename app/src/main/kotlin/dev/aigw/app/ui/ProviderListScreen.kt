@@ -9,6 +9,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
@@ -50,21 +51,20 @@ fun ProviderListScreen(
             )
         },
     ) {
-        item {
-            Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
         if (state.providers.isEmpty()) {
-            SectionCard(modifier = Modifier.padding(bottom = 12.dp)) {
-                EmptyHint("还没有供应商", "内置供应商会在启动时自动登记；自定义供应商可点右上角「+」添加。")
+            item {
+                SectionCard {
+                    EmptyHint("还没有供应商", "内置供应商会在启动时自动登记；自定义供应商可点右上角「+」添加。")
+                }
             }
         } else {
-        for ((index, provider) in state.providers.withIndex()) {
-            val ui = ProviderUiRegistry.of(provider.id)
-            SectionCard(
-                modifier = Modifier
-                    .padding(bottom = 12.dp)
-                    .staggeredAppear(index)
-                    .clickable { onOpen(provider.id) },
-            ) {
+            itemsIndexed(state.providers, key = { _, p -> p.id }) { index, provider ->
+                val ui = ProviderUiRegistry.of(provider.id)
+                SectionCard(
+                    modifier = Modifier
+                        .staggeredAppear(index)
+                        .clickable { onOpen(provider.id) },
+                ) {
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     verticalAlignment = Alignment.CenterVertically,
@@ -126,9 +126,7 @@ fun ProviderListScreen(
                         tint = MiuixTheme.colorScheme.primary,
                     )
                 }
-            }
-        }
-        }
+                }
             }
         }
     }

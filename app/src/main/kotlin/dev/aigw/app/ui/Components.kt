@@ -19,7 +19,6 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyListScope
 import androidx.compose.foundation.shape.CircleShape
@@ -30,16 +29,16 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import dev.aigw.app.ui.theme.LocalAppColors
+import dev.aigw.core.pool.AccountStatus
+import top.yukonga.miuix.kmp.basic.Button
+import top.yukonga.miuix.kmp.basic.ButtonDefaults
 import top.yukonga.miuix.kmp.basic.Card
-import top.yukonga.miuix.kmp.basic.CardDefaults
 import top.yukonga.miuix.kmp.basic.HorizontalDivider
 import top.yukonga.miuix.kmp.basic.Icon
 import top.yukonga.miuix.kmp.basic.IconButton
@@ -52,52 +51,6 @@ import top.yukonga.miuix.kmp.icon.extended.Back
 import top.yukonga.miuix.kmp.theme.MiuixTheme
 import top.yukonga.miuix.kmp.utils.overScrollVertical
 import top.yukonga.miuix.kmp.utils.scrollEndHaptic
-
-/** 无 Scaffold 页头（Tab 页：记录/模型）：左侧大标题 + 副标题 + 金色短下划线，右侧动作。 */
-@Composable
-fun PageHeader(
-    title: String,
-    subtitle: String,
-    actions: @Composable RowScope.() -> Unit = {},
-) {
-    Column(
-        modifier = Modifier
-            .fillMaxWidth()
-            .background(MiuixTheme.colorScheme.background)
-            .padding(start = 26.dp, end = 20.dp, top = 8.dp, bottom = 12.dp),
-        verticalArrangement = Arrangement.spacedBy(6.dp),
-    ) {
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(6.dp),
-        ) {
-            Column(Modifier.weight(1f)) {
-                Text(
-                    text = title,
-                    style = MiuixTheme.textStyles.title2,
-                    fontWeight = FontWeight.Light,
-                    color = MiuixTheme.colorScheme.onBackground,
-                    maxLines = 1,
-                )
-                Text(
-                    text = subtitle,
-                    style = MiuixTheme.textStyles.footnote1,
-                    color = MiuixTheme.colorScheme.onBackgroundVariant,
-                    maxLines = 1,
-                )
-            }
-            Row(
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                actions()
-            }
-        }
-        Box(Modifier.size(width = 64.dp, height = 3.dp).background(LocalAppColors.current.goldStart))
-    }
-    HorizontalDivider(color = MiuixTheme.colorScheme.dividerLine)
-}
 
 /** 账号状态文案：只有凭证失效与手动停用两种异常态，正常即「可用」。 */
 fun accountStatusText(account: AccountStatus): String = when {
@@ -119,11 +72,16 @@ fun PageScaffold(
     content: LazyListScope.() -> Unit,
 ) {
     val scrollBehavior = MiuixScrollBehavior()
+    // 配色方案覆盖页面底色时，骨架与顶栏必须同步跟随，否则覆盖只改了
+    // background 却被 Scaffold/TopAppBar 的默认 surface 色整页盖住（视觉上「无效」）。
+    val scaffoldBg = MiuixTheme.colorScheme.background
     Scaffold(
+        containerColor = scaffoldBg,
         topBar = {
             TopAppBar(
                 title = title,
-                subtitle = subtitle,
+                color = scaffoldBg,
+                largeTitle = title,
                 navigationIcon = { leading?.invoke() },
                 actions = actions,
                 scrollBehavior = scrollBehavior,
@@ -139,7 +97,7 @@ fun PageScaffold(
             contentPadding = PaddingValues(top = paddingValues.calculateTopPadding()),
             overscrollEffect = null,
         ) {
-            item { Spacer(Modifier.size(12.dp)) }
+            item { Spacer(Modifier.height(12.dp)) }
             content()
             item { Spacer(Modifier.height(paddingValues.calculateBottomPadding())) }
         }
@@ -154,7 +112,31 @@ fun BackButton(onBack: () -> Unit) {
     }
 }
 
-/** 内容卡：Miuix 卡片 + 16dp 内边距；[enterIndex] 非空时带错峰入场动效。 */
+/** miuix 标准分组容器：横向 12dp + 底部 12dp 外边距，内部 0 边距（Super* 行自带 16dp 内边距）。
+ *  仅用于装 Super* 设置行；普通内容卡用 [SectionCard]。 */
+@Composable
+fun GroupCard(
+    modifier: Modifier = Modifier,
+    content: @Composable ColumnScope.() -> Unit,
+) {
+    Card(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 12.dp)
+            .padding(bottom = 12.dp)
+            .then(modifier),
+        content = content,
+    )
+}
+
+/** 组内行间分割线：与卡片内文字左对齐（16dp 缩进）。每行之间加，最后一行后不加。 */
+@Composable
+fun GroupDivider() {
+    HorizontalDivider(modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp))
+}
+
+/** 内容卡：Miuix 卡片 + 16dp 内边距 + 横向 12dp 外边距；[enterIndex] 非空时带错峰入场动效。
+ *  自带底部间距，列表项无需再包 Box。 */
 @Composable
 fun SectionCard(
     modifier: Modifier = Modifier,
@@ -165,6 +147,7 @@ fun SectionCard(
         modifier = Modifier
             .then(if (enterIndex != null) Modifier.staggeredAppear(enterIndex) else Modifier)
             .padding(horizontal = 12.dp)
+            .padding(bottom = 12.dp)
             .then(modifier),
         insideMargin = PaddingValues(16.dp),
         content = content,
@@ -184,18 +167,16 @@ fun StatusChip(running: Boolean) {
         modifier = Modifier
             .clip(CircleShape)
             .background(MiuixTheme.colorScheme.surfaceContainer)
-            .padding(horizontal = 12.dp, vertical = 6.dp),
+            .padding(start = 12.dp, end = 14.dp, top = 6.dp, bottom = 6.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(6.dp),
     ) {
-        Box(contentAlignment = Alignment.Center) {
+        Box(
+            modifier = Modifier.size(6.dp), // 固定占位尺寸，光环不参与对齐计算，圆点与文字始终垂直居中
+            contentAlignment = Alignment.Center,
+        ) {
             if (running) {
-                Box(
-                    Modifier
-                        .size(12.dp)
-                        .clip(CircleShape)
-                        .background(gold.copy(alpha = 0.18f)),
-                )
+                Box(Modifier.size(14.dp).clip(CircleShape).background(gold.copy(alpha = 0.18f)))
             }
             Box(
                 Modifier
@@ -281,59 +262,21 @@ fun AddressTile(value: String, onCopy: () -> Unit) {
     )
 }
 
-/** 全宽主操作按钮。onClick 放最后以支持尾随 lambda。 */
+/** 全宽主操作按钮：Miuix Button 主色（跟随主题金）。onClick 放最后以支持尾随 lambda。 */
 @Composable
 fun OutlineActionButton(
     text: String,
     modifier: Modifier = Modifier,
+    enabled: Boolean = true,
     onClick: () -> Unit,
 ) {
-    Card(
-        modifier = modifier.fillMaxWidth(),
-        cornerRadius = 10.dp,
-        colors = CardDefaults.defaultColors(
-            color = MiuixTheme.colorScheme.surfaceVariant,
-        ),
+    Button(
         onClick = onClick,
-        insideMargin = PaddingValues(vertical = 14.dp),
+        modifier = modifier.fillMaxWidth(),
+        enabled = enabled,
+        colors = ButtonDefaults.buttonColorsPrimary(),
     ) {
-        Text(
-            text = text,
-            style = MiuixTheme.textStyles.main,
-            color = MiuixTheme.colorScheme.onSurface,
-            textAlign = TextAlign.Center,
-            modifier = Modifier.fillMaxWidth(),
-        )
-    }
-}
-
-/** 带图标的功能行（「我的」页的功能列表）。 */
-@Composable
-fun NavRow(
-    icon: ImageVector,
-    title: String,
-    subtitle: String,
-    onClick: () -> Unit,
-) {
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .pressScale()
-            .background(MiuixTheme.colorScheme.surfaceContainer)
-            .padding(horizontal = 16.dp, vertical = 12.dp),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(14.dp),
-    ) {
-        Icon(icon, contentDescription = null, tint = MiuixTheme.colorScheme.primary, modifier = Modifier.size(22.dp))
-        Column(Modifier.weight(1f)) {
-            Text(title, style = MiuixTheme.textStyles.headline2)
-            Text(
-                subtitle,
-                style = MiuixTheme.textStyles.footnote1,
-                color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
-            )
-        }
-        Text(text = "→", style = MiuixTheme.textStyles.main, color = LocalAppColors.current.goldStart)
+        Text(text, style = MiuixTheme.textStyles.main)
     }
 }
 
@@ -345,25 +288,15 @@ fun EmptyHint(title: String, message: String) {
     }
 }
 
-/** 小灰大写小节标签（中文 · ENGLISH）。 */
-@Composable
-fun SectionLabel(text: String) {
-    Text(
-        text = text,
-        style = MiuixTheme.textStyles.footnote1,
-        fontWeight = FontWeight.SemiBold,
-        letterSpacing = 1.2.sp,
-        color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
-        modifier = Modifier.padding(start = 2.dp, top = 2.dp),
-    )
-}
-
-/** 小节头：左小灰大写标题 + 右侧可选金色小链接。 */
+/** 小节头：左小灰大写标题 + 右侧可选金色小链接（仅用于内容卡内部，分组标题一律用 SmallTitle）。 */
 @Composable
 fun SectionHeader(title: String, action: String? = null, onAction: (() -> Unit)? = null) {
     val goldText = LocalAppColors.current.goldText
     Row(
-        modifier = Modifier.fillMaxWidth(),
+        modifier = Modifier
+            .fillMaxWidth()
+            // 与卡内正文基线对齐：小节头文字偏小，底部补 2dp 视觉对齐
+            .padding(bottom = 2.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(8.dp),
     ) {
@@ -382,30 +315,6 @@ fun SectionHeader(title: String, action: String? = null, onAction: (() -> Unit)?
                 color = goldText,
                 modifier = if (onAction != null) Modifier.clickable(onClick = onAction) else Modifier,
             )
-        }
-    }
-}
-
-/** 编辑式分组头：金色小竖条 + 「index / 标题」小灰大写 + 右侧可选元信息。 */
-@Composable
-fun EditorialGroupHeader(index: String, title: String, meta: String? = null) {
-    val gold = LocalAppColors.current.goldStart
-    Row(
-        modifier = Modifier.fillMaxWidth(),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(8.dp),
-    ) {
-        Box(Modifier.size(width = 4.dp, height = 15.dp).background(gold))
-        Text(
-            text = "$index / $title",
-            style = MiuixTheme.textStyles.footnote1,
-            fontWeight = FontWeight.SemiBold,
-            letterSpacing = 1.2.sp,
-            color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
-            modifier = Modifier.weight(1f),
-        )
-        if (meta != null) {
-            Text(meta, style = MiuixTheme.textStyles.footnote2, color = MiuixTheme.colorScheme.onSurfaceVariantSummary)
         }
     }
 }

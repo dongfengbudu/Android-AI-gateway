@@ -18,14 +18,11 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyListScope
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
@@ -40,7 +37,6 @@ import androidx.compose.runtime.toMutableStateList
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.platform.LocalContext
@@ -48,6 +44,8 @@ import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import dev.aigw.core.provider.RoutedModel
+import dev.aigw.app.ui.theme.SuccessGreen
+import dev.aigw.app.ui.theme.WarnAmber
 import top.yukonga.miuix.kmp.basic.Icon
 import top.yukonga.miuix.kmp.basic.LinearProgressIndicator
 import top.yukonga.miuix.kmp.basic.ProgressIndicatorDefaults
@@ -114,54 +112,50 @@ fun ModelsScreen(state: AppUiState, viewModel: AppViewModel) {
     // 还在加载中的供应商列表
     val pendingProviders = state.modelLoadStates.filter { it.value is ModelLoadState.Loading }.keys
 
-    // 本页自带骨架（不走 PageScaffold）：模型量大，LazyColumn 懒加载避免整页一次性组合；
-    // PageScaffold 的 verticalScroll 与 LazyColumn 不兼容（无限高度约束会崩）。
-    Column(Modifier.fillMaxSize().background(MiuixTheme.colorScheme.background)) {
-        PageHeader(
-            title = "模型",
-            subtitle = subtitleText,
-            actions = {
-                // 「只看可用模型」：隐藏上游的非对话内部条目（如 Trae 的内部 config）
-                val only = state.settings.onlyUsableModels
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Text(
-                        if (only) "只看可用" else "全部模型",
-                        style = MiuixTheme.textStyles.footnote1,
-                        color = if (only) MiuixTheme.colorScheme.primary
-                        else MiuixTheme.colorScheme.onSurfaceVariantSummary,
-                        modifier = Modifier
-                            .clip(RoundedCornerShape(8.dp))
-                            .clickable {
-                                viewModel.updateSettings(
-                                    state.settings.copy(onlyUsableModels = !only),
-                                )
-                            }
-                            .padding(horizontal = 8.dp, vertical = 6.dp),
-                    )
-                    Icon(
-                        MiuixIcons.Refresh,
-                        contentDescription = "刷新",
-                        tint = MiuixTheme.colorScheme.primary,
-                        modifier = Modifier
-                            .bouncyClick { viewModel.refreshModels() }
-                            .padding(6.dp)
-                            .graphicsLayer { rotationZ = iconRotation },
-                    )
-                }
-            },
-        )
-
-        Column(
-            modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 14.dp),
-        ) {
-            // 顶部细条流式进度指示
+    PageScaffold(
+        title = "模型",
+        subtitle = subtitleText,
+        actions = {
+            // 「只看可用模型」：隐藏上游的非对话内部条目（如 Trae 的内部 config）
+            val only = state.settings.onlyUsableModels
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text(
+                    if (only) "只看可用" else "全部模型",
+                    style = MiuixTheme.textStyles.footnote1,
+                    color = if (only) MiuixTheme.colorScheme.primary
+                    else MiuixTheme.colorScheme.onSurfaceVariantSummary,
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(8.dp))
+                        .clickable {
+                            viewModel.updateSettings(
+                                state.settings.copy(onlyUsableModels = !only),
+                            )
+                        }
+                        .padding(horizontal = 8.dp, vertical = 6.dp),
+                )
+                Icon(
+                    MiuixIcons.Refresh,
+                    contentDescription = "刷新",
+                    tint = MiuixTheme.colorScheme.primary,
+                    modifier = Modifier
+                        .bouncyClick { viewModel.refreshModels() }
+                        .padding(6.dp)
+                        .graphicsLayer { rotationZ = iconRotation },
+                )
+            }
+        },
+    ) {
+        // 顶部细条流式进度指示
+        item(key = "progress") {
             AnimatedVisibility(
                 visible = state.modelsLoading,
                 enter = fadeIn(tween(200)) + expandVertically(tween(200)),
                 exit = fadeOut(tween(200)) + shrinkVertically(tween(200)),
             ) {
                 LinearProgressIndicator(
-                    modifier = Modifier.fillMaxWidth(),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 12.dp),
                     colors = ProgressIndicatorDefaults.progressIndicatorColors(
                         foregroundColor = MiuixTheme.colorScheme.primary,
                         backgroundColor = MiuixTheme.colorScheme.primary.copy(alpha = 0.12f),
@@ -169,9 +163,11 @@ fun ModelsScreen(state: AppUiState, viewModel: AppViewModel) {
                     height = 3.dp,
                 )
             }
+        }
 
-            if (state.modelsError.isNotEmpty()) {
-                SectionCard(enterIndex = 0, modifier = Modifier.padding(top = 14.dp)) {
+        if (state.modelsError.isNotEmpty()) {
+            item(key = "error") {
+                SectionCard(enterIndex = 0) {
                     Text(
                         text = "拉取模型目录时有报错：${state.modelsError}",
                         style = MiuixTheme.textStyles.footnote1,
@@ -181,53 +177,47 @@ fun ModelsScreen(state: AppUiState, viewModel: AppViewModel) {
             }
         }
 
-        LazyColumn(
-            modifier = Modifier.weight(1f).fillMaxWidth(),
-            contentPadding = PaddingValues(start = 16.dp, end = 16.dp, bottom = 20.dp),
-            verticalArrangement = Arrangement.spacedBy(14.dp),
-        ) {
-            if (grouped.isEmpty()) {
-                if (state.modelsLoading) {
-                    // 首屏流式载入中骨架屏
-                    val loadingList = pendingProviders.toList().ifEmpty { listOf("loading_1", "loading_2") }
-                    items(loadingList, key = { "skeleton-$it" }) { id ->
-                        val name = state.providerOf(id)?.displayName ?: "正在拉取模型目录"
-                        ModelSkeletonCard(providerName = name)
-                    }
-                } else {
-                    item(key = "empty") {
-                        SectionCard(enterIndex = 1) {
-                            EmptyHint("还没有模型", "点右上角刷新；无可用账号的供应商可能不展示动态模型。")
-                        }
-                    }
+        if (grouped.isEmpty()) {
+            if (state.modelsLoading) {
+                // 首屏流式载入中骨架屏
+                val loadingList = pendingProviders.toList().ifEmpty { listOf("loading_1", "loading_2") }
+                items(loadingList, key = { "skeleton-$it" }) { id ->
+                    val name = state.providerOf(id)?.displayName ?: "正在拉取模型目录"
+                    ModelSkeletonCard(providerName = name)
                 }
             } else {
-                // 已加载的模型按组展示。
-                //
-                // 性能注意：折叠状态不要在这里读——状态一变整页都会重组，
-                // 模型多的时候点一下要卡好几帧。这里把「这一组是否折叠」的判断
-                // 下沉到 [ModelGroupSection] 内部，由它自己订阅状态，
-                // 这样点击只重组那一个分组。
-                for ((routePrefix, models) in grouped) {
-                    modelGroupSection(
-                        routePrefix = routePrefix,
-                        models = models,
-                        collapsed = collapsed,
-                        testLatencies = state.modelTestLatencies,
-                        onCopy = { id ->
-                            clipboard.setText(AnnotatedString(id))
-                            Toast.makeText(context, "已复制模型名称：$id", Toast.LENGTH_SHORT).show()
-                        },
-                        onTest = { viewModel.testModel(it) },
-                    )
-                }
-
-                // 若已有部分模型展示，而剩余供应商仍在加载中，在下方继续展示该供应商的骨架占位
-                if (state.modelsLoading && pendingProviders.isNotEmpty()) {
-                    items(pendingProviders.toList(), key = { "skeleton-$it" }) { id ->
-                        val name = state.providerOf(id)?.displayName ?: id
-                        ModelSkeletonCard(providerName = name)
+                item(key = "empty") {
+                    SectionCard(enterIndex = 1) {
+                        EmptyHint("还没有模型", "点右上角刷新；无可用账号的供应商可能不展示动态模型。")
                     }
+                }
+            }
+        } else {
+            // 已加载的模型按组展示。
+            //
+            // 性能注意：折叠状态不要在这里读——状态一变整页都会重组，
+            // 模型多的时候点一下要卡好几帧。这里把「这一组是否折叠」的判断
+            // 下沉到 [ModelGroupSection] 内部，由它自己订阅状态，
+            // 这样点击只重组那一个分组。
+            for ((routePrefix, models) in grouped) {
+                modelGroupSection(
+                    routePrefix = routePrefix,
+                    models = models,
+                    collapsed = collapsed,
+                    testLatencies = state.modelTestLatencies,
+                    onCopy = { id ->
+                        clipboard.setText(AnnotatedString(id))
+                        Toast.makeText(context, "已复制模型名称：$id", Toast.LENGTH_SHORT).show()
+                    },
+                    onTest = { viewModel.testModel(it) },
+                )
+            }
+
+            // 若已有部分模型展示，而剩余供应商仍在加载中，在下方继续展示该供应商的骨架占位
+            if (state.modelsLoading && pendingProviders.isNotEmpty()) {
+                items(pendingProviders.toList(), key = { "skeleton-$it" }) { id ->
+                    val name = state.providerOf(id)?.displayName ?: id
+                    ModelSkeletonCard(providerName = name)
                 }
             }
         }
@@ -239,11 +229,12 @@ fun ModelsScreen(state: AppUiState, viewModel: AppViewModel) {
 private fun ModelRow(
     model: RoutedModel,
     testStatus: ModelTestStatus?,
+    modifier: Modifier = Modifier,
     onCopy: () -> Unit,
     onTest: () -> Unit,
 ) {
     Row(
-        modifier = Modifier.fillMaxWidth(),
+        modifier = modifier.fillMaxWidth(),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(10.dp),
     ) {
@@ -336,7 +327,7 @@ private fun ModelRow(
                     text = "${testStatus.latencyMs}ms",
                     style = MiuixTheme.textStyles.footnote1,
                     fontWeight = FontWeight.Bold,
-                    color = if (isFast) Color(0xFF2E7D32) else Color(0xFFEF6C00),
+                    color = if (isFast) SuccessGreen else WarnAmber,
                 )
             }
             is ModelTestStatus.Timeout -> {
@@ -462,6 +453,7 @@ private fun LazyListScope.modelGroupSection(
         Row(
             modifier = Modifier
                 .fillMaxWidth()
+                .padding(horizontal = 12.dp)
                 .clip(RoundedCornerShape(16.dp))
                 .background(MiuixTheme.colorScheme.surface)
                 // 标题栏不用 bouncyClick：那是给按钮用的超弹动画（spring damping 0.36），
@@ -470,7 +462,7 @@ private fun LazyListScope.modelGroupSection(
                     if (routePrefix in collapsed) collapsed.remove(routePrefix)
                     else collapsed.add(routePrefix)
                 }
-                .padding(start = 14.dp, end = 14.dp, top = 12.dp, bottom = 12.dp),
+                .padding(start = 16.dp, end = 16.dp, top = 12.dp, bottom = 12.dp),
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically,
         ) {
@@ -484,7 +476,11 @@ private fun LazyListScope.modelGroupSection(
                     tint = MiuixTheme.colorScheme.onSurfaceVariantSummary,
                     modifier = Modifier.size(18.dp),
                 )
-                SectionLabel(title)
+                Text(
+                    text = title,
+                    style = MiuixTheme.textStyles.body2,
+                    fontWeight = FontWeight.SemiBold,
+                )
             }
             Box(
                 modifier = Modifier
@@ -506,6 +502,7 @@ private fun LazyListScope.modelGroupSection(
         ModelRow(
             model = model,
             testStatus = testLatencies[model.fullId],
+            modifier = Modifier.padding(start = 28.dp, end = 28.dp),
             onCopy = { onCopy(model.fullId) },
             onTest = { onTest(model) },
         )

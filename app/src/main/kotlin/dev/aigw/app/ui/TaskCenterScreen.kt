@@ -10,6 +10,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import top.yukonga.miuix.kmp.basic.Button
 import top.yukonga.miuix.kmp.basic.ButtonDefaults
+import top.yukonga.miuix.kmp.basic.SmallTitle
 import top.yukonga.miuix.kmp.basic.Text
 import top.yukonga.miuix.kmp.basic.TextButton
 import top.yukonga.miuix.kmp.theme.MiuixTheme
@@ -27,79 +28,81 @@ fun TaskCenterScreen(state: AppUiState, viewModel: AppViewModel, onBack: () -> U
         subtitle = "签到与额度",
         leading = { BackButton(onBack) },
     ) {
+        item { SmallTitle("批量操作") }
         item {
-            Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
-        SectionCard(enterIndex = 0) {
-            SectionLabel("批量操作")
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(10.dp),
-            ) {
-                Button(
-                    onClick = { viewModel.checkinAll() },
-                    modifier = Modifier.weight(1f),
-                    colors = ButtonDefaults.buttonColorsPrimary(),
+            SectionCard(enterIndex = 0) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(10.dp),
                 ) {
-                    Text("批量签到")
+                    Button(
+                        onClick = { viewModel.checkinAll() },
+                        modifier = Modifier.weight(1f),
+                        colors = ButtonDefaults.buttonColorsPrimary(),
+                    ) {
+                        Text("批量签到")
+                    }
+                    TextButton(
+                        text = "批量任务",
+                        onClick = { viewModel.runAllTasks() },
+                        modifier = Modifier.weight(1f),
+                    )
                 }
                 TextButton(
-                    text = "批量任务",
-                    onClick = { viewModel.runAllTasks() },
-                    modifier = Modifier.weight(1f),
+                    text = "刷新全部额度",
+                    onClick = { viewModel.refreshAllCredits() },
+                    modifier = Modifier.fillMaxWidth(),
+                )
+                Text(
+                    text = "签到作用于 Trae 与 WorkBuddy 国内版（国际版没有签到制度，自动跳过）；" +
+                        "任务作用于 Loomy 的新手任务；额度刷新作用于全部账号。",
+                    style = MiuixTheme.textStyles.footnote1,
+                    color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
                 )
             }
-            TextButton(
-                text = "刷新全部额度",
-                onClick = { viewModel.refreshAllCredits() },
-                modifier = Modifier.fillMaxWidth(),
-            )
-            Text(
-                text = "签到作用于 Trae 与 WorkBuddy 国内版（国际版没有签到制度，自动跳过）；" +
-                    "任务作用于 Loomy 的新手任务；额度刷新作用于全部账号。",
-                style = MiuixTheme.textStyles.footnote1,
-                color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
-            )
         }
 
         if (state.providers.none { state.accountsOf(it.id).isNotEmpty() }) {
-            SectionCard(enterIndex = 1) {
-                EmptyHint("还没有账号", "先去「供应商」页添加账号，再回来签到。")
+            item {
+                SectionCard(enterIndex = 1) {
+                    EmptyHint("还没有账号", "先去「供应商」页添加账号，再回来签到。")
+                }
             }
         }
 
         for (info in state.providers) {
             val accounts = state.accountsOf(info.id)
             if (accounts.isEmpty()) continue
-            SectionCard(enterIndex = 2) {
-                SectionLabel(info.displayName)
-                for (account in accounts) {
-                    Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
-                        Text(
-                            text = account.nickname.ifEmpty { account.uid },
-                            style = MiuixTheme.textStyles.body2,
-                            fontWeight = FontWeight.SemiBold,
-                        )
-                        Text(
-                            text = buildString {
-                                append("额度 ")
-                                append(if (account.creditsKnown) account.credits.toString() else "—")
-                                append(" · ")
-                                append(accountStatusText(account))
-                            },
-                            style = MiuixTheme.textStyles.footnote1,
-                            color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
-                        )
-                        if (account.detail.isNotEmpty()) {
+            item(key = info.id) { SmallTitle(info.displayName) }
+            item(key = "${info.id}/card") {
+                SectionCard(enterIndex = 2) {
+                    for (account in accounts) {
+                        Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
                             Text(
-                                text = account.detail,
+                                text = account.nickname.ifEmpty { account.uid },
+                                style = MiuixTheme.textStyles.body2,
+                                fontWeight = FontWeight.SemiBold,
+                            )
+                            Text(
+                                text = buildString {
+                                    append("额度 ")
+                                    append(if (account.creditsKnown) account.credits.toString() else "—")
+                                    append(" · ")
+                                    append(accountStatusText(account))
+                                },
                                 style = MiuixTheme.textStyles.footnote1,
                                 color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
                             )
+                            if (account.detail.isNotEmpty()) {
+                                Text(
+                                    text = account.detail,
+                                    style = MiuixTheme.textStyles.footnote1,
+                                    color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
+                                )
+                            }
                         }
                     }
                 }
-            }
-        }
             }
         }
     }

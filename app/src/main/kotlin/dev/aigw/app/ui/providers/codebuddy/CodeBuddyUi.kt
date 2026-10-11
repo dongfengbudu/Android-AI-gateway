@@ -7,6 +7,7 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
@@ -24,11 +25,12 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import com.google.gson.JsonObject
 import dev.aigw.app.ui.ChoiceChip
 import dev.aigw.app.ui.OutlineActionButton
 import dev.aigw.app.ui.SectionCard
-import dev.aigw.app.ui.SectionLabel
+import dev.aigw.app.ui.SectionHeader
 import dev.aigw.app.ui.accountStatusText
 import dev.aigw.app.ui.providers.ProviderUi
 import dev.aigw.app.ui.providers.ProviderUiActions
@@ -42,8 +44,8 @@ import top.yukonga.miuix.kmp.basic.Button
 import top.yukonga.miuix.kmp.basic.ButtonDefaults
 import top.yukonga.miuix.kmp.basic.Icon
 import top.yukonga.miuix.kmp.basic.Surface
-import top.yukonga.miuix.kmp.basic.Switch
 import top.yukonga.miuix.kmp.basic.Text
+import top.yukonga.miuix.kmp.extra.SuperSwitch
 import top.yukonga.miuix.kmp.icon.MiuixIcons
 import top.yukonga.miuix.kmp.icon.extended.Link
 import top.yukonga.miuix.kmp.icon.extended.Refresh
@@ -90,7 +92,13 @@ object CodeBuddyUi : ProviderUi {
                         tint = MiuixTheme.colorScheme.primary,
                         modifier = Modifier.size(20.dp),
                     )
-                    SectionLabel("服务区域")
+                    Text(
+                        text = "服务区域",
+                        style = MiuixTheme.textStyles.footnote1,
+                        fontWeight = FontWeight.SemiBold,
+                        letterSpacing = 1.2.sp,
+                        color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
+                    )
                 }
                 RegionSelector(
                     isGlobal = global,
@@ -116,7 +124,7 @@ object CodeBuddyUi : ProviderUi {
         val region = if (global) CodeBuddyProvider.REGION_GLOBAL else CodeBuddyProvider.REGION_CN
         Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
             SectionCard(enterIndex = 1) {
-                SectionLabel(if (global) "登录 · 国际版 workbuddy.ai" else "登录 · 国内版 copilot.tencent.com")
+                SectionHeader(if (global) "登录 · 国际版 workbuddy.ai" else "登录 · 国内版 copilot.tencent.com")
                 Button(
                     onClick = { actions.onDeviceLogin(id, region) },
                     modifier = Modifier.fillMaxWidth(),
@@ -136,7 +144,7 @@ object CodeBuddyUi : ProviderUi {
         Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
             if (scoped.isEmpty()) {
                 SectionCard(enterIndex = 2) {
-                    SectionLabel("账号")
+                    SectionHeader("账号")
                     Text(
                         text = if (global) "还没有国际版账号，先登录" else "还没有国内版账号，先登录",
                         style = MiuixTheme.textStyles.footnote1,
@@ -146,7 +154,7 @@ object CodeBuddyUi : ProviderUi {
                 return
             }
             SectionCard(enterIndex = 2) {
-                SectionLabel("账号 · ${scoped.size} 个")
+                SectionHeader("账号 · ${scoped.size} 个")
                 for (account in scoped) {
                     AccountBlock(account, actions)
                 }
@@ -158,24 +166,12 @@ object CodeBuddyUi : ProviderUi {
     @Composable
     private fun AccountBlock(status: AccountStatus, actions: ProviderUiActions) {
         Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                Column(Modifier.weight(1f)) {
-                    Text(
-                        text = status.nickname.ifEmpty { status.uid },
-                        style = MiuixTheme.textStyles.body2,
-                        fontWeight = FontWeight.SemiBold,
-                    )
-                    Text(
-                        text = accountStatusText(status),
-                        style = MiuixTheme.textStyles.footnote1,
-                        color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
-                    )
-                }
-                Switch(
-                    checked = status.enabled,
-                    onCheckedChange = { actions.onToggleAccount(id, status.uid, it) },
-                )
-            }
+            SuperSwitch(
+                title = status.nickname.ifEmpty { status.uid },
+                summary = accountStatusText(status),
+                checked = status.enabled,
+                onCheckedChange = { actions.onToggleAccount(id, status.uid, it) },
+            )
             Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                 Text("额度", style = MiuixTheme.textStyles.body2, modifier = Modifier.weight(1f))
                 Text(
@@ -225,7 +221,7 @@ object CodeBuddyUi : ProviderUi {
         }
 
         Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-            SectionLabel("任务中心")
+            SectionHeader("任务中心")
             Icon(
                 MiuixIcons.Refresh,
                 contentDescription = "刷新任务列表",

@@ -4,6 +4,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -34,13 +35,16 @@ import java.util.Date
 import java.util.Locale
 import top.yukonga.miuix.kmp.basic.ButtonDefaults
 import top.yukonga.miuix.kmp.basic.HorizontalDivider
-import top.yukonga.miuix.kmp.basic.Switch
+import top.yukonga.miuix.kmp.basic.SmallTitle
 import top.yukonga.miuix.kmp.basic.Text
 import top.yukonga.miuix.kmp.basic.TextButton
 import top.yukonga.miuix.kmp.basic.TextField
+import top.yukonga.miuix.kmp.extra.SuperArrow
+import top.yukonga.miuix.kmp.extra.SuperSwitch
 import top.yukonga.miuix.kmp.theme.MiuixTheme
-import top.yukonga.miuix.kmp.window.WindowBottomSheet
-import top.yukonga.miuix.kmp.window.WindowDialog
+import top.yukonga.miuix.kmp.extra.WindowBottomSheet
+import top.yukonga.miuix.kmp.extra.WindowDialog
+import top.yukonga.miuix.kmp.utils.overScrollVertical
 
 /**
  * 安全防护与风控设置页：
@@ -60,24 +64,24 @@ fun SecurityProtectionScreen(
         subtitle = "反审核脱敏与账号限速",
         leading = { BackButton(onBack) },
     ) {
-        item {
-            Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
         // 组件 1：反审核脱敏模块
-        DesensitizationComponent(
-            state = state,
-            onToggle = { enabled ->
-                viewModel.updateSecuritySettings(state.security.copy(sanitizeEnabled = enabled))
-            },
-            onReloadPipeline = { viewModel.reloadSanitizerPipeline() },
-            onViewEvidence = { showEvidenceSheet = true },
-        )
+        item {
+            DesensitizationComponent(
+                state = state,
+                onToggle = { enabled ->
+                    viewModel.updateSecuritySettings(state.security.copy(sanitizeEnabled = enabled))
+                },
+                onReloadPipeline = { viewModel.reloadSanitizerPipeline() },
+                onViewEvidence = { showEvidenceSheet = true },
+            )
+        }
 
         // 组件 2：账号级限速模块
-        RateLimitComponent(
-            state = state,
-            onOpenEdit = { showRateLimitDialog = true },
-        )
-            }
+        item {
+            RateLimitComponent(
+                state = state,
+                onOpenEdit = { showRateLimitDialog = true },
+            )
         }
     }
 
@@ -118,27 +122,15 @@ fun DesensitizationComponent(
     onReloadPipeline: () -> Unit,
     onViewEvidence: () -> Unit,
 ) {
-    SectionLabel("反审核脱敏")
+    SmallTitle("反审核脱敏")
     SectionCard(enterIndex = 0) {
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.SpaceBetween,
-        ) {
-            Column(Modifier.weight(1f)) {
-                Text("开启脱敏", style = MiuixTheme.textStyles.headline2, fontWeight = FontWeight.SemiBold)
-                Spacer(Modifier.height(4.dp))
-                Text(
-                    text = "客户端的合规声明里常有 DoS / exploit 等词，会被上游误拦。开启后在这些词内部插零宽空格，只改 system 消息，不影响用户输入",
-                    style = MiuixTheme.textStyles.footnote1,
-                    color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
-                )
-            }
-            Switch(
-                checked = state.security.sanitizeEnabled,
-                onCheckedChange = onToggle,
-            )
-        }
+        SuperSwitch(
+            title = "开启脱敏",
+            summary = "客户端的合规声明里常有 DoS / exploit 等词，会被上游误拦。开启后在这些词内部插零宽空格，只改 system 消息，不影响用户输入",
+            checked = state.security.sanitizeEnabled,
+            onCheckedChange = onToggle,
+            insideMargin = PaddingValues(0.dp),
+        )
 
         Spacer(Modifier.height(8.dp))
         OutlineActionButton("重新加载处理链") {
@@ -160,32 +152,37 @@ fun RateLimitComponent(
     state: AppUiState,
     onOpenEdit: () -> Unit,
 ) {
-    SectionLabel("账号级限速")
+    SmallTitle("账号级限速")
     SectionCard(enterIndex = 1) {
-        Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-            Text("最小间隔", style = MiuixTheme.textStyles.body2, fontWeight = FontWeight.SemiBold)
-            Text(
-                text = "${state.security.minIntervalMillis} 毫秒（同一账号两次上游请求的最短间隔）",
-                style = MiuixTheme.textStyles.footnote1,
-                color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
-            )
-        }
+        SuperArrow(
+            title = "最小间隔",
+            summary = "同一账号两次上游请求的最短间隔",
+            endActions = {
+                Text(
+                    text = "${state.security.minIntervalMillis} 毫秒",
+                    style = MiuixTheme.textStyles.footnote2,
+                    color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
+                )
+            },
+            onClick = onOpenEdit,
+            insideMargin = PaddingValues(vertical = 12.dp),
+        )
 
-        HorizontalDivider(color = MiuixTheme.colorScheme.dividerLine)
+        HorizontalDivider(modifier = Modifier.fillMaxWidth())
 
-        Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-            Text("抖动幅度", style = MiuixTheme.textStyles.body2, fontWeight = FontWeight.SemiBold)
-            Text(
-                text = "${state.security.jitterMillis} 毫秒（避免固定节拍本身成为特征）",
-                style = MiuixTheme.textStyles.footnote1,
-                color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
-            )
-        }
-
-        Spacer(Modifier.height(4.dp))
-        OutlineActionButton("修改限速") {
-            onOpenEdit()
-        }
+        SuperArrow(
+            title = "抖动幅度",
+            summary = "避免固定节拍本身成为特征",
+            endActions = {
+                Text(
+                    text = "${state.security.jitterMillis} 毫秒",
+                    style = MiuixTheme.textStyles.footnote2,
+                    color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
+                )
+            },
+            onClick = onOpenEdit,
+            insideMargin = PaddingValues(vertical = 12.dp),
+        )
     }
 }
 
@@ -230,10 +227,13 @@ private fun EvidenceSheet(
                 EmptyHint("暂无取证记录", "当客户端发送包含 DoS / exploit 等词的 system 提示词时，脱敏穿透快照会记录在这里。")
             } else {
                 LazyColumn(
-                    modifier = Modifier.fillMaxWidth(),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .overScrollVertical(),
+                    overscrollEffect = null,
                     verticalArrangement = Arrangement.spacedBy(14.dp),
                 ) {
-                    itemsIndexed(evidences) { index, item ->
+                    itemsIndexed(evidences, key = { i, e -> "${e.atMillis}_$i" }) { index, item ->
                         Column(
                             modifier = Modifier
                                 .fillMaxWidth()

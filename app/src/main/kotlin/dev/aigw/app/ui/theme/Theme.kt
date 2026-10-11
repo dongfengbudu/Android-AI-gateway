@@ -14,9 +14,9 @@ import top.yukonga.miuix.kmp.theme.darkColorScheme
 import top.yukonga.miuix.kmp.theme.lightColorScheme
 
 // 黑金极简设计规范 Token（默认值；实际生效值见 Appearance.kt 的 LocalAppColors）
-val GoldAccent = Color(0xFFD4A843)
-val GoldText = Color(0xFFB88A20)
-val HairlineBorder = Color(0xFFEAEAEA)
+val GoldAccent = Color(0xFFD4A843)  // miuix-lint:allow 主题/品牌色定义
+val GoldText = Color(0xFFB88A20)  // miuix-lint:allow 主题/品牌色定义
+val HairlineBorder = Color(0xFFEAEAEA)  // miuix-lint:allow 主题/品牌色定义
 
 /**
  * 用 [app] 的两端金构造浅色 Miuix scheme：金色作 primary，
@@ -24,55 +24,55 @@ val HairlineBorder = Color(0xFFEAEAEA)
  */
 private fun lightScheme(app: AppColors): Colors = lightColorScheme(
     primary = app.goldStart,
-    onPrimary = Color.White,
+    onPrimary = Color.White,  // miuix-lint:allow 主题/品牌色定义
     primaryVariant = app.goldStart,
-    onPrimaryVariant = Color(0xFF6B4E0E),
-    primaryContainer = Color(0xFFFBF6EA),
-    onPrimaryContainer = Color(0xFF6B4E0E),
-    background = Color(0xFFFCFCFD),
-    onBackground = Color(0xFF0D0D0D),
-    onBackgroundVariant = Color(0xFF777777),
-    surface = Color(0xFFFFFFFF),
-    onSurface = Color(0xFF0D0D0D),
-    surfaceVariant = Color(0xFFF8F8FA),
-    onSurfaceSecondary = Color(0xFF777777),
-    onSurfaceVariantSummary = Color(0xFF777777),
-    onSurfaceVariantActions = Color(0xFF777777),
-    surfaceContainerHighest = Color(0xFFF0F0F2),
-    onSurfaceContainerHighest = Color(0xFF0D0D0D),
-    surfaceContainer = Color(0xFFFFFFFF),
-    onSurfaceContainer = Color(0xFF0D0D0D),
+    onPrimaryVariant = Color(0xFF6B4E0E),  // miuix-lint:allow 主题/品牌色定义
+    primaryContainer = Color(0xFFFBF6EA),  // miuix-lint:allow 主题/品牌色定义
+    onPrimaryContainer = Color(0xFF6B4E0E),  // miuix-lint:allow 主题/品牌色定义
+    background = Color(0xFFFCFCFD),  // miuix-lint:allow 主题/品牌色定义
+    onBackground = Color(0xFF0D0D0D),  // miuix-lint:allow 主题/品牌色定义
+    onBackgroundVariant = Color(0xFF777777),  // miuix-lint:allow 主题/品牌色定义
+    surface = Color(0xFFFFFFFF),  // miuix-lint:allow 主题/品牌色定义
+    onSurface = Color(0xFF0D0D0D),  // miuix-lint:allow 主题/品牌色定义
+    surfaceVariant = Color(0xFFF8F8FA),  // miuix-lint:allow 主题/品牌色定义
+    onSurfaceSecondary = Color(0xFF777777),  // miuix-lint:allow 主题/品牌色定义
+    onSurfaceVariantSummary = Color(0xFF777777),  // miuix-lint:allow 主题/品牌色定义
+    onSurfaceVariantActions = Color(0xFF777777),  // miuix-lint:allow 主题/品牌色定义
+    surfaceContainerHighest = Color(0xFFF0F0F2),  // miuix-lint:allow 主题/品牌色定义
+    onSurfaceContainerHighest = Color(0xFF0D0D0D),  // miuix-lint:allow 主题/品牌色定义
+    surfaceContainer = Color(0xFFFFFFFF),  // miuix-lint:allow 主题/品牌色定义
+    onSurfaceContainer = Color(0xFF0D0D0D),  // miuix-lint:allow 主题/品牌色定义
     outline = HairlineBorder,
-    dividerLine = Color(0xFFEDEDED),
-    tertiaryContainer = Color(0xFFF0FDF4),
-    onTertiaryContainer = Color(0xFF166534),
+    dividerLine = Color(0xFFEDEDED),  // miuix-lint:allow 主题/品牌色定义
+    tertiaryContainer = Color(0xFFF0FDF4),  // miuix-lint:allow 主题/品牌色定义
+    onTertiaryContainer = Color(0xFF166534),  // miuix-lint:allow 主题/品牌色定义
 )
 
 /** 用 [app] 的两端金构造深色 Miuix scheme。 */
 private fun darkScheme(app: AppColors): Colors = darkColorScheme(
     primary = app.goldStart,
-    onPrimary = Color(0xFF141414),
+    onPrimary = Color(0xFF141414),  // miuix-lint:allow 主题/品牌色定义
     primaryVariant = app.goldText,
-    onPrimaryVariant = Color(0xFFE5C158),
-    primaryContainer = Color(0xFF2A2210),
-    onPrimaryContainer = Color(0xFFE5C158),
-    background = Color(0xFF0A0A0A),
-    onBackground = Color(0xFFF5F5F5),
-    onBackgroundVariant = Color(0xFF999999),
-    surface = Color(0xFF141414),
-    onSurface = Color(0xFFF5F5F5),
-    surfaceVariant = Color(0xFF1E1E1E),
-    onSurfaceSecondary = Color(0xFF999999),
-    onSurfaceVariantSummary = Color(0xFF999999),
-    onSurfaceVariantActions = Color(0xFF999999),
-    surfaceContainerHighest = Color(0xFF262626),
-    onSurfaceContainerHighest = Color(0xFFF5F5F5),
-    surfaceContainer = Color(0xFF141414),
-    onSurfaceContainer = Color(0xFFF5F5F5),
-    outline = Color(0xFF2A2A2A),
-    dividerLine = Color(0xFF2A2A2A),
-    tertiaryContainer = Color(0xFF064E3B),
-    onTertiaryContainer = Color(0xFFD1FAE5),
+    onPrimaryVariant = Color(0xFFE5C158),  // miuix-lint:allow 主题/品牌色定义
+    primaryContainer = Color(0xFF2A2210),  // miuix-lint:allow 主题/品牌色定义
+    onPrimaryContainer = Color(0xFFE5C158),  // miuix-lint:allow 主题/品牌色定义
+    background = Color(0xFF0A0A0A),  // miuix-lint:allow 主题/品牌色定义
+    onBackground = Color(0xFFF5F5F5),  // miuix-lint:allow 主题/品牌色定义
+    onBackgroundVariant = Color(0xFF999999),  // miuix-lint:allow 主题/品牌色定义
+    surface = Color(0xFF141414),  // miuix-lint:allow 主题/品牌色定义
+    onSurface = Color(0xFFF5F5F5),  // miuix-lint:allow 主题/品牌色定义
+    surfaceVariant = Color(0xFF1E1E1E),  // miuix-lint:allow 主题/品牌色定义
+    onSurfaceSecondary = Color(0xFF999999),  // miuix-lint:allow 主题/品牌色定义
+    onSurfaceVariantSummary = Color(0xFF999999),  // miuix-lint:allow 主题/品牌色定义
+    onSurfaceVariantActions = Color(0xFF999999),  // miuix-lint:allow 主题/品牌色定义
+    surfaceContainerHighest = Color(0xFF262626),  // miuix-lint:allow 主题/品牌色定义
+    onSurfaceContainerHighest = Color(0xFFF5F5F5),  // miuix-lint:allow 主题/品牌色定义
+    surfaceContainer = Color(0xFF141414),  // miuix-lint:allow 主题/品牌色定义
+    onSurfaceContainer = Color(0xFFF5F5F5),  // miuix-lint:allow 主题/品牌色定义
+    outline = Color(0xFF2A2A2A),  // miuix-lint:allow 主题/品牌色定义
+    dividerLine = Color(0xFF2A2A2A),  // miuix-lint:allow 主题/品牌色定义
+    tertiaryContainer = Color(0xFF064E3B),  // miuix-lint:allow 主题/品牌色定义
+    onTertiaryContainer = Color(0xFFD1FAE5),  // miuix-lint:allow 主题/品牌色定义
 )
 
 /**
@@ -114,11 +114,13 @@ fun AiGatewayTheme(
                 }
             }
         } else {
-            val scheme = remember(colorSchemeMode, appColors, backgroundOverride) {
+            // isSystemInDarkTheme() 是 @Composable，必须在 remember 外调用
+            val systemDark = isSystemInDarkTheme()
+            val scheme = remember(colorSchemeMode, appColors, backgroundOverride, systemDark) {
                 val base = when (colorSchemeMode) {
                     ColorSchemeMode.Light -> lightScheme(appColors)
                     ColorSchemeMode.Dark -> darkScheme(appColors)
-                    else -> if (isSystemInDarkTheme()) darkScheme(appColors) else lightScheme(appColors)
+                    else -> if (systemDark) darkScheme(appColors) else lightScheme(appColors)
                 }
                 if (backgroundOverride != null) base.copy(background = backgroundOverride) else base
             }
@@ -128,7 +130,7 @@ fun AiGatewayTheme(
 }
 
 /** Hero 黑金渐变（#1A1A1A → #080808）。 */
-val HeroGradient: List<Color> = listOf(Color(0xFF1A1A1A), Color(0xFF080808))
+val HeroGradient: List<Color> = listOf(Color(0xFF1A1A1A), Color(0xFF080808))  // miuix-lint:allow 主题/品牌色定义
 
 /** 可直接用于 Modifier.background(brush) 的渐变画笔。 */
 val HeroBrush: Brush get() = Brush.linearGradient(HeroGradient)

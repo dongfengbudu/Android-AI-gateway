@@ -8,6 +8,7 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
@@ -19,13 +20,13 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import dev.aigw.app.ui.providers.ProviderUiActions
 import dev.aigw.app.ui.providers.ProviderUiRegistry
 import top.yukonga.miuix.kmp.basic.Icon
-import top.yukonga.miuix.kmp.basic.Switch
+import top.yukonga.miuix.kmp.basic.SmallTitle
 import top.yukonga.miuix.kmp.basic.Text
+import top.yukonga.miuix.kmp.extra.SuperSwitch
 import top.yukonga.miuix.kmp.icon.MiuixIcons
 import top.yukonga.miuix.kmp.icon.extended.Edit
 import top.yukonga.miuix.kmp.theme.MiuixTheme
@@ -138,25 +139,25 @@ fun ProviderDetailScreen(
             }
         },
     ) {
-        item {
-            Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
         // LoginEntry 自带卡片，这里不再包一层，避免双层卡片
-        ui.LoginEntry(accounts, actions)
+        item { ui.LoginEntry(accounts, actions) }
 
         // 账号列表由供应商组件自管（如 WorkBuddy 按国内外分区）时，不再重复渲染通用账号卡
         if (accounts.isNotEmpty() && !ui.managesOwnAccounts) {
+            item { SmallTitle("账号") }
+            item {
             SectionCard(enterIndex = 0) {
-                SectionLabel("账号")
                 accounts.forEachIndexed { index, account ->
                     AccountRow(account, ui, actions, index = index)
                 }
                 OutlineActionButton("刷新额度") { actions.onRefreshCredits(providerId, null) }
             }
+            }
         }
 
-        ui.SettingsSection(viewModel.providerSettings(providerId)) { updated ->
-            viewModel.updateProviderSettings(providerId, updated)
-        }
+        item {
+            ui.SettingsSection(viewModel.providerSettings(providerId)) { updated ->
+                viewModel.updateProviderSettings(providerId, updated)
             }
         }
     }
@@ -173,28 +174,12 @@ private fun AccountRow(
         modifier = Modifier.fillMaxWidth().staggeredAppear(index),
         verticalArrangement = Arrangement.spacedBy(8.dp),
     ) {
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            Column(Modifier.weight(1f)) {
-                Text(
-                    text = account.nickname.ifEmpty { account.uid },
-                    style = MiuixTheme.textStyles.body2,
-                    fontWeight = FontWeight.SemiBold,
-                )
-                // 额度与明细交给各供应商自己的组件展示（它们知道该怎么解读），这里只报状态
-                Text(
-                    text = accountStatusText(account),
-                    style = MiuixTheme.textStyles.footnote1,
-                    color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
-                )
-            }
-            Switch(
-                checked = account.enabled,
-                onCheckedChange = { actions.onToggleAccount(account.providerId, account.uid, it) },
-            )
-        }
+        SuperSwitch(
+            title = account.nickname.ifEmpty { account.uid },
+            summary = accountStatusText(account),
+            checked = account.enabled,
+            onCheckedChange = { actions.onToggleAccount(account.providerId, account.uid, it) },
+        )
 
         ui.AccountExtra(account, actions)
 

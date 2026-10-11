@@ -6,12 +6,9 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.CircleShape
@@ -33,6 +30,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import dev.aigw.core.usage.CallRecord
 import dev.aigw.core.usage.CallStatus
+import dev.aigw.app.ui.theme.WarnAmber
 import kotlinx.coroutines.delay
 import top.yukonga.miuix.kmp.basic.Icon
 import top.yukonga.miuix.kmp.basic.IconButton
@@ -40,7 +38,7 @@ import top.yukonga.miuix.kmp.basic.Text
 import top.yukonga.miuix.kmp.icon.MiuixIcons
 import top.yukonga.miuix.kmp.icon.extended.Refresh
 import top.yukonga.miuix.kmp.theme.MiuixTheme
-import top.yukonga.miuix.kmp.window.WindowBottomSheet
+import top.yukonga.miuix.kmp.extra.WindowBottomSheet
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
@@ -76,97 +74,88 @@ fun LogsScreen(state: AppUiState, viewModel: AppViewModel) {
         }
     }
 
-    // 本页自带骨架：筛选区固定在顶部，列表用 LazyColumn 懒加载。
-    // 记录最多数百条、每条含大段原文，一次性组合全部卡片会明显卡顿；
-    // 而 LazyColumn 不能嵌在 PageScaffold 的 verticalScroll 里（无限高度约束会崩），所以这里不走 PageScaffold。
-    Column(Modifier.fillMaxSize().background(MiuixTheme.colorScheme.background)) {
-        PageHeader(
-            title = "记录",
-            subtitle = "调用与请求日志",
-            actions = {
-                IconButton(onClick = { viewModel.refresh() }) {
-                    Icon(MiuixIcons.Refresh, contentDescription = "刷新")
-                }
-                StatusChip(state.running)
-            },
-        )
-
-        Column(
-            modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 14.dp),
-            verticalArrangement = Arrangement.spacedBy(10.dp),
-        ) {
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                ChoiceChip(LogTab.Calls.label, tab == LogTab.Calls) { tab = LogTab.Calls }
-                ChoiceChip(LogTab.Requests.label, tab == LogTab.Requests) { tab = LogTab.Requests }
+    PageScaffold(
+        title = "记录",
+        subtitle = "调用与请求日志",
+        actions = {
+            IconButton(onClick = { viewModel.refresh() }) {
+                Icon(MiuixIcons.Refresh, contentDescription = "刷新")
             }
-            if (tab == LogTab.Calls) {
-                Text(
-                    text = "共 ${state.calls.size} 条记录",
-                    style = MiuixTheme.textStyles.headline2,
-                    fontWeight = FontWeight.SemiBold,
-                )
+            StatusChip(state.running)
+        },
+    ) {
+        item(key = "filters") {
+            Column(
+                modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 4.dp),
+                verticalArrangement = Arrangement.spacedBy(10.dp),
+            ) {
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    StatusFilter.entries.forEach { option ->
-                        ChoiceChip(option.label, filter == option, { filter = option })
-                    }
+                    ChoiceChip(LogTab.Calls.label, tab == LogTab.Calls) { tab = LogTab.Calls }
+                    ChoiceChip(LogTab.Requests.label, tab == LogTab.Requests) { tab = LogTab.Requests }
                 }
-                Text(
-                    text = "点卡片看原文 · 长按删除 · 停留本页自动刷新",
-                    style = MiuixTheme.textStyles.footnote1,
-                    color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
-                )
-            } else {
-                Text(
-                    text = "共 ${state.logs.size} 条日志",
-                    style = MiuixTheme.textStyles.headline2,
-                    fontWeight = FontWeight.SemiBold,
-                )
-                Text(
-                    text = "网关与上游交互的流水，仅保留最近若干条。",
-                    style = MiuixTheme.textStyles.footnote1,
-                    color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
-                )
+                if (tab == LogTab.Calls) {
+                    Text(
+                        text = "共 ${state.calls.size} 条记录",
+                        style = MiuixTheme.textStyles.headline2,
+                        fontWeight = FontWeight.SemiBold,
+                    )
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        StatusFilter.entries.forEach { option ->
+                            ChoiceChip(option.label, filter == option, { filter = option })
+                        }
+                    }
+                    Text(
+                        text = "点卡片看原文 · 长按删除 · 停留本页自动刷新",
+                        style = MiuixTheme.textStyles.footnote1,
+                        color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
+                    )
+                } else {
+                    Text(
+                        text = "共 ${state.logs.size} 条日志",
+                        style = MiuixTheme.textStyles.headline2,
+                        fontWeight = FontWeight.SemiBold,
+                    )
+                    Text(
+                        text = "网关与上游交互的流水，仅保留最近若干条。",
+                        style = MiuixTheme.textStyles.footnote1,
+                        color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
+                    )
+                }
             }
         }
 
-        LazyColumn(
-            modifier = Modifier.weight(1f).fillMaxWidth(),
-            contentPadding = PaddingValues(start = 16.dp, end = 16.dp, bottom = 20.dp),
-            verticalArrangement = Arrangement.spacedBy(14.dp),
-        ) {
-            if (tab == LogTab.Calls) {
-                if (calls.isEmpty()) {
-                    item(key = "empty-calls") {
-                        SectionCard {
-                            EmptyHint(
-                                title = "暂无调用记录",
-                                message = "用任一 API Key 调用本地网关后，记录会出现在这里。",
-                            )
-                        }
-                    }
-                } else {
-                    items(calls, key = { it.id }) { record ->
-                        SectionCard {
-                            CallRow(record, onClick = { detail = record }, onLongClick = { viewModel.deleteCall(record.id) })
-                        }
+        if (tab == LogTab.Calls) {
+            if (calls.isEmpty()) {
+                item(key = "empty-calls") {
+                    SectionCard {
+                        EmptyHint(
+                            title = "暂无调用记录",
+                            message = "用任一 API Key 调用本地网关后，记录会出现在这里。",
+                        )
                     }
                 }
             } else {
-                if (state.logs.isEmpty()) {
-                    item(key = "empty-logs") {
-                        SectionCard {
-                            EmptyHint("暂无请求日志", "启动服务并发起调用后，这里会记录每次转发与换号。")
-                        }
+                items(calls, key = { it.id }) { record ->
+                    SectionCard {
+                        CallRow(record, onClick = { detail = record }, onLongClick = { viewModel.deleteCall(record.id) })
                     }
-                } else {
-                    itemsIndexed(state.logs) { _, line ->
-                        SectionCard {
-                            Text(
-                                text = line.render(),
-                                style = MiuixTheme.textStyles.footnote1.copy(fontFamily = FontFamily.Monospace),
-                                modifier = Modifier.fillMaxWidth().padding(vertical = 2.dp),
-                            )
-                        }
+                }
+            }
+        } else {
+            if (state.logs.isEmpty()) {
+                item(key = "empty-logs") {
+                    SectionCard {
+                        EmptyHint("暂无请求日志", "启动服务并发起调用后，这里会记录每次转发与换号。")
+                    }
+                }
+            } else {
+                itemsIndexed(state.logs, key = { i, _ -> i }) { _, line ->
+                    SectionCard {
+                        Text(
+                            text = line.render(),
+                            style = MiuixTheme.textStyles.footnote1.copy(fontFamily = FontFamily.Monospace),
+                            modifier = Modifier.fillMaxWidth().padding(vertical = 2.dp),
+                        )
                     }
                 }
             }
@@ -290,7 +279,7 @@ private fun statusLabel(status: CallStatus): String = when (status) {
 private fun statusColor(status: CallStatus): Color = when (status) {
     CallStatus.SUCCESS -> MiuixTheme.colorScheme.onTertiaryContainer
     CallStatus.FAILED -> MiuixTheme.colorScheme.error
-    CallStatus.ABORTED -> Color(0xFFC97F0A)
+    CallStatus.ABORTED -> WarnAmber
 }
 
 private val TIME_FORMAT = SimpleDateFormat("MM-dd HH:mm:ss", Locale.getDefault())

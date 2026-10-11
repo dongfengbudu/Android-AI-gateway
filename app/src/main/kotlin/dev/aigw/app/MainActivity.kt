@@ -17,6 +17,7 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
@@ -29,6 +30,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.unit.dp
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -45,11 +47,11 @@ import top.yukonga.miuix.kmp.basic.TextButton
 import top.yukonga.miuix.kmp.icon.MiuixIcons
 import top.yukonga.miuix.kmp.icon.extended.Contacts
 import top.yukonga.miuix.kmp.icon.extended.GridView
-import top.yukonga.miuix.kmp.icon.extended.Home
+import top.yukonga.miuix.kmp.icon.extended.CloudFill
 import top.yukonga.miuix.kmp.icon.extended.Recent
 import top.yukonga.miuix.kmp.icon.extended.Settings
 import top.yukonga.miuix.kmp.theme.MiuixTheme
-import top.yukonga.miuix.kmp.window.WindowDialog
+import top.yukonga.miuix.kmp.extra.WindowDialog
 import dev.aigw.app.service.GatewayTileService
 import dev.aigw.app.ui.pushPopSpec
 import dev.aigw.app.ui.tabContentSpec
@@ -166,7 +168,7 @@ class MainActivity : ComponentActivity() {
 }
 
 private enum class Tab(val label: String, val icon: ImageVector) {
-    Home("首页", MiuixIcons.Home),
+    Home("首页", MiuixIcons.CloudFill),
     Providers("供应商", MiuixIcons.Contacts),
     Models("模型", MiuixIcons.GridView),
     Logs("记录", MiuixIcons.Recent),
@@ -200,9 +202,9 @@ private fun AppRoot(viewModel: AppViewModel, state: AppUiState) {
     }
 
     Scaffold(
+        containerColor = MiuixTheme.colorScheme.background,
         snackbarHost = { SnackbarHost(snackbarHostState) },
         bottomBar = {
-            val selectedGold = LocalAppColors.current.goldStart
             NavigationBar {
                 Tab.entries.forEach { item ->
                     NavigationBarItem(
@@ -214,16 +216,15 @@ private fun AppRoot(viewModel: AppViewModel, state: AppUiState) {
                         },
                         icon = item.icon,
                         label = item.label,
-                        colors = NavigationBarDefaults.navigationBarItemColors(
-                            unselectedContentColor = MiuixTheme.colorScheme.onSurfaceContainerVariant,
-                            selectedContentColor = selectedGold,
-                        ),
                     )
                 }
             }
         },
     ) { insets ->
-        Box(Modifier.fillMaxSize().padding(bottom = insets.calculateBottomPadding())) {
+        // 外层 Scaffold 的 bottom padding 已包含 bottomBar（含导航栏 inset），
+        // 这里只把内容顶下来即可；内容列表自身会再加底部 inset spacer，
+        // 不重复叠 padding，避免底部出现一段「挤」出来的空白。
+        Box(Modifier.fillMaxSize()) {
             // 二级页推拉过渡：推入从右滑入，返回向右滑出
             AnimatedContent(
                 targetState = subPage,

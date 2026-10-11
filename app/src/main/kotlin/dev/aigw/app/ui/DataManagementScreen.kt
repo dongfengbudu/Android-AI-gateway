@@ -19,6 +19,7 @@ import androidx.compose.ui.unit.dp
 import dev.aigw.core.gateway.GatewaySettings
 import dev.aigw.core.usage.StorageAudit
 import top.yukonga.miuix.kmp.basic.HorizontalDivider
+import top.yukonga.miuix.kmp.basic.SmallTitle
 import top.yukonga.miuix.kmp.basic.Text
 import top.yukonga.miuix.kmp.basic.TextField
 import top.yukonga.miuix.kmp.theme.MiuixTheme
@@ -45,36 +46,36 @@ fun DataManagementScreen(state: AppUiState, viewModel: AppViewModel, onBack: () 
         leading = { BackButton(onBack) },
     ) {
         item {
-            Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
-        SectionCard(enterIndex = 0) {
-            Text("使用记录", style = MiuixTheme.textStyles.headline2, fontWeight = FontWeight.SemiBold)
-            Text(
-                text = "记录会保存每次请求的输入/输出/思考链，是应用数据体积的主要来源；服务运行时按保留天数每日自动清理。",
-                style = MiuixTheme.textStyles.footnote1,
-                color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
-            )
-            RetentionField(retention) { viewModel.setLogRetentionDays(it) }
-            HorizontalDivider(color = MiuixTheme.colorScheme.dividerLine)
-            Text(
-                text = "当前占用 ${StorageAudit.formatSize(records)} · ${state.storedCalls} 条记录",
-                style = MiuixTheme.textStyles.body2,
-            )
-            Text(
-                text = "自动保留 $retention 天，服务运行时会每日自动清理",
-                style = MiuixTheme.textStyles.footnote1,
-                color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
-            )
+            SectionCard(enterIndex = 0) {
+                Text("使用记录", style = MiuixTheme.textStyles.headline2, fontWeight = FontWeight.SemiBold)
+                Text(
+                    text = "记录会保存每次请求的输入/输出/思考链，是应用数据体积的主要来源；服务运行时按保留天数每日自动清理。",
+                    style = MiuixTheme.textStyles.footnote1,
+                    color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
+                )
+                RetentionField(retention) { viewModel.setLogRetentionDays(it) }
+                HorizontalDivider(color = MiuixTheme.colorScheme.dividerLine)
+                Text(
+                    text = "当前占用 ${StorageAudit.formatSize(records)} · ${state.storedCalls} 条记录",
+                    style = MiuixTheme.textStyles.body2,
+                )
+                Text(
+                    text = "自动保留 $retention 天，服务运行时会每日自动清理",
+                    style = MiuixTheme.textStyles.footnote1,
+                    color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
+                )
+            }
         }
 
-        SectionLabel("清理")
-        SectionCard(enterIndex = 1) {
-            OutlineActionButton("查看存储占用明细") { showDetail = !showDetail }
-            if (showDetail) {
-                StorageDetail(state)
-            }
-            OutlineActionButton("截断超长记录内容") { viewModel.truncateLongRecords() }
-            OutlineActionButton("清理过期记录") { viewModel.purgeExpiredRecords() }
-        }
+        item { SmallTitle("清理") }
+        item {
+            SectionCard(enterIndex = 1) {
+                OutlineActionButton("查看存储占用明细") { showDetail = !showDetail }
+                if (showDetail) {
+                    StorageDetail(state)
+                }
+                OutlineActionButton("截断超长记录内容") { viewModel.truncateLongRecords() }
+                OutlineActionButton("清理过期记录") { viewModel.purgeExpiredRecords() }
             }
         }
     }

@@ -9,7 +9,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import dev.aigw.app.ui.QuotaPackBar
 import dev.aigw.app.ui.SectionCard
-import dev.aigw.app.ui.SectionLabel
+import dev.aigw.app.ui.SectionHeader
 import dev.aigw.app.ui.providers.ProviderUi
 import dev.aigw.app.ui.providers.ProviderUiActions
 import dev.aigw.core.pool.AccountStatus
@@ -40,7 +40,7 @@ object AntigravityUi : ProviderUi {
     @Composable
     override fun LoginEntry(accounts: List<AccountStatus>, actions: ProviderUiActions) {
         SectionCard(enterIndex = 0) {
-            SectionLabel("登录")
+            SectionHeader("登录")
             Button(
                 onClick = { actions.onWebLogin(id) },
                 modifier = Modifier.fillMaxWidth(),

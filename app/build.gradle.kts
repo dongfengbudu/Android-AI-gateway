@@ -113,18 +113,21 @@ dependencies {
     // :core 用 implementation 引 gson，不传递；app 里要直接构造 JsonObject（如动作 payload）
     implementation("com.google.code.gson:gson:2.11.0")
 
-    implementation(platform("androidx.compose:compose-bom:2024.12.01"))
+    // Compose 版本与 miuix 0.8.8 的传递依赖对齐（JB CMP 1.10.3 → androidx 1.10.5）。
+    // 不用 BOM：旧 BOM 2024.12.01 会把 ui/foundation 钉在 1.7.6，与 1.10.5 混版本运行。
+    implementation("androidx.compose.ui:ui:1.10.5")
+    implementation("androidx.compose.foundation:foundation:1.10.5")
     implementation("androidx.core:core-ktx:1.15.0")
     implementation("androidx.activity:activity-compose:1.9.3")
     implementation("androidx.lifecycle:lifecycle-runtime-compose:2.8.7")
     implementation("androidx.lifecycle:lifecycle-viewmodel-compose:2.8.7")
-    implementation("androidx.compose.ui:ui")
 
-    // Miuix（HyperOS 风格 UI 库）；金色 accent 通过 MiuixTheme 自定义 Colors 注入
-    implementation("top.yukonga.miuix.kmp:miuix-ui-android:0.9.4")
-    implementation("top.yukonga.miuix.kmp:miuix-preference-android:0.9.4")
-    implementation("top.yukonga.miuix.kmp:miuix-icons-android:0.9.4")
+    // Miuix（HyperOS 风格 UI 库）；金色 accent 通过 MiuixTheme 自定义 Colors 注入。
+    // 0.9.x 要求 compileSdk 37 + AGP 9.1（超出本地工具链），故取 0.8.8：
+    // 单构件 miuix-android（basic/theme/utils/extra 组件），extended 图标在 miuix-icons。
+    implementation("top.yukonga.miuix.kmp:miuix-android:0.8.8")
+    implementation("top.yukonga.miuix.kmp:miuix-icons-android:0.8.8")
     implementation("androidx.security:security-crypto:1.1.0-alpha06")
 
-    debugImplementation("androidx.compose.ui:ui-tooling")
+    debugImplementation("androidx.compose.ui:ui-tooling:1.10.5")
 }

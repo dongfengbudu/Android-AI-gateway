@@ -4,6 +4,7 @@ import androidx.compose.animation.animateContentSize
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -29,7 +30,7 @@ import dev.aigw.app.ui.ChoiceChip
 import dev.aigw.app.ui.EmptyHint
 import dev.aigw.app.ui.OutlineActionButton
 import dev.aigw.app.ui.SectionCard
-import dev.aigw.app.ui.SectionLabel
+import dev.aigw.app.ui.SectionHeader
 import dev.aigw.app.ui.accountStatusText
 import dev.aigw.app.ui.providers.ProviderUi
 import dev.aigw.app.ui.providers.ProviderUiActions
@@ -38,17 +39,18 @@ import top.yukonga.miuix.kmp.basic.Button
 import top.yukonga.miuix.kmp.basic.ButtonDefaults
 import top.yukonga.miuix.kmp.basic.Checkbox
 import top.yukonga.miuix.kmp.basic.Icon
-import top.yukonga.miuix.kmp.basic.Switch
 import top.yukonga.miuix.kmp.basic.Text
 import top.yukonga.miuix.kmp.basic.TextButton
 import top.yukonga.miuix.kmp.basic.TextField
+import top.yukonga.miuix.kmp.extra.SuperSwitch
 import top.yukonga.miuix.kmp.icon.MiuixIcons
 import top.yukonga.miuix.kmp.icon.extended.Download
 import top.yukonga.miuix.kmp.icon.extended.ExpandLess
 import top.yukonga.miuix.kmp.icon.extended.ExpandMore
 import top.yukonga.miuix.kmp.icon.extended.Layers
 import top.yukonga.miuix.kmp.theme.MiuixTheme
-import top.yukonga.miuix.kmp.window.WindowBottomSheet
+import top.yukonga.miuix.kmp.extra.WindowBottomSheet
+import top.yukonga.miuix.kmp.utils.overScrollVertical
 
 class CustomUi(override val id: String) : ProviderUi {
 
@@ -90,7 +92,7 @@ class CustomUi(override val id: String) : ProviderUi {
                 ) { Text("添加账号") }
                 return@SectionCard
             }
-            SectionLabel("添加账号")
+            SectionHeader("添加账号")
             var nickname by remember { mutableStateOf("") }
             var apiKey by remember { mutableStateOf("") }
             TextField(
@@ -172,7 +174,7 @@ class CustomUi(override val id: String) : ProviderUi {
                 .padding(top = 12.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            SectionLabel("模型")
+            SectionHeader("模型")
             Spacer(Modifier.weight(1f))
             Row(
                 modifier = Modifier.clickable(enabled = !loading) {
@@ -268,7 +270,9 @@ class CustomUi(override val id: String) : ProviderUi {
                     modifier = Modifier
                         .fillMaxWidth()
                         .padding(top = 10.dp)
-                        .heightIn(min = 240.dp, max = 420.dp),
+                        .heightIn(min = 240.dp, max = 420.dp)
+                        .overScrollVertical(),
+                    overscrollEffect = null,
                 ) {
                     if (filtered.isEmpty()) {
                         item { EmptyHint("没有匹配的模型", "换个关键词试试") }
@@ -351,16 +355,13 @@ class CustomUi(override val id: String) : ProviderUi {
                 actions.onRenameAccount(id, account.uid, nickname)
             }
 
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                Text("启用", modifier = Modifier.weight(1f))
-                Switch(
-                    checked = account.enabled,
-                    onCheckedChange = { actions.onToggleAccount(id, account.uid, it) },
-                )
-            }
+            SuperSwitch(
+                title = "启用",
+                summary = "关闭后该账号不参与请求调度",
+                checked = account.enabled,
+                onCheckedChange = { actions.onToggleAccount(id, account.uid, it) },
+                insideMargin = PaddingValues(0.dp),
+            )
             Text(
                 text = "额度 ${if (account.creditsKnown) account.credits.toString() else "—"}",
                 style = MiuixTheme.textStyles.body2,

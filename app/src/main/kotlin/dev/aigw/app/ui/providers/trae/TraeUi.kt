@@ -16,7 +16,7 @@ import com.google.gson.JsonObject
 import dev.aigw.app.ui.ChoiceChip
 import dev.aigw.app.ui.OutlineActionButton
 import dev.aigw.app.ui.SectionCard
-import dev.aigw.app.ui.SectionLabel
+import dev.aigw.app.ui.SectionHeader
 import dev.aigw.app.ui.providers.ProviderUi
 import dev.aigw.app.ui.providers.ProviderUiActions
 import dev.aigw.core.pool.AccountStatus
@@ -53,7 +53,7 @@ object TraeUi : ProviderUi {
 
         Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
             SectionCard(enterIndex = 0) {
-                SectionLabel("登录")
+                SectionHeader("登录")
                 Button(
                     onClick = { actions.onWebLogin(id) },
                     modifier = Modifier.fillMaxWidth(),

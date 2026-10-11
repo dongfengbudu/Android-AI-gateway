@@ -18,6 +18,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -97,88 +98,78 @@ fun HomeScreen(
         actions = { StatusChip(state.running) },
     ) {
         item {
-            Box(Modifier.padding(bottom = 12.dp)) {
-                ConsoleCard(
-                    state = state,
-                    lanUrl = lanUrl,
-                    onStart = { startWithNotificationPermission() },
-                    onStop = { viewModel.stopGateway() },
-                    onRefreshCredits = { viewModel.refreshAllCredits() },
-                    onCopy = { text, message ->
-                        clipboard.setText(AnnotatedString(text))
-                        Toast.makeText(context, message, Toast.LENGTH_SHORT).show()
-                    },
-                )
-            }
+            ConsoleCard(
+                state = state,
+                lanUrl = lanUrl,
+                onStart = { startWithNotificationPermission() },
+                onStop = { viewModel.stopGateway() },
+                onRefreshCredits = { viewModel.refreshAllCredits() },
+                onCopy = { text, message ->
+                    clipboard.setText(AnnotatedString(text))
+                    Toast.makeText(context, message, Toast.LENGTH_SHORT).show()
+                },
+            )
         }
 
         item {
-            Box(Modifier.padding(bottom = 12.dp)) {
-                TelemetryGrid(state, Modifier.staggeredAppear(1))
-            }
+            TelemetryGrid(state, Modifier.staggeredAppear(1))
         }
 
         item {
-            Box(Modifier.padding(bottom = 12.dp)) {
-                TrendCard(state)
-            }
+            TrendCard(state)
         }
 
         item {
-            Box(Modifier.padding(bottom = 12.dp)) {
-                SectionCard(modifier = Modifier.staggeredAppear(3)) {
-                    SectionHeader("快捷操作 · ACTIONS")
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(10.dp),
+            SectionCard(modifier = Modifier.staggeredAppear(3)) {
+                SectionHeader("快捷操作")
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(10.dp),
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .weight(1f)
+                            .clip(RoundedCornerShape(10.dp))
+                            .background(MiuixTheme.colorScheme.onSurface)
+                            .clickable { viewModel.checkinAll() }
+                            .padding(vertical = 12.dp),
+                        contentAlignment = Alignment.Center,
                     ) {
-                        Box(
-                            modifier = Modifier
-                                .weight(1f)
-                                .clip(RoundedCornerShape(10.dp))
-                                .background(MiuixTheme.colorScheme.onSurface)
-                                .clickable { viewModel.checkinAll() }
-                                .padding(vertical = 12.dp),
-                            contentAlignment = Alignment.Center,
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(6.dp),
                         ) {
-                            Row(
-                                verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.spacedBy(6.dp),
-                            ) {
-                                Box(Modifier.size(6.dp).clip(CircleShape).background(gold))
-                                Text(
-                                    "批量签到",
-                                    style = MiuixTheme.textStyles.footnote1,
-                                    color = MiuixTheme.colorScheme.surface,
-                                    fontWeight = FontWeight.SemiBold,
-                                )
-                            }
-                        }
-                        Box(
-                            modifier = Modifier
-                                .weight(1f)
-                                .clip(RoundedCornerShape(10.dp))
-                                .border(1.dp, gold, RoundedCornerShape(10.dp))
-                                .clickable { openTaskCenter() }
-                                .padding(vertical = 12.dp),
-                            contentAlignment = Alignment.Center,
-                        ) {
+                            Box(Modifier.size(6.dp).clip(CircleShape).background(gold))
                             Text(
-                                "任务中心",
+                                "批量签到",
                                 style = MiuixTheme.textStyles.footnote1,
-                                color = goldText,
+                                color = MiuixTheme.colorScheme.surface,
                                 fontWeight = FontWeight.SemiBold,
                             )
                         }
+                    }
+                    Box(
+                        modifier = Modifier
+                            .weight(1f)
+                            .clip(RoundedCornerShape(10.dp))
+                            .border(1.dp, gold, RoundedCornerShape(10.dp))
+                            .clickable { openTaskCenter() }
+                            .padding(vertical = 12.dp),
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        Text(
+                            "任务中心",
+                            style = MiuixTheme.textStyles.footnote1,
+                            color = goldText,
+                            fontWeight = FontWeight.SemiBold,
+                        )
                     }
                 }
             }
         }
 
         item {
-            Box(Modifier.padding(bottom = 12.dp)) {
-                AntigravityQuotaSection(state, viewModel, baseIndex = 4)
-            }
+            AntigravityQuotaSection(state, viewModel, baseIndex = 4)
         }
     }
 }
@@ -195,7 +186,7 @@ private fun ConsoleCard(
 ) {
     val gold = LocalAppColors.current.goldStart
     SectionCard(modifier = Modifier.staggeredAppear(0)) {
-        SectionHeader("网关状态 · CORE CONSOLE")
+        SectionHeader("网关状态")
         Row(
             modifier = Modifier.fillMaxWidth(),
             verticalAlignment = Alignment.CenterVertically,
@@ -281,10 +272,13 @@ private fun ConsoleCard(
     }
 }
 
-/** 状态圆点：运行中绿色带浅光环，停止灰色。 */
+/** 状态圆点：运行中绿色带浅光环，停止灰色。光环用固定外框占位，避免撑高行影响对齐。 */
 @Composable
 private fun StatusDot(running: Boolean) {
-    Box(contentAlignment = Alignment.Center) {
+    Box(
+        modifier = Modifier.size(12.dp),
+        contentAlignment = Alignment.Center,
+    ) {
         if (running) {
             Box(Modifier.size(16.dp).clip(CircleShape).background(SuccessGreen.copy(alpha = 0.18f)))
         }
@@ -348,7 +342,7 @@ private fun TrendCard(state: AppUiState) {
     val trend = state.daily.takeLast(TREND_DAYS)
     val gold = LocalAppColors.current.goldStart
     SectionCard(modifier = Modifier.staggeredAppear(2)) {
-        SectionHeader("消耗趋势 · TREND", action = if (trend.isEmpty()) null else "近 ${trend.size} 天")
+        SectionHeader("消耗趋势", action = if (trend.isEmpty()) null else "近 ${trend.size} 天")
         val drawable = trend.size >= 2 && trend.any { it.promptTokens > 0 || it.completionTokens > 0 }
         if (drawable) {
             TrendChart(trend, startOfDay(System.currentTimeMillis()))
@@ -445,7 +439,7 @@ private fun DrawScope.drawSeries(xs: FloatArray, ys: FloatArray, baseline: Float
     )
 }
 
-/** 2×3 遥测指标网格。 */
+/** 2×3 遥测指标网格：卡片内留 10dp 呼吸间距，不再贴边挤在一起。 */
 @Composable
 private fun TelemetryGrid(state: AppUiState, modifier: Modifier = Modifier) {
     Column(modifier = modifier, verticalArrangement = Arrangement.spacedBy(10.dp)) {
@@ -466,11 +460,11 @@ private fun TelemetryGrid(state: AppUiState, modifier: Modifier = Modifier) {
 private fun Tile(modifier: Modifier, label: String, content: @Composable ColumnScope.() -> Unit) {
     Column(
         modifier = modifier
-            .height(112.dp)
+            .heightIn(min = 112.dp)
             .clip(RoundedCornerShape(16.dp))
             .background(MiuixTheme.colorScheme.surface)
-            .border(1.dp, MiuixTheme.colorScheme.outline, RoundedCornerShape(16.dp))
-            .padding(12.dp),
+            .padding(12.dp)
+            .border(1.dp, MiuixTheme.colorScheme.outline, RoundedCornerShape(16.dp)),
         verticalArrangement = Arrangement.spacedBy(6.dp),
     ) {
         Text(
@@ -650,7 +644,7 @@ private fun AntigravityQuotaSection(state: AppUiState, viewModel: AppViewModel, 
     }
 
     SectionCard(modifier = Modifier.staggeredAppear(baseIndex)) {
-        SectionHeader("上游配额池 · ANTIGRAVITY QUOTA")
+        SectionHeader("上游配额池")
         for (account in accounts) {
             val packs = state.creditPacks["antigravity/${account.uid}"].orEmpty()
             if (accounts.size > 1) {

@@ -13,7 +13,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import dev.aigw.app.ui.SectionCard
-import dev.aigw.app.ui.SectionLabel
+import dev.aigw.app.ui.SectionHeader
 import dev.aigw.app.ui.accountStatusText
 import dev.aigw.app.ui.providers.ProviderUi
 import dev.aigw.app.ui.providers.ProviderUiActions
@@ -101,7 +101,7 @@ object LongCatUi : ProviderUi {
                 return@SectionCard
             }
 
-            SectionLabel("Cookie 登录")
+            SectionHeader("Cookie 登录")
             Text(
                 "浏览器打开 longcat.chat 登录后，从开发者工具里复制整段 Cookie " +
                     "（至少要有 passport_token_key）。",

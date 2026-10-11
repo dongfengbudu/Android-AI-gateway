@@ -3,6 +3,7 @@ package dev.aigw.app.ui
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
@@ -16,15 +17,15 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import dev.aigw.core.gateway.ProxyType
-import top.yukonga.miuix.kmp.basic.Icon
-import top.yukonga.miuix.kmp.basic.Switch
+import top.yukonga.miuix.kmp.basic.HorizontalDivider
+import top.yukonga.miuix.kmp.basic.SmallTitle
 import top.yukonga.miuix.kmp.basic.Text
 import top.yukonga.miuix.kmp.basic.TextButton
 import top.yukonga.miuix.kmp.basic.TextField
-import top.yukonga.miuix.kmp.icon.MiuixIcons
-import top.yukonga.miuix.kmp.icon.extended.ChevronForward
+import top.yukonga.miuix.kmp.extra.SuperArrow
+import top.yukonga.miuix.kmp.extra.SuperSwitch
 import top.yukonga.miuix.kmp.theme.MiuixTheme
-import top.yukonga.miuix.kmp.window.WindowDialog
+import top.yukonga.miuix.kmp.extra.WindowDialog
 
 /**
  * 代理设置：境外供应商（如 Antigravity）需要走代理。
@@ -48,38 +49,28 @@ fun ProxyScreen(state: AppUiState, viewModel: AppViewModel, onBack: () -> Unit) 
         subtitle = if (settings.usable) "已启用 ${settings.host}:${settings.port}" else "未启用",
         leading = { BackButton(onBack) },
     ) {
+        item { SmallTitle("代理") }
         item {
-            Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
         SectionCard(enterIndex = 0) {
-            SectionLabel("代理")
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                Text("启用代理", modifier = Modifier.weight(1f))
-                Switch(
-                    checked = settings.enabled,
-                    onCheckedChange = { viewModel.updateProxySettings(settings.copy(enabled = it)) },
-                )
-            }
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .clickable { showTypeDialog = true },
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                Text("代理类型", modifier = Modifier.weight(1f))
-                Text(
-                    text = settings.type.label,
-                    style = MiuixTheme.textStyles.body2,
-                    color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
-                )
-                Icon(
-                    MiuixIcons.ChevronForward,
-                    contentDescription = null,
-                    tint = MiuixTheme.colorScheme.outline,
-                )
-            }
+            SuperSwitch(
+                title = "启用代理",
+                summary = "开启后所有上游请求默认走代理",
+                checked = settings.enabled,
+                onCheckedChange = { viewModel.updateProxySettings(settings.copy(enabled = it)) },
+                insideMargin = PaddingValues(0.dp),
+            )
+            SuperArrow(
+                title = "代理类型",
+                endActions = {
+                    Text(
+                        text = settings.type.label,
+                        style = MiuixTheme.textStyles.body2,
+                        color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
+                    )
+                },
+                onClick = { showTypeDialog = true },
+                insideMargin = PaddingValues(0.dp),
+            )
             TextField(
                 value = host,
                 onValueChange = { host = it.trim() },
@@ -144,46 +135,33 @@ fun ProxyScreen(state: AppUiState, viewModel: AppViewModel, onBack: () -> Unit) 
                 }
             }
         }
+        }
 
+        item { SmallTitle("走代理的供应商") }
+        item {
         SectionCard(enterIndex = 1) {
-            SectionLabel("走代理的供应商")
             if (state.providers.isEmpty()) {
                 EmptyHint("还没有供应商", "内置供应商会在启动时自动登记。")
             } else {
-                for (info in state.providers) {
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(8.dp),
-                    ) {
-                        Column(Modifier.weight(1f)) {
-                            Text(
-                                text = info.displayName,
-                                style = MiuixTheme.textStyles.body2,
-                                fontWeight = FontWeight.SemiBold,
-                            )
-                            Text(
-                                text = info.id,
-                                style = MiuixTheme.textStyles.footnote1,
-                                color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
-                            )
-                        }
-                        Switch(
-                            checked = info.id !in settings.excludedProviderIds,
-                            onCheckedChange = { checked ->
-                                val excluded = if (checked) {
-                                    settings.excludedProviderIds - info.id
-                                } else {
-                                    settings.excludedProviderIds + info.id
-                                }
-                                viewModel.updateProxySettings(settings.copy(excludedProviderIds = excluded))
-                            },
-                        )
-                    }
+                state.providers.forEachIndexed { index, info ->
+                    if (index > 0) HorizontalDivider(modifier = Modifier.fillMaxWidth())
+                    SuperSwitch(
+                        title = info.displayName,
+                        summary = info.id,
+                        checked = info.id !in settings.excludedProviderIds,
+                        onCheckedChange = { checked ->
+                            val excluded = if (checked) {
+                                settings.excludedProviderIds - info.id
+                            } else {
+                                settings.excludedProviderIds + info.id
+                            }
+                            viewModel.updateProxySettings(settings.copy(excludedProviderIds = excluded))
+                        },
+                        insideMargin = PaddingValues(vertical = 12.dp),
+                    )
                 }
             }
         }
-            }
         }
     }
 
