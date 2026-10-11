@@ -43,7 +43,7 @@ import dev.aigw.core.provider.codebuddy.CodeBuddyProvider
 import dev.aigw.core.provider.trae.TraeProvider
 import dev.aigw.core.store.KeyValueStore
 import dev.aigw.core.usage.CallRecord
-import dev.aigw.core.usage.LogLine
+import dev.aigw.core.usage.OperationEntry
 import dev.aigw.core.usage.StorageAudit
 import dev.aigw.core.usage.StorageReport
 import dev.aigw.core.usage.UsageStats
@@ -209,9 +209,8 @@ data class AppUiState(
     val creditPacks: Map<String, List<QuotaPack>> = emptyMap(),
     /** 已拉取的成长任务明细，键为 `providerId/uid`。 */
     val taskLists: Map<String, dev.aigw.core.provider.ProviderTaskListView> = emptyMap(),
-    val logs: List<LogLine> = emptyList(),
-    /** 登录过程日志（授权链接请求、每次轮询的上游响应），供「登录日志」页排查登录问题。 */
-    val loginLogs: List<LogLine> = emptyList(),
+    /** 统一操作日志（请求、登录、以及未来各功能自己的类别）。 */
+    val operations: List<OperationEntry> = emptyList(),
     val settings: GatewaySettings = GatewaySettings(),
     /**
      * 非空表示需要打开内嵌登录页（URL）。
@@ -278,8 +277,7 @@ private class Snapshot(
     val accounts: List<AccountStatus>,
     val customProviders: List<CustomProviderConfig>,
     val calls: List<CallRecord>,
-    val logs: List<LogLine>,
-    val loginLogs: List<LogLine>,
+    val operations: List<OperationEntry>,
     val settings: GatewaySettings,
     val proxy: ProxySettings,
     val keepAlive: KeepAliveStatus,
@@ -371,8 +369,7 @@ class AppViewModel(
                     accounts = engine.accounts(),
                     customProviders = engine.settingsRepository.loadCustomProviders(),
                     calls = engine.callLogStore.list(),
-                    logs = engine.requestLog.lines(),
-                    loginLogs = engine.loginLog.lines(),
+                    operations = engine.operationLog.entries(),
                     settings = engine.settings(),
                     proxy = engine.proxySettings(),
                     keepAlive = KeepAlive.status(app),
@@ -394,8 +391,7 @@ class AppViewModel(
                 accounts = snapshot.accounts,
                 customProviders = snapshot.customProviders,
                 calls = snapshot.calls,
-                logs = snapshot.logs,
-                loginLogs = snapshot.loginLogs,
+                operations = snapshot.operations,
                 settings = snapshot.settings,
                 proxy = snapshot.proxy,
                 keepAlive = snapshot.keepAlive,
@@ -414,10 +410,10 @@ class AppViewModel(
      */
     fun refreshRecords() {
         viewModelScope.launch {
-            val (calls, logs, loginLogs) = withContext(Dispatchers.IO) {
-                Triple(engine.callLogStore.list(), engine.requestLog.lines(), engine.loginLog.lines())
+            val (calls, operations) = withContext(Dispatchers.IO) {
+                engine.callLogStore.list() to engine.operationLog.entries()
             }
-            _state.value = _state.value.copy(calls = calls, logs = logs, loginLogs = loginLogs)
+            _state.value = _state.value.copy(calls = calls, operations = operations)
         }
     }
 
@@ -1200,9 +1196,8 @@ class AppViewModel(
     }
 
     fun clearLogs() = action {
-        engine.requestLog.clear()
-        engine.loginLog.clear()
-        "请求日志已清空"
+        engine.operationLog.clear()
+        "操作日志已清空"
     }
 
     // ------------------------------------------------------------------ 关于与更新

@@ -1,6 +1,7 @@
 package dev.aigw.core.gateway
 
 import dev.aigw.core.provider.ProviderRegistry
+import dev.aigw.core.usage.OperationLog
 import dev.aigw.core.provider.antigravity.AntigravityProvider
 import dev.aigw.core.provider.codebuddy.CodeBuddyProvider
 import dev.aigw.core.provider.loomy.LoomyProvider
@@ -40,7 +41,7 @@ internal fun registerBuiltinProviders(engine: GatewayEngine) {
         LoomyProvider(
             defaultModel = { engine.providerSettings(LoomyProvider.ID).defaultModel },
             nowMillis = { engine.now() },
-            onLoginLog = { engine.loginLog.info(it) },
+            onLoginLog = { engine.operationLog.info(OperationLog.CATEGORY_LOGIN, it) },
         ),
     )
 
@@ -55,7 +56,7 @@ internal fun registerBuiltinProviders(engine: GatewayEngine) {
         CodeBuddyProvider(
             region = { engine.providerSettings(CodeBuddyProvider.ID).option("region", CodeBuddyProvider.REGION_CN) },
             nowMillis = { engine.now() },
-            onLoginLog = { engine.loginLog.info(it) },
+            onLoginLog = { engine.operationLog.info(OperationLog.CATEGORY_LOGIN, it) },
         ),
     )
 

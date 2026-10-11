@@ -103,7 +103,7 @@ class VerboseLoggingTest {
     fun `详细日志关闭时不记录请求原文`() {
         withServer(verbose = false) { port, engine, _ ->
             postChat(port)
-            val lines = engine.requestLog.lines().map { it.text }
+            val lines = engine.operationLog.entries().map { it.message }
             assertTrue(lines.none { it.contains("请求原文") || it.contains("收到请求") },
                 "关闭详细日志时不应有链路日志：$lines")
         }
@@ -117,7 +117,7 @@ class VerboseLoggingTest {
             assertEquals(200, status)
             assertTrue(response.contains("recovered"), "重试后应成功")
 
-            val logs = engine.requestLog.lines().map { it.text }
+            val logs = engine.operationLog.entries().map { it.message }
             assertTrue(logs.any { it.contains("收到请求") && it.contains("flaky/m") }, "应记录请求入口：$logs")
             assertTrue(logs.any { it.contains("[请求原文]") && it.contains("hi") }, "应记录请求原文：$logs")
             assertTrue(logs.any { it.contains("第 1 次选号") }, "应记录第1次选号：$logs")

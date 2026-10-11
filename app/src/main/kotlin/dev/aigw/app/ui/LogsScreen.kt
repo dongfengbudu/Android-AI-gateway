@@ -4,6 +4,7 @@ import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -13,8 +14,8 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
@@ -22,6 +23,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -32,66 +34,108 @@ import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import dev.aigw.app.ui.theme.SuccessGreen
+import dev.aigw.app.ui.theme.WarnAmber
 import dev.aigw.core.usage.CallRecord
 import dev.aigw.core.usage.CallStatus
-import dev.aigw.core.usage.LogLine
-import dev.aigw.app.ui.theme.WarnAmber
+import dev.aigw.core.usage.LogLevel
+import dev.aigw.core.usage.OperationEntry
+import dev.aigw.core.usage.OperationLog
 import kotlinx.coroutines.delay
 import top.yukonga.miuix.kmp.basic.HorizontalDivider
 import top.yukonga.miuix.kmp.basic.Icon
 import top.yukonga.miuix.kmp.basic.IconButton
 import top.yukonga.miuix.kmp.basic.Text
+import top.yukonga.miuix.kmp.basic.TextButton
 import top.yukonga.miuix.kmp.icon.MiuixIcons
 import top.yukonga.miuix.kmp.icon.extended.Refresh
 import top.yukonga.miuix.kmp.theme.MiuixTheme
 import top.yukonga.miuix.kmp.extra.WindowBottomSheet
 import top.yukonga.miuix.kmp.extra.WindowDialog
-import dev.aigw.app.ui.DialogButtonRow
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
 
-private enum class LogTab(val label: String) { Calls("调用记录"), Requests("请求日志"), Login("登录日志") }
+/** 调用记录（结构化）与操作日志（文本）合并后的展示条目。 */
+private sealed interface LogItem {
+    val atMillis: Long
 
-private enum class StatusFilter(val label: String) {
-    ALL("全部"), SUCCESS("成功"), FAILED("失败"), ABORTED("中断"),
+    data class Call(val record: CallRecord) : LogItem {
+        override val atMillis: Long get() = record.startedAtMillis
+    }
+
+    data class Op(val entry: OperationEntry) : LogItem {
+        override val atMillis: Long get() = entry.atMillis
+    }
 }
+
+private enum class LevelFilter(val label: String, val level: LogLevel?) {
+    ALL("全部", null), INFO("信息", LogLevel.INFO), WARN("警告", LogLevel.WARN), ERROR("错误", LogLevel.ERROR),
+}
+
+/** 统一条目映射到级别：调用记录失败=错误、中断=警告，让「只看问题」对调用也生效。 */
+private fun levelOf(item: LogItem): LogLevel = when (item) {
+    is LogItem.Call -> levelOf(item.record)
+    is LogItem.Op -> item.entry.level
+}
+
+private fun levelOf(record: CallRecord): LogLevel = when (record.status) {
+    CallStatus.FAILED -> LogLevel.ERROR
+    CallStatus.ABORTED -> LogLevel.WARN
+    CallStatus.SUCCESS -> LogLevel.INFO
+}
+
+private fun categoryLabel(category: String): String = when (category) {
+    KEY_CALL -> "调用"
+    OperationLog.CATEGORY_REQUEST -> "请求"
+    OperationLog.CATEGORY_LOGIN -> "登录"
+    else -> category
+}
+
+private const val KEY_CALL = "call"
 
 @Composable
 fun LogsScreen(state: AppUiState, viewModel: AppViewModel) {
-    var tab by remember { mutableStateOf(LogTab.Calls) }
-    var filter by remember { mutableStateOf(StatusFilter.ALL) }
-    var detail by remember { mutableStateOf<CallRecord?>(null) }
-    // 长按删除不可恢复，需二次确认
+    var category by rememberSaveable { mutableStateOf<String?>(null) }
+    var level by rememberSaveable { mutableStateOf(LevelFilter.ALL) }
+    var detail by remember { mutableStateOf<LogItem?>(null) }
+    // 长按删除/清空不可恢复，均需二次确认
     var pendingDelete by remember { mutableStateOf<CallRecord?>(null) }
+    var showClear by remember { mutableStateOf(false) }
 
-    // 停留在本页时自动刷新（只刷记录，不动低频数据）
-    LaunchedEffect(tab) {
+    // 停留在本页时自动刷新（只刷记录，不动低频数据）；进入页面先刷一次，避免首帧展示旧数据
+    LaunchedEffect(Unit) {
+        viewModel.refreshRecords()
         while (true) {
             delay(5_000)
             viewModel.refreshRecords()
         }
     }
 
-    val calls = remember(state.calls, filter) {
-        state.calls.filter {
-            when (filter) {
-                StatusFilter.ALL -> true
-                StatusFilter.SUCCESS -> it.status == CallStatus.SUCCESS
-                StatusFilter.FAILED -> it.status == CallStatus.FAILED
-                StatusFilter.ABORTED -> it.status == CallStatus.ABORTED
+    val items = remember(state.calls, state.operations, category, level) {
+        buildList {
+            if (category == null || category == KEY_CALL) {
+                state.calls.forEach { add(LogItem.Call(it)) }
             }
+            state.operations
+                .filter { category == null || it.category == category }
+                .forEach { add(LogItem.Op(it)) }
         }
+            .filter { level.level == null || levelOf(it) == level.level }
+            .sortedByDescending { it.atMillis }
     }
 
+    val errorCount = items.count { levelOf(it) == LogLevel.ERROR }
+    val warnCount = items.count { levelOf(it) == LogLevel.WARN }
+
     PageScaffold(
-        title = "记录",
-        subtitle = "调用、请求与登录日志",
+        title = "日志",
+        subtitle = "全部操作的统一记录",
         actions = {
-            IconButton(onClick = { viewModel.refresh() }) {
+            TextButton(text = "清空", onClick = { showClear = true })
+            IconButton(onClick = { viewModel.refreshRecords() }) {
                 Icon(MiuixIcons.Refresh, contentDescription = "刷新")
             }
-            StatusChip(state.running)
         },
     ) {
         item(key = "filters") {
@@ -99,91 +143,68 @@ fun LogsScreen(state: AppUiState, viewModel: AppViewModel) {
                 modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 4.dp),
                 verticalArrangement = Arrangement.spacedBy(10.dp),
             ) {
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    ChoiceChip(LogTab.Calls.label, tab == LogTab.Calls) { tab = LogTab.Calls }
-                    ChoiceChip(LogTab.Requests.label, tab == LogTab.Requests) { tab = LogTab.Requests }
-                    ChoiceChip(LogTab.Login.label, tab == LogTab.Login) { tab = LogTab.Login }
-                }
-                if (tab == LogTab.Calls) {
-                    Text(
-                        text = "共 ${state.calls.size} 条记录",
-                        style = MiuixTheme.textStyles.headline2,
-                        fontWeight = FontWeight.SemiBold,
-                    )
-                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        StatusFilter.entries.forEach { option ->
-                            ChoiceChip(option.label, filter == option, { filter = option })
-                        }
+                Row(
+                    modifier = Modifier.horizontalScroll(rememberScrollState()),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                ) {
+                    ChoiceChip("全部", category == null) { category = null }
+                    ChoiceChip(categoryLabel(KEY_CALL), category == KEY_CALL) { category = KEY_CALL }
+                    ChoiceChip(
+                        categoryLabel(OperationLog.CATEGORY_REQUEST),
+                        category == OperationLog.CATEGORY_REQUEST,
+                    ) { category = OperationLog.CATEGORY_REQUEST }
+                    ChoiceChip(
+                        categoryLabel(OperationLog.CATEGORY_LOGIN),
+                        category == OperationLog.CATEGORY_LOGIN,
+                    ) { category = OperationLog.CATEGORY_LOGIN }
+                    unknownCategories(state.operations).forEach { extra ->
+                        ChoiceChip(categoryLabel(extra), category == extra) { category = extra }
                     }
-                    Text(
-                        text = "点卡片看原文 · 长按删除 · 停留本页自动刷新",
-                        style = MiuixTheme.textStyles.footnote1,
-                        color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
-                    )
-                } else {
-                    Text(
-                        text = if (tab == LogTab.Requests) "共 ${state.logs.size} 条日志" else "共 ${state.loginLogs.size} 条日志",
-                        style = MiuixTheme.textStyles.headline2,
-                        fontWeight = FontWeight.SemiBold,
-                    )
-                    Text(
-                        text = if (tab == LogTab.Requests) {
-                            "网关与上游交互的流水，仅保留最近若干条。"
-                        } else {
-                            "各供应商登录每一步的端点、状态码与响应摘录；登录卡住时先看这里。"
-                        },
-                        style = MiuixTheme.textStyles.footnote1,
-                        color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
-                    )
                 }
+                Row(
+                    modifier = Modifier.horizontalScroll(rememberScrollState()),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                ) {
+                    LevelFilter.entries.forEach { option ->
+                        ChoiceChip(option.label, level == option) { level = option }
+                    }
+                }
+                Text(
+                    text = "共 ${items.size} 条" +
+                        (if (errorCount > 0) " · 错误 $errorCount" else "") +
+                        (if (warnCount > 0) " · 警告 $warnCount" else ""),
+                    style = MiuixTheme.textStyles.headline2,
+                    fontWeight = FontWeight.SemiBold,
+                )
+                Text(
+                    text = "点条目看原文 · 调用记录长按删除 · 停留本页自动刷新",
+                    style = MiuixTheme.textStyles.footnote1,
+                    color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
+                )
             }
         }
 
-        if (tab == LogTab.Calls) {
-            if (calls.isEmpty()) {
-                item(key = "empty-calls") {
-                    SectionCard {
-                        EmptyHint(
-                            title = "暂无调用记录",
-                            message = "用任一 API Key 调用本地网关后，记录会出现在这里。",
-                        )
-                    }
-                }
-            } else {
-                items(calls, key = { it.id }) { record ->
-                    SectionCard {
-                        CallRow(record, onClick = { detail = record }, onLongClick = { pendingDelete = record })
-                    }
-                }
-            }
-        } else if (tab == LogTab.Login) {
-            if (state.loginLogs.isEmpty()) {
-                item(key = "empty-login") {
-                    SectionCard {
-                        EmptyHint("暂无登录日志", "发起任一供应商的登录后，这里会记录每个请求的端点与上游响应。")
-                    }
-                }
-            } else {
-                itemsIndexed(state.loginLogs, key = { i, line -> "login-${line.atMillis}-$i" }) { index, line ->
-                    LogRow(line)
-                    if (index != state.loginLogs.lastIndex) {
-                        HorizontalDivider(modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp))
-                    }
+        if (items.isEmpty()) {
+            item(key = "empty") {
+                SectionCard {
+                    EmptyHint(
+                        title = "暂无日志",
+                        message = "发起调用、登录或任一操作后，记录会按时间统一出现在这里。",
+                    )
                 }
             }
         } else {
-            if (state.logs.isEmpty()) {
-                item(key = "empty-logs") {
-                    SectionCard {
-                        EmptyHint("暂无请求日志", "启动服务并发起调用后，这里会记录每次转发与换号。")
-                    }
+            itemsIndexed(items, key = { _, item -> itemKey(item) }) { index, item ->
+                when (item) {
+                    is LogItem.Call -> CallRow(
+                        record = item.record,
+                        onClick = { detail = item },
+                        onLongClick = { pendingDelete = item.record },
+                    )
+                    is LogItem.Op -> OperationRow(entry = item.entry, onClick = { detail = item })
                 }
-            } else {
-                itemsIndexed(state.logs, key = { i, line -> "${line.atMillis}-$i" }) { index, line ->
-                    LogRow(line)
-                    if (index != state.logs.lastIndex) {
-                        HorizontalDivider(modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp))
-                    }
+                if (index != items.lastIndex) {
+                    HorizontalDivider(modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp))
                 }
             }
         }
@@ -191,11 +212,13 @@ fun LogsScreen(state: AppUiState, viewModel: AppViewModel) {
 
     WindowBottomSheet(
         show = detail != null,
-        title = "调用详情",
+        title = if (detail is LogItem.Call) "调用详情" else "日志详情",
         onDismissRequest = { detail = null },
     ) {
-        detail?.let { record ->
-            CallDetailSheet(record)
+        when (val item = detail) {
+            is LogItem.Call -> CallDetailSheet(item.record)
+            is LogItem.Op -> OperationDetailSheet(item.entry)
+            null -> {}
         }
     }
 
@@ -217,14 +240,47 @@ fun LogsScreen(state: AppUiState, viewModel: AppViewModel) {
             },
         )
     }
+
+    WindowDialog(
+        show = showClear,
+        title = "清空日志",
+        onDismissRequest = { showClear = false },
+    ) {
+        Text(
+            text = "将清空调用记录与全部操作日志（含用量统计聚合），删除后不可恢复。",
+            style = MiuixTheme.textStyles.main,
+        )
+        DialogButtonRow(
+            confirmText = "清空",
+            onCancel = { showClear = false },
+            onConfirm = {
+                showClear = false
+                viewModel.clearCalls()
+                viewModel.clearLogs()
+                viewModel.refreshRecords()
+            },
+        )
+    }
 }
 
-/** 请求日志一行：级别彩点 + 级别/时间在首行，正文在下，行间分割线由列表补。 */
+/** 数据里出现、但界面没有固定胶囊的类别（新功能自带的新类别自动出现）。 */
+private fun unknownCategories(operations: List<OperationEntry>): List<String> =
+    operations.map { it.category }
+        .distinct()
+        .filter { it != KEY_CALL && it != OperationLog.CATEGORY_REQUEST && it != OperationLog.CATEGORY_LOGIN }
+
+private fun itemKey(item: LogItem): String = when (item) {
+    is LogItem.Call -> "call-${item.record.id}"
+    is LogItem.Op -> "op-${item.entry.id}"
+}
+
+/** 操作日志一行：级别彩点 + 类别/时间在首行，正文在下，行间分割线由列表补。 */
 @Composable
-private fun LogRow(line: LogLine) {
+private fun OperationRow(entry: OperationEntry, onClick: () -> Unit) {
     Column(
         modifier = Modifier
             .fillMaxWidth()
+            .clickable(onClick = onClick)
             .padding(horizontal = 16.dp, vertical = 10.dp),
         verticalArrangement = Arrangement.spacedBy(4.dp),
     ) {
@@ -233,35 +289,37 @@ private fun LogRow(line: LogLine) {
                 modifier = Modifier
                     .size(6.dp)
                     .clip(CircleShape)
-                    .background(levelColor(line.level)),
+                    .background(levelColor(entry.level)),
             )
             Spacer(Modifier.width(6.dp))
             Text(
-                text = line.level,
+                text = categoryLabel(entry.category),
                 style = MiuixTheme.textStyles.footnote2,
                 fontWeight = FontWeight.SemiBold,
-                color = levelColor(line.level),
+                color = levelColor(entry.level),
             )
             Spacer(Modifier.weight(1f))
             Text(
-                text = TIME_FORMAT.format(Date(line.atMillis)),
+                text = TIME_FORMAT.format(Date(entry.atMillis)),
                 style = MiuixTheme.textStyles.footnote2,
                 color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
             )
         }
         Text(
-            text = line.text,
+            text = entry.message,
             style = MiuixTheme.textStyles.footnote1,
             modifier = Modifier.fillMaxWidth(),
+            maxLines = 3,
         )
     }
 }
 
+/** 级别语义色：错误红随主题，警示橙/信息灰是固定语义色（Miuix 无 warning token）。 */
 @Composable
-private fun levelColor(level: String): Color = when (level) {
-    "WARN" -> WarnAmber
-    "ERROR" -> MiuixTheme.colorScheme.error
-    else -> MiuixTheme.colorScheme.primary
+private fun levelColor(level: LogLevel): Color = when (level) {
+    LogLevel.WARN -> WarnAmber
+    LogLevel.ERROR -> MiuixTheme.colorScheme.error
+    LogLevel.INFO -> MiuixTheme.colorScheme.onSurfaceVariantSummary
 }
 
 @OptIn(ExperimentalFoundationApi::class)
@@ -271,7 +329,7 @@ private fun CallRow(record: CallRecord, onClick: () -> Unit, onLongClick: () -> 
         modifier = Modifier
             .fillMaxWidth()
             .combinedClickable(onClick = onClick, onLongClick = onLongClick)
-            .padding(vertical = 10.dp),
+            .padding(horizontal = 16.dp, vertical = 10.dp),
         verticalArrangement = Arrangement.spacedBy(6.dp),
     ) {
         Row(verticalAlignment = Alignment.CenterVertically) {
@@ -310,6 +368,26 @@ private fun CallRow(record: CallRecord, onClick: () -> Unit, onLongClick: () -> 
     }
 }
 
+private fun statusLabel(status: CallStatus): String = when (status) {
+    CallStatus.SUCCESS -> "成功"
+    CallStatus.FAILED -> "失败"
+    CallStatus.ABORTED -> "中断"
+}
+
+private fun levelLabel(level: LogLevel): String = when (level) {
+    LogLevel.INFO -> "信息"
+    LogLevel.WARN -> "警告"
+    LogLevel.ERROR -> "错误"
+}
+
+/** 状态语义色：成功绿/警示橙为固定语义色，错误红随主题。 */
+@Composable
+private fun statusColor(status: CallStatus): Color = when (status) {
+    CallStatus.SUCCESS -> SuccessGreen
+    CallStatus.FAILED -> MiuixTheme.colorScheme.error
+    CallStatus.ABORTED -> WarnAmber
+}
+
 @Composable
 private fun CallDetailSheet(record: CallRecord) {
     val clipboard = LocalClipboardManager.current
@@ -329,6 +407,23 @@ private fun CallDetailSheet(record: CallRecord) {
             DetailBlock("返回原文（上游报文）", record.rawResponse) { clipboard.setText(AnnotatedString(record.rawResponse)) }
         }
         if (record.error.isNotEmpty()) DetailBlock("错误", record.error) { clipboard.setText(AnnotatedString(record.error)) }
+    }
+}
+
+@Composable
+private fun OperationDetailSheet(entry: OperationEntry) {
+    val clipboard = LocalClipboardManager.current
+    Column(
+        modifier = Modifier.fillMaxWidth().padding(horizontal = 20.dp).padding(bottom = 28.dp),
+        verticalArrangement = Arrangement.spacedBy(12.dp),
+    ) {
+        Text(categoryLabel(entry.category), style = MiuixTheme.textStyles.headline2, fontWeight = FontWeight.SemiBold)
+        Text(
+            text = "${TIME_FORMAT.format(Date(entry.atMillis))} · ${levelLabel(entry.level)}",
+            style = MiuixTheme.textStyles.footnote1,
+            color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
+        )
+        DetailBlock("内容", entry.message) { clipboard.setText(AnnotatedString(entry.message)) }
     }
 }
 
@@ -358,19 +453,6 @@ private fun DetailBlock(title: String, body: String, onCopy: () -> Unit) {
                 .padding(12.dp),
         )
     }
-}
-
-private fun statusLabel(status: CallStatus): String = when (status) {
-    CallStatus.SUCCESS -> "成功"
-    CallStatus.FAILED -> "失败"
-    CallStatus.ABORTED -> "中断"
-}
-
-@Composable
-private fun statusColor(status: CallStatus): Color = when (status) {
-    CallStatus.SUCCESS -> MiuixTheme.colorScheme.onTertiaryContainer
-    CallStatus.FAILED -> MiuixTheme.colorScheme.error
-    CallStatus.ABORTED -> WarnAmber
 }
 
 private val TIME_FORMAT = SimpleDateFormat("MM-dd HH:mm:ss", Locale.getDefault())

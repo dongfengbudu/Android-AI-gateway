@@ -28,7 +28,7 @@ import dev.aigw.core.provider.custom.CustomProvider
 import dev.aigw.core.provider.trae.TraeProvider
 import dev.aigw.core.store.KeyValueStore
 import dev.aigw.core.usage.CallLogStore
-import dev.aigw.core.usage.RequestLog
+import dev.aigw.core.usage.OperationLog
 import dev.aigw.core.usage.StorageAudit
 import dev.aigw.core.usage.StorageReport
 import dev.aigw.core.usage.UsageStats
@@ -136,10 +136,7 @@ class GatewayEngine(
     val settingsRepository = SettingsRepository(store)
     val pool = AccountPool(store, nowMillis)
     val callLogStore = CallLogStore(store)
-    val requestLog = RequestLog(store, nowMillis = nowMillis)
-
-    /** 登录过程日志：授权链接请求、每次轮询的上游响应，供「登录日志」页排查登录卡住等问题。 */
-    val loginLog = RequestLog(store, capacity = 600, nowMillis = nowMillis, storeKey = RequestLog.LOGIN_STORE_KEY)
+    val operationLog = OperationLog(store, nowMillis = nowMillis)
     val registry = ProviderRegistry()
 
     val sanitizer = dev.aigw.core.security.RequestSanitizer(nowMillis)
@@ -217,7 +214,7 @@ class GatewayEngine(
             onAccountsChanged?.invoke()
         },
         onLog = { log(it) },
-        onLoginLog = { loginLog.info(it) },
+        onLoginLog = { operationLog.info(OperationLog.CATEGORY_LOGIN, it) },
         onVerbose = { tag, text -> logVerbose(tag, text) },
     )
 
@@ -368,7 +365,7 @@ class GatewayEngine(
         synchronized(lifecycleLock) {
             server?.stop()
             server = null
-            requestLog.flush()
+            operationLog.flush()
             log("网关已停止")
         }
     }
@@ -579,7 +576,7 @@ class GatewayEngine(
         return when {
             provider is WebLoginSupport && providerId == TraeProvider.ID -> {
                 val callbackUrl = "http://127.0.0.1:$TRAE_CALLBACK_PORT$TRAE_CALLBACK_PATH"
-                loginLog.info("[${provider.displayName}] 开始网页登录，本地回调 $callbackUrl")
+                operationLog.info(OperationLog.CATEGORY_LOGIN, "[${provider.displayName}] 开始网页登录，本地回调 $callbackUrl")
                 val ticket = provider.beginWebLogin(callbackUrl)
                 startCallbackServer(TRAE_CALLBACK_PORT, TRAE_CALLBACK_PATH) { url ->
                     val outcome = completeWebLogin(providerId, url)
@@ -589,7 +586,7 @@ class GatewayEngine(
             }
 
             provider is LoopbackOAuthSupport -> {
-                loginLog.info("[${provider.displayName}] 开始 OAuth 登录")
+                operationLog.info(OperationLog.CATEGORY_LOGIN, "[${provider.displayName}] 开始 OAuth 登录")
                 startCallbackServer(AntigravityProvider.CALLBACK_PORT, AntigravityProvider.CALLBACK_PATH) { url ->
                     val outcome = completeOAuth(providerId, url)
                     resultPage(outcome.ok, outcome.nickname.ifEmpty { outcome.uid }, outcome.error)
@@ -600,14 +597,14 @@ class GatewayEngine(
             provider is DeviceCodeSupport -> {
                 // 区域感知的登录端点（WorkBuddy：cn=copilot.tencent.com / global=workbuddy.ai）
                 val region = providerSettings(providerId).option("region", "")
-                loginLog.info("[${provider.displayName}] 开始设备授权登录（region=${region.ifEmpty { "默认(cn)" }}）")
+                operationLog.info(OperationLog.CATEGORY_LOGIN, "[${provider.displayName}] 开始设备授权登录（region=${region.ifEmpty { "默认(cn)" }}）")
                 val ticket = try {
                     provider.startDeviceAuth(region)
                 } catch (e: Exception) {
-                    loginLog.error("[${provider.displayName}] 请求授权链接失败：${e.message}")
+                    operationLog.error(OperationLog.CATEGORY_LOGIN, "[${provider.displayName}] 请求授权链接失败：${e.message}")
                     throw e
                 }
-                loginLog.info("[${provider.displayName}] 已拿到授权页与轮询 state，等待用户在登录页完成授权")
+                operationLog.info(OperationLog.CATEGORY_LOGIN, "[${provider.displayName}] 已拿到授权页与轮询 state，等待用户在登录页完成授权")
                 BrowserLoginTicket(ticket.loginUrl, ticket.state)
             }
 
@@ -624,12 +621,12 @@ class GatewayEngine(
                 html
             }.also { it.startServer() }
         } catch (e: Exception) {
-            loginLog.error("监听本地回调端口 $port 失败：${e.message}")
+            operationLog.error(OperationLog.CATEGORY_LOGIN, "监听本地回调端口 $port 失败：${e.message}")
             throw IllegalStateException("无法监听本地回调端口 $port：${e.message}")
         }
         callbackServer = server
         log("已监听本地回调 http://127.0.0.1:$port$path")
-        loginLog.info("已监听本地回调 http://127.0.0.1:$port$path，等待登录回调")
+        operationLog.info(OperationLog.CATEGORY_LOGIN, "已监听本地回调 http://127.0.0.1:$port$path，等待登录回调")
         // 用户长时间不完成登录时释放端口，避免一直占着
         Thread {
             runCatching { Thread.sleep(CALLBACK_TIMEOUT_MS) }
@@ -637,7 +634,7 @@ class GatewayEngine(
                 callbackServer = null
                 runCatching { server.stop() }
                 log("浏览器登录超时，已释放回调端口 $port")
-                loginLog.warn("等待登录回调超时（${CALLBACK_TIMEOUT_MS / 1000} 秒），已释放回调端口 $port")
+                operationLog.warn(OperationLog.CATEGORY_LOGIN, "等待登录回调超时（${CALLBACK_TIMEOUT_MS / 1000} 秒），已释放回调端口 $port")
             }
         }.start()
     }
@@ -671,7 +668,7 @@ class GatewayEngine(
             adopt(providerId, support.completeWebLogin(callbackUrl), "登录")
         } catch (e: Exception) {
             logWarn("登录失败（$providerId）：${e.message}")
-            loginLog.warn("[${registry.get(providerId)?.displayName ?: providerId}] 登录失败：${e.message}")
+            operationLog.warn(OperationLog.CATEGORY_LOGIN, "[${registry.get(providerId)?.displayName ?: providerId}] 登录失败：${e.message}")
             LoginOutcome(LoginState.FAILED, error = e.message ?: "登录失败")
         }
     }
@@ -683,10 +680,10 @@ class GatewayEngine(
         val name = registry.get(providerId)?.displayName ?: providerId
         return try {
             support.sendSmsCode(phone, ccode).also {
-                loginLog.info("[$name] 验证码已发送到 $phone（ccode=$ccode）")
+                operationLog.info(OperationLog.CATEGORY_LOGIN, "[$name] 验证码已发送到 $phone（ccode=$ccode）")
             }
         } catch (e: Exception) {
-            loginLog.warn("[$name] 发送验证码失败（ccode=$ccode）：${e.message}")
+            operationLog.warn(OperationLog.CATEGORY_LOGIN, "[$name] 发送验证码失败（ccode=$ccode）：${e.message}")
             throw e
         }
     }
@@ -704,7 +701,7 @@ class GatewayEngine(
             adopt(providerId, support.loginBySmsCode(phone, code, msgid, ccode), "登录")
         } catch (e: Exception) {
             logWarn("登录失败（$providerId）：${e.message}")
-            loginLog.warn("[${registry.get(providerId)?.displayName ?: providerId}] 短信登录失败：${e.message}")
+            operationLog.warn(OperationLog.CATEGORY_LOGIN, "[${registry.get(providerId)?.displayName ?: providerId}] 短信登录失败：${e.message}")
             LoginOutcome(LoginState.FAILED, error = e.message ?: "登录失败")
         }
     }
@@ -726,7 +723,7 @@ class GatewayEngine(
         when (poll) {
             is DeviceAuthPoll.Pending -> {
                 val count = deviceAuthPollCounts.merge(pollKey, 1, Int::plus)
-                loginLog.info("[$name] 第 $count 次轮询：上游返回等待中（region=${effectiveRegion.ifEmpty { "默认(cn)" }}）")
+                operationLog.info(OperationLog.CATEGORY_LOGIN, "[$name] 第 $count 次轮询：上游返回等待中（region=${effectiveRegion.ifEmpty { "默认(cn)" }}）")
             }
             is DeviceAuthPoll.Success -> {
                 deviceAuthPollCounts.remove(pollKey)
@@ -734,7 +731,7 @@ class GatewayEngine(
             }
             is DeviceAuthPoll.Failed -> {
                 deviceAuthPollCounts.remove(pollKey)
-                loginLog.warn("[$name] 轮询失败：${poll.error}")
+                operationLog.warn(OperationLog.CATEGORY_LOGIN, "[$name] 轮询失败：${poll.error}")
             }
         }
         if (poll is DeviceAuthPoll.Success) {
@@ -758,7 +755,7 @@ class GatewayEngine(
             adopt(providerId, support.exchangeCode(code), "登录")
         } catch (e: Exception) {
             logWarn("OAuth 登录失败（$providerId）：${e.message}")
-            loginLog.warn("[${registry.get(providerId)?.displayName ?: providerId}] OAuth 登录失败：${e.message}")
+            operationLog.warn(OperationLog.CATEGORY_LOGIN, "[${registry.get(providerId)?.displayName ?: providerId}] OAuth 登录失败：${e.message}")
             LoginOutcome(LoginState.FAILED, error = e.message ?: "登录失败")
         }
     }
@@ -773,7 +770,7 @@ class GatewayEngine(
             adopt(providerId, account, "导入")
         } catch (e: Exception) {
             logWarn("导入失败（$providerId）：${e.message}")
-            loginLog.warn("[${provider.displayName}] 导入凭证失败：${e.message}")
+            operationLog.warn(OperationLog.CATEGORY_LOGIN, "[${provider.displayName}] 导入凭证失败：${e.message}")
             LoginOutcome(LoginState.FAILED, error = e.message ?: "导入失败")
         }
     }
@@ -789,7 +786,7 @@ class GatewayEngine(
         refreshCredits(providerId, account.uid)
         val text = "$verb 成功：${account.nickname.ifEmpty { account.uid }}（$providerId）"
         log(text)
-        loginLog.info(text)
+        operationLog.info(OperationLog.CATEGORY_LOGIN, text)
         onAccountsChanged?.invoke()
         return LoginOutcome(LoginState.SUCCESS, account.uid, account.nickname)
     }
@@ -1173,17 +1170,17 @@ class GatewayEngine(
     // ------------------------------------------------------------------ 日志
 
     internal fun log(text: String) {
-        requestLog.info(text)
+        operationLog.info(OperationLog.CATEGORY_REQUEST, text)
         onLog(text)
     }
 
     internal fun logWarn(text: String) {
-        requestLog.warn(text)
+        operationLog.warn(OperationLog.CATEGORY_REQUEST, text)
         onLog(text)
     }
 
     internal fun logError(text: String) {
-        requestLog.error(text)
+        operationLog.error(OperationLog.CATEGORY_REQUEST, text)
         onLog(text)
     }
 
@@ -1198,11 +1195,11 @@ class GatewayEngine(
         var part = 0
         while (start < text.length) {
             val end = minOf(start + limit, text.length)
-            requestLog.info("[${tag}] ${if (part == 0) "" else "(续${part}) "}" + text.substring(start, end))
+            operationLog.info(OperationLog.CATEGORY_REQUEST, "[${tag}] ${if (part == 0) "" else "(续${part}) "}" + text.substring(start, end))
             start = end
             part++
         }
-        if (text.isEmpty()) requestLog.info("[$tag] （空）")
+        if (text.isEmpty()) operationLog.info(OperationLog.CATEGORY_REQUEST, "[$tag] （空）")
     }
 
     private companion object {

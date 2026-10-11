@@ -29,7 +29,6 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.mutableStateListOf
-import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
@@ -63,14 +62,10 @@ fun ModelsScreen(state: AppUiState, viewModel: AppViewModel) {
     val context = LocalContext.current
     val clipboard = LocalClipboardManager.current
     // 按 routePrefix 分组：区域型供应商（如 WorkBuddy 国内与国外）各成一个分组。
-    // 用 derivedStateOf 而不是 remember(key)：模型列表在流式加载期间会被不断替换，
-    // remember(key) 每次都是新引用、必然重算；derivedStateOf 只在真正读到的值变化时才失效，
-    // 且能避免与之无关的重组（如折叠状态变化）触发分组重算。
-    val grouped by remember {
-        derivedStateOf {
-            state.models.groupBy { it.routePrefix }
-        }
-    }
+    // 这里不能用 remember { derivedStateOf { ... } }：state 是普通参数而非 State，
+    // derivedStateOf 只追踪快照状态的读取，remember 无 key 又会一直返回首次创建的实例，
+    // 结果分组被冻结在首次组合时的 models 上，刷新后列表永远不更新。
+    val grouped = remember(state.models) { state.models.groupBy { it.routePrefix } }
     // 折叠状态：记「被展开」的分组（默认全部折叠，点分组头才展开）。用 rememberSaveable 让旋转屏幕后保持。
     val expanded = rememberSaveable(
         saver = androidx.compose.runtime.saveable.listSaver(

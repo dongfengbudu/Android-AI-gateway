@@ -1,6 +1,22 @@
 # 进度
 
 ## 当前状态
+统一日志页重做（2026-10-11）：
+- 新增 `core/usage/OperationLog`：全部非调用操作的统一日志（环形缓冲 + 节流落盘 + 开放类别），
+  接口 `info/warn/error(category, message)` / `entries(category)` / `clear()`；
+  旧 `logs/requests.json` 与 `logs/login.json` 首次启动自动迁入 `logs/operations.json` 并删旧键。
+- `GatewayEngine.requestLog/loginLog` 合并为 `operationLog`（request/login 两个内置类别），
+  `ProviderBootstrap.onLoginLog` 同步改写；`StorageAudit` 两个旧分组合并为 NAME_OPERATIONS。
+- `LogsScreen` 重写：调用记录 + 操作日志按时间合并成统一流，类别/级别两级筛选
+  （调用失败→错误、中断→警告）；新功能自带新类别即可自动出现在筛选胶囊；
+  页面只用 MiuixTheme 令牌，不再引用金色 LocalAppColors/Hero 渐变。
+- 新增 `core/usage/OperationLogTest`（迁移/持久化回读/容量/过滤/清空），
+  `VerboseLoggingTest` 改读 `operationLog.entries()`。
+- 代码评审修复：ARCHITECTURE.md 模块地图补登 usage 两模块；`StorageReport.recordsChars`
+  注释纠正为「调用记录占用」；`StorageAudit`/`OperationLog` 行内全限定名改 import、
+  `keysMatching` 改名 `exactKeys`；迁移中断残留的旧键在下次启动清理（新增测试锁定）；
+  日志页进入即刷新一次（不再等 5 秒首帧旧数据）；日志页顶栏新增「清空」入口（二次确认）。
+
 登录日志扩展到全部供应商（2026-10-11）：
 - `ProviderHooks` 新增 `onLoginLog`，引擎统一接住写进 `loginLog`；所有登录路径都覆盖：
   - 引擎层（全部供应商通用）：网页登录/OAuth/设备授权开始、回调端口监听与超时、

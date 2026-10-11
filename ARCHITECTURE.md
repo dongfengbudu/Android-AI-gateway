@@ -87,6 +87,8 @@
 | `provider/trae/` | 字节 Trae SOLO 通道（最重的协议转换）| |
 | `provider/loomy/` | 讯飞 Loomy（HTTP 200 + 业务码陷阱）| |
 | `provider/custom/` | 任意 OpenAI 兼容中转站 | 一个 key = 一个账号 |
+| `usage/OperationLog.kt` | 统一操作日志：请求/登录/未来功能的任意类别共用一个环形缓冲（节流落盘）；旧 `logs/requests.json`、`logs/login.json` 首次启动自动迁入并清孤儿键 | 新功能记日志直接 `operationLog.info(类别, 文案)`，界面自动出现新筛选 |
+| `usage/CallLogStore.kt` | 调用记录（含请求/响应原文）与用量聚合（累计/每日），容量淘汰 + 保留天数清理 | 单记录单独占一个存储键，避免大 JSON 整体重加密 |
 | `store/KeyValueStore.kt` | 存储抽象（App 侧用 EncryptedSharedPreferences 实现） | |
 
 ### app/（Android 壳）
@@ -132,7 +134,8 @@ settings/gateway.json              # 网关设置
 settings/provider/<id>.json        # 供应商设置（含 region 等 option）
 settings/proxy.json                # 代理设置
 settings/custom.json               # 自定义供应商配置
-call/...                           # 调用日志
+call/...                           # 调用日志（实际前缀 logs/calls/<id>，含请求/响应原文）
+logs/operations.json               # 统一操作日志（请求/登录/其它，OperationLog；旧 logs/requests.json 与 logs/login.json 首次启动自动迁入）
 ```
 
 ---
