@@ -5,10 +5,14 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.CircleShape
@@ -30,8 +34,10 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import dev.aigw.core.usage.CallRecord
 import dev.aigw.core.usage.CallStatus
+import dev.aigw.core.usage.LogLine
 import dev.aigw.app.ui.theme.WarnAmber
 import kotlinx.coroutines.delay
+import top.yukonga.miuix.kmp.basic.HorizontalDivider
 import top.yukonga.miuix.kmp.basic.Icon
 import top.yukonga.miuix.kmp.basic.IconButton
 import top.yukonga.miuix.kmp.basic.Text
@@ -39,6 +45,8 @@ import top.yukonga.miuix.kmp.icon.MiuixIcons
 import top.yukonga.miuix.kmp.icon.extended.Refresh
 import top.yukonga.miuix.kmp.theme.MiuixTheme
 import top.yukonga.miuix.kmp.extra.WindowBottomSheet
+import top.yukonga.miuix.kmp.extra.WindowDialog
+import dev.aigw.app.ui.DialogButtonRow
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
@@ -54,6 +62,8 @@ fun LogsScreen(state: AppUiState, viewModel: AppViewModel) {
     var tab by remember { mutableStateOf(LogTab.Calls) }
     var filter by remember { mutableStateOf(StatusFilter.ALL) }
     var detail by remember { mutableStateOf<CallRecord?>(null) }
+    // 长按删除不可恢复，需二次确认
+    var pendingDelete by remember { mutableStateOf<CallRecord?>(null) }
 
     // 停留在本页时自动刷新（只刷记录，不动低频数据）
     LaunchedEffect(tab) {
@@ -137,7 +147,7 @@ fun LogsScreen(state: AppUiState, viewModel: AppViewModel) {
             } else {
                 items(calls, key = { it.id }) { record ->
                     SectionCard {
-                        CallRow(record, onClick = { detail = record }, onLongClick = { viewModel.deleteCall(record.id) })
+                        CallRow(record, onClick = { detail = record }, onLongClick = { pendingDelete = record })
                     }
                 }
             }
@@ -149,13 +159,10 @@ fun LogsScreen(state: AppUiState, viewModel: AppViewModel) {
                     }
                 }
             } else {
-                itemsIndexed(state.logs, key = { i, _ -> i }) { _, line ->
-                    SectionCard {
-                        Text(
-                            text = line.render(),
-                            style = MiuixTheme.textStyles.footnote1.copy(fontFamily = FontFamily.Monospace),
-                            modifier = Modifier.fillMaxWidth().padding(vertical = 2.dp),
-                        )
+                itemsIndexed(state.logs, key = { i, line -> "${line.atMillis}-$i" }) { index, line ->
+                    LogRow(line)
+                    if (index != state.logs.lastIndex) {
+                        HorizontalDivider(modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp))
                     }
                 }
             }
@@ -171,12 +178,74 @@ fun LogsScreen(state: AppUiState, viewModel: AppViewModel) {
             CallDetailSheet(record)
         }
     }
+
+    WindowDialog(
+        show = pendingDelete != null,
+        title = "删除调用记录",
+        onDismissRequest = { pendingDelete = null },
+    ) {
+        Text(
+            text = "将删除该条调用记录，删除后不可恢复。",
+            style = MiuixTheme.textStyles.main,
+        )
+        DialogButtonRow(
+            confirmText = "删除",
+            onCancel = { pendingDelete = null },
+            onConfirm = {
+                pendingDelete?.let { viewModel.deleteCall(it.id) }
+                pendingDelete = null
+            },
+        )
+    }
+}
+
+/** 请求日志一行：级别彩点 + 级别/时间在首行，正文在下，行间分割线由列表补。 */
+@Composable
+private fun LogRow(line: LogLine) {
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 16.dp, vertical = 10.dp),
+        verticalArrangement = Arrangement.spacedBy(4.dp),
+    ) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Box(
+                modifier = Modifier
+                    .size(6.dp)
+                    .clip(CircleShape)
+                    .background(levelColor(line.level)),
+            )
+            Spacer(Modifier.width(6.dp))
+            Text(
+                text = line.level,
+                style = MiuixTheme.textStyles.footnote2,
+                fontWeight = FontWeight.SemiBold,
+                color = levelColor(line.level),
+            )
+            Spacer(Modifier.weight(1f))
+            Text(
+                text = TIME_FORMAT.format(Date(line.atMillis)),
+                style = MiuixTheme.textStyles.footnote2,
+                color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
+            )
+        }
+        Text(
+            text = line.text,
+            style = MiuixTheme.textStyles.footnote1,
+            modifier = Modifier.fillMaxWidth(),
+        )
+    }
+}
+
+private fun levelColor(level: String): Color = when (level) {
+    "WARN" -> WarnAmber
+    "ERROR" -> MiuixTheme.colorScheme.error
+    else -> MiuixTheme.colorScheme.primary
 }
 
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
-private fun CallRow(record: CallRecord, onClick: () -> Unit, onLongClick: () -> Unit) {
-    Column(
+private fun CallRow(record: CallRecord, onClick: () -> Unit, onLongClick: () -> Unit) {    Column(
         modifier = Modifier
             .fillMaxWidth()
             .combinedClickable(onClick = onClick, onLongClick = onLongClick)

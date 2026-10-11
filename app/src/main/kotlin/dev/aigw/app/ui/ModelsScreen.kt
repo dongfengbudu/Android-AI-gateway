@@ -71,8 +71,8 @@ fun ModelsScreen(state: AppUiState, viewModel: AppViewModel) {
             state.models.groupBy { it.routePrefix }
         }
     }
-    // 折叠状态：记「被折叠」的分组（默认全展开）。用 rememberSaveable 让旋转屏幕后保持。
-    val collapsed = rememberSaveable(
+    // 折叠状态：记「被展开」的分组（默认全部折叠，点分组头才展开）。用 rememberSaveable 让旋转屏幕后保持。
+    val expanded = rememberSaveable(
         saver = androidx.compose.runtime.saveable.listSaver(
             save = { it.toList() },
             restore = { it.toMutableStateList() },
@@ -203,7 +203,7 @@ fun ModelsScreen(state: AppUiState, viewModel: AppViewModel) {
                 modelGroupSection(
                     routePrefix = routePrefix,
                     models = models,
-                    collapsed = collapsed,
+                    expanded = expanded,
                     testLatencies = state.modelTestLatencies,
                     onCopy = { id ->
                         clipboard.setText(AnnotatedString(id))
@@ -429,26 +429,26 @@ private fun ModelSkeletonCard(
 /**
  * 一个供应商分组的渲染单元。
  *
- * 把分组独立成 Composable 是为了让折叠状态的变化**只重组这一组**：
- * 如果在调用方读 [collapsed]，任何一次折叠都会让整个 LazyColumn 重组，
+ * 把分组独立成 Composable 是为了让展开/折叠状态的变化**只重组这一组**：
+ * 如果在调用方读 [expanded]，任何一次切换都会让整个 LazyColumn 重组，
  * 模型多时手感明显发涩。
  *
- * [collapsed] 传的是同一个 [SnapshotStateList]，读取放在函数内部，
+ * [expanded] 传的是同一个 [SnapshotStateList]，读取放在函数内部，
  * Compose 的按需重组会把它限定在本函数范围。
  */
 private fun LazyListScope.modelGroupSection(
     routePrefix: String,
     models: List<RoutedModel>,
-    collapsed: androidx.compose.runtime.snapshots.SnapshotStateList<String>,
+    expanded: androidx.compose.runtime.snapshots.SnapshotStateList<String>,
     testLatencies: Map<String, ModelTestStatus>,
     onCopy: (String) -> Unit,
     onTest: (RoutedModel) -> Unit,
 ) {
-    // 注意：这里**不能**在 LazyListScope 作用域里读 collapsed——
+    // 注意：这里**不能**在 LazyListScope 作用域里读 expanded——
     // 它不是 @Composable，读了也不会订阅变更。所以把读取放进 item 的内容 lambda，
-    // 让 Compose 在那一层做订阅，折叠时只重建这一个分组。
+    // 让 Compose 在那一层做订阅，展开/折叠时只重建这一个分组。
     item(key = "header-$routePrefix") {
-        val isCollapsed = routePrefix in collapsed
+        val isExpanded = routePrefix in expanded
         val title = models.firstOrNull()?.providerName ?: routePrefix
         Row(
             modifier = Modifier
@@ -459,8 +459,8 @@ private fun LazyListScope.modelGroupSection(
                 // 标题栏不用 bouncyClick：那是给按钮用的超弹动画（spring damping 0.36），
                 // 放在会滚动的列表项上每帧都要跑插值，是折叠发卡的另一个原因。
                 .clickable {
-                    if (routePrefix in collapsed) collapsed.remove(routePrefix)
-                    else collapsed.add(routePrefix)
+                    if (routePrefix in expanded) expanded.remove(routePrefix)
+                    else expanded.add(routePrefix)
                 }
                 .padding(start = 16.dp, end = 16.dp, top = 12.dp, bottom = 12.dp),
             horizontalArrangement = Arrangement.SpaceBetween,
@@ -471,8 +471,8 @@ private fun LazyListScope.modelGroupSection(
                 horizontalArrangement = Arrangement.spacedBy(6.dp),
             ) {
                 Icon(
-                    imageVector = if (isCollapsed) MiuixIcons.ExpandMore else MiuixIcons.ExpandLess,
-                    contentDescription = if (isCollapsed) "展开" else "折叠",
+                    imageVector = if (isExpanded) MiuixIcons.ExpandLess else MiuixIcons.ExpandMore,
+                    contentDescription = if (isExpanded) "折叠" else "展开",
                     tint = MiuixTheme.colorScheme.onSurfaceVariantSummary,
                     modifier = Modifier.size(18.dp),
                 )
@@ -497,7 +497,7 @@ private fun LazyListScope.modelGroupSection(
         }
     }
 
-    if (routePrefix in collapsed) return
+    if (routePrefix !in expanded) return
     items(models, key = { it.fullId }) { model ->
         ModelRow(
             model = model,

@@ -13,7 +13,6 @@ import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.AnimatedContent
 import androidx.activity.enableEdgeToEdge
-import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
@@ -37,7 +36,6 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
-import top.yukonga.miuix.kmp.basic.ButtonDefaults
 import top.yukonga.miuix.kmp.basic.NavigationBar
 import top.yukonga.miuix.kmp.basic.NavigationBarDefaults
 import top.yukonga.miuix.kmp.basic.NavigationBarItem
@@ -45,7 +43,6 @@ import top.yukonga.miuix.kmp.basic.Scaffold
 import top.yukonga.miuix.kmp.basic.SnackbarHost
 import top.yukonga.miuix.kmp.basic.SnackbarHostState
 import top.yukonga.miuix.kmp.basic.Text
-import top.yukonga.miuix.kmp.basic.TextButton
 import top.yukonga.miuix.kmp.icon.MiuixIcons
 import top.yukonga.miuix.kmp.icon.extended.Contacts
 import top.yukonga.miuix.kmp.icon.extended.GridView
@@ -59,6 +56,7 @@ import dev.aigw.app.ui.pushPopSpec
 import dev.aigw.app.ui.tabContentSpec
 import dev.aigw.app.ui.AppUiState
 import dev.aigw.app.ui.CookieLoginActivity
+import dev.aigw.app.ui.DialogButtonRow
 import dev.aigw.app.ui.ApiSettingsScreen
 import dev.aigw.app.ui.AppViewModel
 import dev.aigw.app.ui.AppearanceThemeScreen
@@ -214,7 +212,6 @@ private fun AppRoot(viewModel: AppViewModel, state: AppUiState) {
                         onClick = {
                             subPage = null
                             tab = item
-                            if (item == Tab.Models) viewModel.refreshModels()
                         },
                         icon = item.icon,
                         label = item.label,
@@ -288,7 +285,6 @@ private fun AppRoot(viewModel: AppViewModel, state: AppUiState) {
                     onTab = { newTab ->
                         subPage = null
                         tab = newTab
-                        if (newTab == Tab.Models) viewModel.refreshModels()
                     },
                     onSubPage = { subPage = it },
                 )
@@ -297,34 +293,25 @@ private fun AppRoot(viewModel: AppViewModel, state: AppUiState) {
         }
     }
 
-    state.updateInfo?.let { info ->
-        WindowDialog(
-            show = true,
-            title = "发现新版本 ${info.version}",
-            onDismissRequest = { viewModel.dismissUpdate() },
-        ) {
-            Text(
-                text = info.notes.ifEmpty { "该版本没有提供更新说明。" },
-                color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
-                modifier = Modifier.fillMaxWidth().heightIn(max = 320.dp).verticalScroll(rememberScrollState()),
-            )
-            Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                TextButton(
-                    text = "稍后",
-                    onClick = { viewModel.dismissUpdate() },
-                    modifier = Modifier.weight(1f),
-                )
-                TextButton(
-                    text = "前往下载",
-                    onClick = {
-                        viewModel.openReleasePage(info.url)
-                        viewModel.dismissUpdate()
-                    },
-                    modifier = Modifier.weight(1f),
-                    colors = ButtonDefaults.textButtonColorsPrimary(),
-                )
-            }
-        }
+    WindowDialog(
+        show = state.updateInfo != null,
+        title = "发现新版本 ${state.updateInfo?.version.orEmpty()}",
+        onDismissRequest = { viewModel.dismissUpdate() },
+    ) {
+        val info = state.updateInfo
+        Text(
+            text = info?.notes.ifEmpty { "该版本没有提供更新说明。" },
+            color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
+            modifier = Modifier.fillMaxWidth().heightIn(max = 320.dp).verticalScroll(rememberScrollState()),
+        )
+        DialogButtonRow(
+            confirmText = "前往下载",
+            onCancel = { viewModel.dismissUpdate() },
+            onConfirm = {
+                info?.let { viewModel.openReleasePage(it.url) }
+                viewModel.dismissUpdate()
+            },
+        )
     }
 }
 

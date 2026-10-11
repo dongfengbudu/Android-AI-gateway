@@ -69,6 +69,9 @@ private const val RELEASES_API = "https://api.github.com/repos/x3284728970/Andro
 /** GitHub API 要求请求带 User-Agent。 */
 private const val UPDATE_UA = "ai-gateway-android"
 
+/** 模型目录缓存：手动刷新成功后落盘，启动直接展示，不再自动拉取。 */
+private const val MODELS_CACHE_KEY = "cache/models.json"
+
 /** 外观偏好：动态取色、明暗模式、页面底色与金色渐变两端。 */
 class AppearanceStore(private val store: KeyValueStore) {
     fun dynamicColor(): Boolean = store.read(KEY_DYNAMIC) == "1"
@@ -315,36 +318,33 @@ class AppViewModel(
     /** 最近一次设备授权登录的区域，保证手动重试轮询与登录时打同一个端点。 */
     private val deviceRegions = HashMap<String, String>()
 
-    /** 账号集合签名：判断账号变化是否真的影响模型目录，避免刷新凭证也重复拉取。 */
-    private var lastAccountSignature: String = ""
-
     /** 流式加载代次：连发多次刷新时，只有最新一轮的增量与终态能写入 state。 */
     @Volatile
     private var modelsGeneration = 0
 
+    /** 模型目录缓存的存储键；手动刷新成功后落盘，启动时直接读缓存展示。 */
+    private val gson = com.google.gson.Gson()
+
+    private fun loadCachedModels(): List<RoutedModel> = runCatching {
+        val raw = engine.store().read(MODELS_CACHE_KEY) ?: return emptyList()
+        gson.fromJson(raw, Array<RoutedModel>::class.java).toList()
+    }.getOrDefault(emptyList())
+
+    private fun persistModels(models: List<RoutedModel>) {
+        runCatching { engine.store().write(MODELS_CACHE_KEY, gson.toJson(models)) }
+    }
+
     init {
         // 登录在浏览器里完成、由网关的回调监听落池，这里接住通知刷新界面。
-        // 只有账号集合真的变了才重拉模型：刷新凭证（refreshAccount 回存）也会触发本回调，
-        // 那类更新不影响模型列表，重复拉取只是白白多打一轮上游。
         engine.onAccountsChanged = {
-            viewModelScope.launch {
-                val signature = withContext(Dispatchers.IO) { accountSignature(engine.accounts()) }
-                if (signature != lastAccountSignature) {
-                    lastAccountSignature = signature
-                    refreshModels(silent = true)
-                }
-                refresh()
-            }
+            viewModelScope.launch { refresh() }
         }
         refresh()
-        // 启动时在后台静默预拉取一次模型，进入模型页直接秒开（不弹「正在拉取」提示）
-        refreshModels(silent = true)
+        // 模型目录改为纯手动刷新：启动只读上次落盘的缓存，不再自动向上游拉取
+        _state.value = _state.value.copy(models = loadCachedModels())
         // 自动检查更新：默认开启，每天最多一次，失败静默
         maybeAutoCheckUpdate()
     }
-
-    private fun accountSignature(accounts: List<AccountStatus>): String =
-        accounts.joinToString("|") { "${it.providerId}/${it.uid}/${it.disabled}/${it.enabled}" }
 
     override fun onCleared() {
         engine.onAccountsChanged = null
@@ -467,6 +467,8 @@ class AppViewModel(
                 modelsError = listOf(error, providerError).filter { it.isNotEmpty() }.joinToString("；"),
                 busy = if (quiet) _state.value.busy else "",
             )
+            // 手动刷新成功且有目录时才落盘；空结果（如无账号）不动缓存，避免误清
+            if (catalog.models.isNotEmpty()) persistModels(catalog.models)
         }
     }
 
@@ -739,12 +741,29 @@ class AppViewModel(
     fun pollDeviceLogin(providerId: String, state: String, region: String = "") {
         viewModelScope.launch {
             _state.value = _state.value.copy(busy = "等待授权完成")
-            val deadline = System.currentTimeMillis() + 5 * 60 * 1000
-            var message = "授权超时，请重试"
+            val startedAt = System.currentTimeMillis()
+            val deadline = startedAt + 5 * 60 * 1000
+            var message = "授权超时：5 分钟内未检测到登录完成。请重试，并确认在登录页里点到了「授权/允许」这一步"
+            var lastProgressAt = 0L
             while (System.currentTimeMillis() < deadline) {
-                val poll = withContext(Dispatchers.IO) { engine.pollDeviceAuth(providerId, state, region) }
+                val poll = withContext(Dispatchers.IO) {
+                    // 轮询链路任何异常都转成 Failed 展示，不能让协程静默死掉（那样既没账号也没提示）
+                    runCatching { engine.pollDeviceAuth(providerId, state, region) }
+                        .getOrElse { DeviceAuthPoll.Failed(it.message ?: "轮询异常") }
+                }
                 when (poll) {
-                    is DeviceAuthPoll.Pending -> delay(3_000)
+                    is DeviceAuthPoll.Pending -> {
+                        // 关掉登录页后这里仍在后台等：周期性更新 busy 文案，让用户知道还活着
+                        val now = System.currentTimeMillis()
+                        if (now - lastProgressAt >= 10_000) {
+                            lastProgressAt = now
+                            val waited = (now - startedAt) / 1000
+                            _state.value = _state.value.copy(
+                                busy = "等待授权完成（已等 ${waited} 秒，登录成功会自动添加账号）",
+                            )
+                        }
+                        delay(3_000)
+                    }
                     is DeviceAuthPoll.Success -> {
                         _state.value = _state.value.copy(busy = "", notice = "登录成功：${poll.account.nickname.ifEmpty { poll.account.uid }}")
                         refresh()
@@ -752,6 +771,7 @@ class AppViewModel(
                     }
                     is DeviceAuthPoll.Failed -> {
                         message = poll.error
+                        engine.requestLog.warn("设备授权轮询失败（$providerId，区域 $region）：${poll.error}")
                         break
                     }
                 }

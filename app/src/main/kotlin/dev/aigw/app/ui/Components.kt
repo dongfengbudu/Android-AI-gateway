@@ -45,6 +45,7 @@ import top.yukonga.miuix.kmp.basic.IconButton
 import top.yukonga.miuix.kmp.basic.MiuixScrollBehavior
 import top.yukonga.miuix.kmp.basic.Scaffold
 import top.yukonga.miuix.kmp.basic.Text
+import top.yukonga.miuix.kmp.basic.TextButton
 import top.yukonga.miuix.kmp.basic.TopAppBar
 import top.yukonga.miuix.kmp.icon.MiuixIcons
 import top.yukonga.miuix.kmp.icon.extended.Back
@@ -170,6 +171,53 @@ fun SectionCard(
         insideMargin = PaddingValues(16.dp),
         content = content,
     )
+}
+
+/**
+ * 弹窗底部确认按钮行：左侧取消、右侧确认（主色）。供各 WindowDialog/WindowBottomSheet 复用。
+ */
+@Composable
+fun DialogButtonRow(
+    confirmText: String,
+    onCancel: () -> Unit,
+    onConfirm: () -> Unit,
+    cancelText: String = "取消",
+) {
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.spacedBy(12.dp),
+    ) {
+        TextButton(text = cancelText, onClick = onCancel, modifier = Modifier.weight(1f))
+        TextButton(
+            text = confirmText,
+            onClick = onConfirm,
+            modifier = Modifier.weight(1f),
+            colors = ButtonDefaults.textButtonColorsPrimary(),
+        )
+    }
+}
+
+/**
+ * 账号信息行：左标签右值，同行对齐。供各供应商的 AccountExtra / AccountBlock 使用，
+ * 避免「标签一行、值一行」的松散排布。
+ */
+@Composable
+fun AccountInfoRow(
+    label: String,
+    value: String,
+    valueColor: Color = MiuixTheme.colorScheme.primary,
+) {
+    Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+        Text(label, style = MiuixTheme.textStyles.body2, color = MiuixTheme.colorScheme.onSurfaceVariantSummary)
+        Text(
+            text = value,
+            style = MiuixTheme.textStyles.body2,
+            fontWeight = FontWeight.SemiBold,
+            color = valueColor,
+            modifier = Modifier.weight(1f),
+            textAlign = androidx.compose.ui.text.style.TextAlign.End,
+        )
+    }
 }
 
 /** 「运行中 / 已停止」状态胶囊：圆点 + 文案（运行中金色带浅光环）。 */

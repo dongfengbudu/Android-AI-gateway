@@ -143,18 +143,17 @@ class CustomUi(override val id: String) : ProviderUi {
                 )
             }
         }
-        fetchedModels?.let { fetched ->
-            ModelPickerSheet(
-                fetched = fetched,
-                currentModels = models,
-                onDismiss = { fetchedModels = null },
-                onConfirm = { selected ->
-                    models = selected.sorted().joinToString("\n")
-                    fetchedModels = null
-                    actions.onNotice("已选择 ${selected.size} 个模型")
-                },
-            )
-        }
+        ModelPickerSheet(
+            show = fetchedModels != null,
+            fetched = fetchedModels.orEmpty(),
+            currentModels = models,
+            onDismiss = { fetchedModels = null },
+            onConfirm = { selected ->
+                models = selected.sorted().joinToString("\n")
+                fetchedModels = null
+                actions.onNotice("已选择 ${selected.size} 个模型")
+            },
+        )
     }
 
     /** 模型管理：云端拉取 + 手动编辑。拉模型优先用填写的 key，否则用第一个已有账号的；成功后弹层勾选。 */
@@ -230,6 +229,7 @@ class CustomUi(override val id: String) : ProviderUi {
     /** 拉取成功后的模型勾选弹层：搜索过滤、整行点选，保存时把选中项写回模型输入框。 */
     @Composable
     private fun ModelPickerSheet(
+        show: Boolean,
         fetched: List<String>,
         currentModels: String,
         onDismiss: () -> Unit,
@@ -243,7 +243,7 @@ class CustomUi(override val id: String) : ProviderUi {
         val selectedCount = selected.values.count { it }
         val filtered = fetched.filter { it.contains(search, ignoreCase = true) }
         WindowBottomSheet(
-            show = true,
+            show = show,
             title = "选择模型",
             endAction = {
                 Text(

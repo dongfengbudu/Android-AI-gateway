@@ -118,7 +118,10 @@ dependencies {
     implementation("androidx.compose.ui:ui:1.10.5")
     implementation("androidx.compose.foundation:foundation:1.10.5")
     implementation("androidx.core:core-ktx:1.15.0")
-    implementation("androidx.activity:activity-compose:1.9.3")
+    // ≥1.12.0 的 ComponentActivity 才实现 NavigationEventDispatcherOwner 并挂 ViewTree owner；
+    // miuix 0.8.8 的弹窗（NavigationBackHandler）依赖它，钉 1.9.3 会让所有 WindowDialog 弹出即崩。
+    // 1.13.0 可能要求 compileSdk 37，取 1.12 系最新补丁。
+    implementation("androidx.activity:activity-compose:1.12.4")
     implementation("androidx.lifecycle:lifecycle-runtime-compose:2.8.7")
     implementation("androidx.lifecycle:lifecycle-viewmodel-compose:2.8.7")
 

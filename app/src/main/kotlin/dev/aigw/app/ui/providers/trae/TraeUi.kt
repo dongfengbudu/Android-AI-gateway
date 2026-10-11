@@ -13,10 +13,12 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import com.google.gson.JsonObject
+import dev.aigw.app.ui.AccountInfoRow
 import dev.aigw.app.ui.ChoiceChip
 import dev.aigw.app.ui.OutlineActionButton
 import dev.aigw.app.ui.SectionCard
 import dev.aigw.app.ui.SectionHeader
+import top.yukonga.miuix.kmp.basic.HorizontalDivider
 import dev.aigw.app.ui.providers.ProviderUi
 import dev.aigw.app.ui.providers.ProviderUiActions
 import dev.aigw.core.pool.AccountStatus
@@ -98,10 +100,9 @@ object TraeUi : ProviderUi {
         var manual by remember(status.uid) { mutableStateOf("") }
 
         Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-            Text("额度", style = MiuixTheme.textStyles.body2)
-            Text(
-                text = if (status.creditsKnown) status.credits.toString() else "—",
-                style = MiuixTheme.textStyles.body2,
+            AccountInfoRow(
+                label = "额度",
+                value = if (status.creditsKnown) status.credits.toString() else "—",
             )
             if (status.detail.isNotEmpty()) {
                 Text(
@@ -115,11 +116,8 @@ object TraeUi : ProviderUi {
                     actions.onAction(id, status.uid, ACTION_CHECKIN, JsonObject())
                 }
             }
-            Text("设备指纹", style = MiuixTheme.textStyles.body2)
-            Text(
-                text = deviceId.ifEmpty { "—" },
-                style = MiuixTheme.textStyles.body2,
-            )
+            HorizontalDivider(modifier = Modifier.fillMaxWidth())
+            AccountInfoRow(label = "设备指纹", value = deviceId.ifEmpty { "—" }, valueColor = MiuixTheme.colorScheme.onSurface)
             Text(
                 text = "设备指纹用于签到校验，非数字格式会被上游拒绝。",
                 style = MiuixTheme.textStyles.footnote1,

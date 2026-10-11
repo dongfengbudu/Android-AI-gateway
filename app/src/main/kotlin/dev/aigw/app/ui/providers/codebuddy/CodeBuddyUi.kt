@@ -27,11 +27,13 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.google.gson.JsonObject
+import dev.aigw.app.ui.AccountInfoRow
 import dev.aigw.app.ui.ChoiceChip
 import dev.aigw.app.ui.OutlineActionButton
 import dev.aigw.app.ui.SectionCard
 import dev.aigw.app.ui.SectionHeader
 import dev.aigw.app.ui.accountStatusText
+import top.yukonga.miuix.kmp.basic.HorizontalDivider
 import top.yukonga.miuix.kmp.basic.SmallTitle
 import dev.aigw.app.ui.providers.ProviderUi
 import dev.aigw.app.ui.providers.ProviderUiActions
@@ -174,14 +176,11 @@ object CodeBuddyUi : ProviderUi {
                 checked = status.enabled,
                 onCheckedChange = { actions.onToggleAccount(id, status.uid, it) },
             )
-            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                Text("额度", style = MiuixTheme.textStyles.body2, modifier = Modifier.weight(1f))
-                Text(
-                    text = if (status.creditsKnown) status.credits.toString() else "—",
-                    style = MiuixTheme.textStyles.body2,
-                    color = MiuixTheme.colorScheme.primary,
-                )
-            }
+            HorizontalDivider(modifier = Modifier.fillMaxWidth())
+            AccountInfoRow(
+                label = "额度",
+                value = if (status.creditsKnown) status.credits.toString() else "—",
+            )
             if (status.detail.isNotEmpty()) {
                 Text(
                     text = status.detail,
@@ -191,6 +190,7 @@ object CodeBuddyUi : ProviderUi {
             }
             // 国际版（workbuddy.ai）没有签到制度与成长中心，只给国内账号渲染这两个入口
             if (actions.regionOf(id, status.uid) != CodeBuddyProvider.REGION_GLOBAL) {
+                HorizontalDivider(modifier = Modifier.fillMaxWidth())
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     ChoiceChip("签到", false) {
                         actions.onAction(id, status.uid, ACTION_CHECKIN, JsonObject())
@@ -201,7 +201,8 @@ object CodeBuddyUi : ProviderUi {
                 }
                 TaskListSection(status, actions)
             }
-            Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
+            HorizontalDivider(modifier = Modifier.fillMaxWidth())
+            Row(horizontalArrangement = Arrangement.End, modifier = Modifier.fillMaxWidth()) {
                 ChoiceChip("删除账号", false) { actions.onRemoveAccount(id, status.uid) }
             }
         }

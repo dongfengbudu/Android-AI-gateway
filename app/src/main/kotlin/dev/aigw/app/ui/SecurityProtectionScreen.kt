@@ -30,10 +30,10 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import dev.aigw.core.security.OutboundEvidence
+import dev.aigw.app.ui.DialogButtonRow
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
-import top.yukonga.miuix.kmp.basic.ButtonDefaults
 import top.yukonga.miuix.kmp.basic.HorizontalDivider
 import top.yukonga.miuix.kmp.basic.SmallTitle
 import top.yukonga.miuix.kmp.basic.Text
@@ -85,30 +85,28 @@ fun SecurityProtectionScreen(
         }
     }
 
-    if (showEvidenceSheet) {
-        EvidenceSheet(
-            evidences = state.evidences,
-            onDismiss = { showEvidenceSheet = false },
-            onClear = { viewModel.clearEvidences() },
-        )
-    }
+    EvidenceSheet(
+        show = showEvidenceSheet,
+        evidences = state.evidences,
+        onDismiss = { showEvidenceSheet = false },
+        onClear = { viewModel.clearEvidences() },
+    )
 
-    if (showRateLimitDialog) {
-        RateLimitEditDialog(
-            currentMin = state.security.minIntervalMillis,
-            currentJitter = state.security.jitterMillis,
-            onDismiss = { showRateLimitDialog = false },
-            onConfirm = { newMin, newJitter ->
-                viewModel.updateSecuritySettings(
-                    state.security.copy(
-                        minIntervalMillis = newMin,
-                        jitterMillis = newJitter,
-                    ),
-                )
-                showRateLimitDialog = false
-            },
-        )
-    }
+    RateLimitEditDialog(
+        show = showRateLimitDialog,
+        currentMin = state.security.minIntervalMillis,
+        currentJitter = state.security.jitterMillis,
+        onDismiss = { showRateLimitDialog = false },
+        onConfirm = { newMin, newJitter ->
+            viewModel.updateSecuritySettings(
+                state.security.copy(
+                    minIntervalMillis = newMin,
+                    jitterMillis = newJitter,
+                ),
+            )
+            showRateLimitDialog = false
+        },
+    )
 }
 
 // ==============================================================================
@@ -193,20 +191,23 @@ fun RateLimitComponent(
 
 @Composable
 private fun EvidenceSheet(
+    show: Boolean,
     evidences: List<OutboundEvidence>,
     onDismiss: () -> Unit,
     onClear: () -> Unit,
 ) {
     val clipboard = LocalClipboardManager.current
     val timeFormat = remember { SimpleDateFormat("HH:mm:ss", Locale.getDefault()) }
+    // 清空不可恢复，需二次确认
+    var confirmClear by remember { mutableStateOf(false) }
 
     WindowBottomSheet(
-        show = true,
+        show = show,
         title = "出网取证",
         onDismissRequest = onDismiss,
         endAction = {
             if (evidences.isNotEmpty()) {
-                TextButton(text = "清空", onClick = onClear)
+                TextButton(text = "清空", onClick = { confirmClear = true })
             }
         },
     ) {
@@ -302,6 +303,25 @@ private fun EvidenceSheet(
             }
         }
     }
+
+    WindowDialog(
+        show = confirmClear,
+        title = "清空取证记录",
+        onDismissRequest = { confirmClear = false },
+    ) {
+        Text(
+            text = "将删除全部 ${evidences.size} 条脱敏证据，删除后不可恢复。",
+            style = MiuixTheme.textStyles.main,
+        )
+        DialogButtonRow(
+            confirmText = "清空",
+            onCancel = { confirmClear = false },
+            onConfirm = {
+                onClear()
+                confirmClear = false
+            },
+        )
+    }
 }
 
 // ==============================================================================
@@ -310,16 +330,19 @@ private fun EvidenceSheet(
 
 @Composable
 private fun RateLimitEditDialog(
+    show: Boolean,
     currentMin: Long,
     currentJitter: Long,
     onDismiss: () -> Unit,
     onConfirm: (newMin: Long, newJitter: Long) -> Unit,
 ) {
-    var minText by remember { mutableStateOf(currentMin.toString()) }
-    var jitterText by remember { mutableStateOf(currentJitter.toString()) }
+    // 以 show 为 key：每次重新打开都从当前值初始化输入框
+    var minText by remember(show, currentMin) { mutableStateOf(currentMin.toString()) }
+    var jitterText by remember(show, currentJitter) { mutableStateOf(currentJitter.toString()) }
+    var error by remember(show) { mutableStateOf("") }
 
     WindowDialog(
-        show = true,
+        show = show,
         title = "修改账号限速参数",
         onDismissRequest = onDismiss,
     ) {
@@ -345,22 +368,27 @@ private fun RateLimitEditDialog(
                 style = MiuixTheme.textStyles.footnote1,
                 color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
             )
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(12.dp),
-            ) {
-                TextButton(text = "取消", onClick = onDismiss, modifier = Modifier.weight(1f))
-                TextButton(
-                    text = "保存",
-                    onClick = {
-                        val min = minText.toLongOrNull() ?: currentMin
-                        val jitter = jitterText.toLongOrNull() ?: currentJitter
-                        onConfirm(min.coerceIn(0L, 60_000L), jitter.coerceIn(0L, 10_000L))
-                    },
-                    modifier = Modifier.weight(1f),
-                    colors = ButtonDefaults.textButtonColorsPrimary(),
+            if (error.isNotEmpty()) {
+                Text(
+                    text = error,
+                    style = MiuixTheme.textStyles.footnote1,
+                    color = MiuixTheme.colorScheme.error,
                 )
             }
+            DialogButtonRow(
+                confirmText = "保存",
+                onCancel = onDismiss,
+                onConfirm = {
+                    val min = minText.toLongOrNull()
+                    val jitter = jitterText.toLongOrNull()
+                    if (min == null || jitter == null) {
+                        error = "请输入有效的毫秒数"
+                    } else {
+                        error = ""
+                        onConfirm(min.coerceIn(0L, 60_000L), jitter.coerceIn(0L, 10_000L))
+                    }
+                },
+            )
         }
     }
 }

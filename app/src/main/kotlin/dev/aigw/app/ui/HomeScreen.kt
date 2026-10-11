@@ -112,8 +112,14 @@ fun HomeScreen(
         }
 
         item {
-            // 与 SectionCard 的横向 12dp 外边距对齐，六宫格不能铺满屏宽
-            TelemetryGrid(state, Modifier.staggeredAppear(1).padding(horizontal = 12.dp))
+            // 与 SectionCard 的横向 12dp 外边距对齐；补 12dp 底部外边距与消耗趋势卡拉开
+            TelemetryGrid(
+                state,
+                Modifier
+                    .staggeredAppear(1)
+                    .padding(horizontal = 12.dp)
+                    .padding(bottom = 12.dp),
+            )
         }
 
         item {

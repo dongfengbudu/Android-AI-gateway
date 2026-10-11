@@ -167,20 +167,17 @@ fun ProxyScreen(state: AppUiState, viewModel: AppViewModel, onBack: () -> Unit) 
         }
     }
 
-    if (showTypeDialog) {
-        ProxyTypeDialog(
-            show = showTypeDialog,
-            current = settings.type,
-            onSelect = { selected ->
-                showTypeDialog = false
-                viewModel.updateProxySettings(settings.copy(type = selected))
-                viewModel.notice("代理设置已保存")
-            },
-            onDismiss = { showTypeDialog = false },
-        )
-    }
+    ProxyTypeDialog(
+        show = showTypeDialog,
+        current = settings.type,
+        onSelect = { selected ->
+            showTypeDialog = false
+            viewModel.updateProxySettings(settings.copy(type = selected))
+            viewModel.notice("代理设置已保存")
+        },
+        onDismiss = { showTypeDialog = false },
+    )
 }
-
 @Composable
 private fun ProxyTypeDialog(
     show: Boolean,
