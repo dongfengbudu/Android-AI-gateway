@@ -40,52 +40,58 @@ fun ApiSettingsScreen(state: AppUiState, viewModel: AppViewModel, onBack: () -> 
         item {
         SmallTitle("接入地址")
         SectionCard(enterIndex = 0) {
-            AddressTile(state.localUrl.ifEmpty { "http://127.0.0.1:${settings.port}/v1" }) {
-                clipboard.setText(AnnotatedString(state.localUrl))
-                Toast.makeText(context, "已复制本机地址", Toast.LENGTH_SHORT).show()
-            }
-            state.lanUrls.forEach { url ->
-                AddressTile(url) {
-                    clipboard.setText(AnnotatedString(url))
-                    Toast.makeText(context, "已复制局域网地址", Toast.LENGTH_SHORT).show()
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                AddressTile(state.localUrl.ifEmpty { "http://127.0.0.1:${settings.port}/v1" }) {
+                    clipboard.setText(AnnotatedString(state.localUrl))
+                    Toast.makeText(context, "已复制本机地址", Toast.LENGTH_SHORT).show()
+                }
+                state.lanUrls.forEach { url ->
+                    AddressTile(url) {
+                        clipboard.setText(AnnotatedString(url))
+                        Toast.makeText(context, "已复制局域网地址", Toast.LENGTH_SHORT).show()
+                    }
                 }
             }
         }
 
         SmallTitle("端口")
         SectionCard(enterIndex = 1) {
-            TextField(
-                value = port,
-                onValueChange = { port = it.filter(Char::isDigit).take(5) },
-                label = "监听端口",
-                singleLine = true,
-                modifier = Modifier.fillMaxWidth(),
-            )
-            SuperSwitch(
-                title = "同时监听局域网",
-                summary = "电脑/手机同一网络下可直接调用",
-                checked = settings.exposeLan,
-                onCheckedChange = { viewModel.updateSettings(settings.copy(exposeLan = it)) },
-                insideMargin = PaddingValues(0.dp),
-            )
+            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                TextField(
+                    value = port,
+                    onValueChange = { port = it.filter(Char::isDigit).take(5) },
+                    label = "监听端口",
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth(),
+                )
+                SuperSwitch(
+                    title = "同时监听局域网",
+                    summary = "电脑/手机同一网络下可直接调用",
+                    checked = settings.exposeLan,
+                    onCheckedChange = { viewModel.updateSettings(settings.copy(exposeLan = it)) },
+                    insideMargin = PaddingValues(0.dp),
+                )
+            }
         }
 
         SmallTitle("API Key")
         SectionCard(enterIndex = 2) {
-            TextField(
-                value = apiKey,
-                onValueChange = { apiKey = it },
-                label = "网关鉴权 Key（留空表示不校验）",
-                singleLine = true,
-                modifier = Modifier.fillMaxWidth(),
-            )
-            SuperSwitch(
-                title = "无 Key 调用",
-                summary = "允许客户端不带鉴权 Key 直接调用本机网关",
-                checked = settings.allowNoKey,
-                onCheckedChange = { viewModel.updateSettings(settings.copy(allowNoKey = it)) },
-                insideMargin = PaddingValues(0.dp),
-            )
+            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                TextField(
+                    value = apiKey,
+                    onValueChange = { apiKey = it },
+                    label = "网关鉴权 Key（留空表示不校验）",
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth(),
+                )
+                SuperSwitch(
+                    title = "无 Key 调用",
+                    summary = "允许客户端不带鉴权 Key 直接调用本机网关",
+                    checked = settings.allowNoKey,
+                    onCheckedChange = { viewModel.updateSettings(settings.copy(allowNoKey = it)) },
+                    insideMargin = PaddingValues(0.dp),
+                )
+            }
         }
 
         SmallTitle("默认供应商")

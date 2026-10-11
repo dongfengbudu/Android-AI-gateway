@@ -70,12 +70,14 @@ fun DataManagementScreen(state: AppUiState, viewModel: AppViewModel, onBack: () 
         item { SmallTitle("清理") }
         item {
             SectionCard(enterIndex = 1) {
-                OutlineActionButton("查看存储占用明细") { showDetail = !showDetail }
-                if (showDetail) {
-                    StorageDetail(state)
+                Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                    OutlineActionButton("查看存储占用明细") { showDetail = !showDetail }
+                    if (showDetail) {
+                        StorageDetail(state)
+                    }
+                    OutlineActionButton("截断超长记录内容") { viewModel.truncateLongRecords() }
+                    OutlineActionButton("清理过期记录") { viewModel.purgeExpiredRecords() }
                 }
-                OutlineActionButton("截断超长记录内容") { viewModel.truncateLongRecords() }
-                OutlineActionButton("清理过期记录") { viewModel.purgeExpiredRecords() }
             }
         }
     }

@@ -112,7 +112,8 @@ fun HomeScreen(
         }
 
         item {
-            TelemetryGrid(state, Modifier.staggeredAppear(1))
+            // 与 SectionCard 的横向 12dp 外边距对齐，六宫格不能铺满屏宽
+            TelemetryGrid(state, Modifier.staggeredAppear(1).padding(horizontal = 12.dp))
         }
 
         item {
@@ -218,6 +219,7 @@ private fun ConsoleCard(
         }
 
         val localUrl = state.localUrl.ifEmpty { "http://127.0.0.1:${state.port}/v1" }
+        Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
         AddressRow("本机", localUrl) { onCopy(localUrl, "已复制本机地址") }
         AddressRow(
             label = "局域网",
@@ -268,6 +270,7 @@ private fun ConsoleCard(
                     fontWeight = FontWeight.SemiBold,
                 )
             }
+        }
         }
     }
 }

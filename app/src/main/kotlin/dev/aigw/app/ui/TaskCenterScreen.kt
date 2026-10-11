@@ -31,28 +31,30 @@ fun TaskCenterScreen(state: AppUiState, viewModel: AppViewModel, onBack: () -> U
         item { SmallTitle("批量操作") }
         item {
             SectionCard(enterIndex = 0) {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(10.dp),
-                ) {
-                    Button(
-                        onClick = { viewModel.checkinAll() },
-                        modifier = Modifier.weight(1f),
-                        colors = ButtonDefaults.buttonColorsPrimary(),
+                Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(10.dp),
                     ) {
-                        Text("批量签到")
+                        Button(
+                            onClick = { viewModel.checkinAll() },
+                            modifier = Modifier.weight(1f),
+                            colors = ButtonDefaults.buttonColorsPrimary(),
+                        ) {
+                            Text("批量签到")
+                        }
+                        TextButton(
+                            text = "批量任务",
+                            onClick = { viewModel.runAllTasks() },
+                            modifier = Modifier.weight(1f),
+                        )
                     }
                     TextButton(
-                        text = "批量任务",
-                        onClick = { viewModel.runAllTasks() },
-                        modifier = Modifier.weight(1f),
+                        text = "刷新全部额度",
+                        onClick = { viewModel.refreshAllCredits() },
+                        modifier = Modifier.fillMaxWidth(),
                     )
                 }
-                TextButton(
-                    text = "刷新全部额度",
-                    onClick = { viewModel.refreshAllCredits() },
-                    modifier = Modifier.fillMaxWidth(),
-                )
                 Text(
                     text = "签到作用于 Trae 与 WorkBuddy 国内版（国际版没有签到制度，自动跳过）；" +
                         "任务作用于 Loomy 的新手任务；额度刷新作用于全部账号。",

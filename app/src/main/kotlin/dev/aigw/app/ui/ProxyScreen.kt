@@ -52,87 +52,89 @@ fun ProxyScreen(state: AppUiState, viewModel: AppViewModel, onBack: () -> Unit) 
         item { SmallTitle("代理") }
         item {
         SectionCard(enterIndex = 0) {
-            SuperSwitch(
-                title = "启用代理",
-                summary = "开启后所有上游请求默认走代理",
-                checked = settings.enabled,
-                onCheckedChange = { viewModel.updateProxySettings(settings.copy(enabled = it)) },
-                insideMargin = PaddingValues(0.dp),
-            )
-            SuperArrow(
-                title = "代理类型",
-                endActions = {
-                    Text(
-                        text = settings.type.label,
-                        style = MiuixTheme.textStyles.body2,
-                        color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
-                    )
-                },
-                onClick = { showTypeDialog = true },
-                insideMargin = PaddingValues(0.dp),
-            )
-            TextField(
-                value = host,
-                onValueChange = { host = it.trim() },
-                label = "代理地址",
-                singleLine = true,
-                modifier = Modifier.fillMaxWidth(),
-            )
-            TextField(
-                value = port,
-                onValueChange = { port = it.filter(Char::isDigit).take(5) },
-                label = "端口",
-                singleLine = true,
-                modifier = Modifier.fillMaxWidth(),
-            )
-            TextField(
-                value = username,
-                onValueChange = { username = it },
-                label = "用户名（可选）",
-                singleLine = true,
-                modifier = Modifier.fillMaxWidth(),
-            )
-            TextField(
-                value = password,
-                onValueChange = { password = it },
-                label = "密码（可选）",
-                singleLine = true,
-                modifier = Modifier.fillMaxWidth(),
-            )
-            TextField(
-                value = excludedText,
-                onValueChange = { excludedText = it },
-                label = "不走代理的地址",
-                minLines = 2,
-                maxLines = 5,
-                modifier = Modifier.fillMaxWidth(),
-            )
-            Text(
-                text = "逗号分隔；支持通配符 *、host:port、CIDR 网段",
-                style = MiuixTheme.textStyles.footnote1,
-                color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
-            )
-            OutlineActionButton("保存") {
-                val parsed = port.toIntOrNull()
-                if (parsed == null || parsed !in 1..65535) {
-                    viewModel.notice("端口需要在 1~65535 之间")
-                } else {
-                    val excludedHosts = excludedText
-                        .split(Regex("[,，\\n\\s]+"))
-                        .filter { it.isNotEmpty() }
-                        .distinct()
-                    viewModel.updateProxySettings(
-                        settings.copy(
-                            host = host.trim(),
-                            port = parsed,
-                            username = username.trim(),
-                            password = password,
-                            type = settings.type,
-                            excludedHosts = excludedHosts,
-                        ),
-                    )
-                    viewModel.notice("代理设置已保存")
-                }
+            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                SuperSwitch(
+                    title = "启用代理",
+                    summary = "开启后所有上游请求默认走代理",
+                    checked = settings.enabled,
+                    onCheckedChange = { viewModel.updateProxySettings(settings.copy(enabled = it)) },
+                    insideMargin = PaddingValues(0.dp),
+                )
+                SuperArrow(
+                    title = "代理类型",
+                    endActions = {
+                        Text(
+                            text = settings.type.label,
+                            style = MiuixTheme.textStyles.body2,
+                            color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
+                        )
+                    },
+                    onClick = { showTypeDialog = true },
+                    insideMargin = PaddingValues(0.dp),
+                )
+                TextField(
+                    value = host,
+                    onValueChange = { host = it.trim() },
+                    label = "代理地址",
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth(),
+                )
+                TextField(
+                    value = port,
+                    onValueChange = { port = it.filter(Char::isDigit).take(5) },
+                    label = "端口",
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth(),
+                )
+                TextField(
+                    value = username,
+                    onValueChange = { username = it },
+                    label = "用户名（可选）",
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth(),
+                )
+                TextField(
+                    value = password,
+                    onValueChange = { password = it },
+                    label = "密码（可选）",
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth(),
+                )
+                TextField(
+                    value = excludedText,
+                    onValueChange = { excludedText = it },
+                    label = "不走代理的地址",
+                    minLines = 2,
+                    maxLines = 5,
+                    modifier = Modifier.fillMaxWidth(),
+                )
+                Text(
+                    text = "逗号分隔；支持通配符 *、host:port、CIDR 网段",
+                    style = MiuixTheme.textStyles.footnote1,
+                    color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
+                )
+                OutlineActionButton("保存") {
+                    val parsed = port.toIntOrNull()
+                    if (parsed == null || parsed !in 1..65535) {
+                        viewModel.notice("端口需要在 1~65535 之间")
+                    } else {
+                        val excludedHosts = excludedText
+                            .split(Regex("[,，\\n\\s]+"))
+                            .filter { it.isNotEmpty() }
+                            .distinct()
+                        viewModel.updateProxySettings(
+                            settings.copy(
+                                host = host.trim(),
+                                port = parsed,
+                                username = username.trim(),
+                                password = password,
+                                type = settings.type,
+                                excludedHosts = excludedHosts,
+                            ),
+                        )
+                        viewModel.notice("代理设置已保存")
+                    }
+            }
             }
         }
         }

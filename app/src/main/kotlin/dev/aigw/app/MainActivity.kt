@@ -15,7 +15,9 @@ import androidx.compose.animation.AnimatedContent
 import androidx.activity.enableEdgeToEdge
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.consumeWindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
@@ -221,10 +223,15 @@ private fun AppRoot(viewModel: AppViewModel, state: AppUiState) {
             }
         },
     ) { insets ->
-        // 外层 Scaffold 的 bottom padding 已包含 bottomBar（含导航栏 inset），
-        // 这里只把内容顶下来即可；内容列表自身会再加底部 inset spacer，
-        // 不重复叠 padding，避免底部出现一段「挤」出来的空白。
-        Box(Modifier.fillMaxSize()) {
+        // 外层 Scaffold 的 bottom padding 已含 bottomBar（含导航栏 inset）：把它用到内容上，
+        // 并 consumeWindowInsets 消费掉，否则内层页面自己只补了导航栏 inset，
+        // 差值（bottomBar 高度）正好把列表尾部挡在底栏下面（每页都拉不到底）。
+        Box(
+            Modifier
+                .fillMaxSize()
+                .padding(bottom = insets.calculateBottomPadding())
+                .consumeWindowInsets(PaddingValues(bottom = insets.calculateBottomPadding())),
+        ) {
             // 二级页推拉过渡：推入从右滑入，返回向右滑出
             AnimatedContent(
                 targetState = subPage,

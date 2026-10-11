@@ -147,10 +147,12 @@ fun ProviderDetailScreen(
             item { SmallTitle("账号") }
             item {
             SectionCard(enterIndex = 0) {
+                Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
                 accounts.forEachIndexed { index, account ->
                     AccountRow(account, ui, actions, index = index)
                 }
                 OutlineActionButton("刷新额度") { actions.onRefreshCredits(providerId, null) }
+                }
             }
             }
         }

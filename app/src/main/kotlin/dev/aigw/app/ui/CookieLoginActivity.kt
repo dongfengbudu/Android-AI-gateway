@@ -77,7 +77,8 @@ class CookieLoginActivity : Activity() {
             setPadding(dp(14), dp(10), dp(14), dp(10))
         }
         val label = TextView(this).apply {
-            text = "登录完成后点右侧按钮"
+            // 不走 Cookie 的上游登录完点「完成」直接返回；凭证即 Cookie 的才需要等 Cookie 落盘
+            text = if (cookieHosts.isEmpty()) "登录完成后点右侧按钮返回" else "登录完成后点右侧按钮"
             textSize = 13f
             setTextColor(Color.parseColor("#333333"))
             layoutParams = LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f)
@@ -214,6 +215,14 @@ class CookieLoginActivity : Activity() {
     private fun collectAndFinish(fromAuto: Boolean) = collectAndFinish(pendingHosts, fromAuto)
 
     private fun collectAndFinish(hosts: Array<String>, fromAuto: Boolean) {
+        // Trae / WorkBuddy 这类不走 Cookie 的登录（hosts 为空）：凭证由网关的本地回调
+        // 端口（Trae）或 state 轮询（WorkBuddy）接住，这里只负责关页；
+        // 读 Cookie 必然为空，不能误报「还没读到登录信息」。
+        if (hosts.isEmpty()) {
+            setResult(RESULT_OK, Intent().putExtra(EXTRA_RESULT_COOKIE, ""))
+            finish()
+            return
+        }
         val manager = CookieManager.getInstance()
         manager.flush()
         val builder = StringBuilder()

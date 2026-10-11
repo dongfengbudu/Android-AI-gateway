@@ -54,39 +54,38 @@ object TraeUi : ProviderUi {
         Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
             SectionCard(enterIndex = 0) {
                 SectionHeader("登录")
-                Button(
-                    onClick = { actions.onWebLogin(id) },
-                    modifier = Modifier.fillMaxWidth(),
-                    colors = ButtonDefaults.buttonColorsPrimary(),
-                ) {
-                    Text("在浏览器中打开 Trae 登录页")
-                }
-                OutlineActionButton(
-                    text = if (expanded) "收起粘贴导入" else "粘贴凭证 JSON 导入",
-                ) { expanded = !expanded }
-                if (expanded) {
-                    TextField(
-                        value = raw,
-                        onValueChange = { raw = it },
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(top = 10.dp),
-                        minLines = 3,
-                        maxLines = 8,
-                        label = "回调链接 / 凭证 JSON",
-                    )
+                Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
                     Button(
-                        onClick = {
-                            actions.onImport(id, raw.trim())
-                            raw = ""
-                        },
-                        enabled = raw.isNotBlank(),
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(top = 10.dp),
+                        onClick = { actions.onWebLogin(id) },
+                        modifier = Modifier.fillMaxWidth(),
                         colors = ButtonDefaults.buttonColorsPrimary(),
                     ) {
-                        Text("导入")
+                        Text("在浏览器中打开 Trae 登录页")
+                    }
+                    OutlineActionButton(
+                        text = if (expanded) "收起粘贴导入" else "粘贴凭证 JSON 导入",
+                    ) { expanded = !expanded }
+                    if (expanded) {
+                        TextField(
+                            value = raw,
+                            onValueChange = { raw = it },
+                            modifier = Modifier
+                                .fillMaxWidth(),
+                            minLines = 3,
+                            maxLines = 8,
+                            label = "回调链接 / 凭证 JSON",
+                        )
+                        Button(
+                            onClick = {
+                                actions.onImport(id, raw.trim())
+                                raw = ""
+                            },
+                            enabled = raw.isNotBlank(),
+                            modifier = Modifier.fillMaxWidth(),
+                            colors = ButtonDefaults.buttonColorsPrimary(),
+                        ) {
+                            Text("导入")
+                        }
                     }
                 }
             }

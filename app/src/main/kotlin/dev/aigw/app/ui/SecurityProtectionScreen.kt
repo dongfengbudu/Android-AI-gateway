@@ -133,12 +133,13 @@ fun DesensitizationComponent(
         )
 
         Spacer(Modifier.height(8.dp))
-        OutlineActionButton("重新加载处理链") {
-            onReloadPipeline()
-        }
-
-        OutlineActionButton("进入出网取证") {
-            onViewEvidence()
+        Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+            OutlineActionButton("重新加载处理链") {
+                onReloadPipeline()
+            }
+            OutlineActionButton("进入出网取证") {
+                onViewEvidence()
+            }
         }
     }
 }
