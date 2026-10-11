@@ -137,6 +137,9 @@ class GatewayEngine(
     val pool = AccountPool(store, nowMillis)
     val callLogStore = CallLogStore(store)
     val requestLog = RequestLog(store, nowMillis = nowMillis)
+
+    /** 登录过程日志：授权链接请求、每次轮询的上游响应，供「登录日志」页排查登录卡住等问题。 */
+    val loginLog = RequestLog(store, capacity = 600, nowMillis = nowMillis, storeKey = RequestLog.LOGIN_STORE_KEY)
     val registry = ProviderRegistry()
 
     val sanitizer = dev.aigw.core.security.RequestSanitizer(nowMillis)
@@ -148,6 +151,9 @@ class GatewayEngine(
 
     private val circuitBreakers = ConcurrentHashMap<String, dev.aigw.core.failover.ProviderCircuitBreaker>()
     private val providerMetrics = ConcurrentHashMap<String, dev.aigw.core.failover.ProviderMetricsTracker>()
+
+    /** 设备授权轮询计数，键为 `providerId/state`；拿到终态后移除。 */
+    private val deviceAuthPollCounts = ConcurrentHashMap<String, Int>()
 
     @Volatile
     private var securitySettings: dev.aigw.core.security.SecuritySettings =
@@ -211,6 +217,7 @@ class GatewayEngine(
             onAccountsChanged?.invoke()
         },
         onLog = { log(it) },
+        onLoginLog = { loginLog.info(it) },
         onVerbose = { tag, text -> logVerbose(tag, text) },
     )
 
@@ -572,6 +579,7 @@ class GatewayEngine(
         return when {
             provider is WebLoginSupport && providerId == TraeProvider.ID -> {
                 val callbackUrl = "http://127.0.0.1:$TRAE_CALLBACK_PORT$TRAE_CALLBACK_PATH"
+                loginLog.info("[${provider.displayName}] 开始网页登录，本地回调 $callbackUrl")
                 val ticket = provider.beginWebLogin(callbackUrl)
                 startCallbackServer(TRAE_CALLBACK_PORT, TRAE_CALLBACK_PATH) { url ->
                     val outcome = completeWebLogin(providerId, url)
@@ -581,6 +589,7 @@ class GatewayEngine(
             }
 
             provider is LoopbackOAuthSupport -> {
+                loginLog.info("[${provider.displayName}] 开始 OAuth 登录")
                 startCallbackServer(AntigravityProvider.CALLBACK_PORT, AntigravityProvider.CALLBACK_PATH) { url ->
                     val outcome = completeOAuth(providerId, url)
                     resultPage(outcome.ok, outcome.nickname.ifEmpty { outcome.uid }, outcome.error)
@@ -591,7 +600,14 @@ class GatewayEngine(
             provider is DeviceCodeSupport -> {
                 // 区域感知的登录端点（WorkBuddy：cn=copilot.tencent.com / global=workbuddy.ai）
                 val region = providerSettings(providerId).option("region", "")
-                val ticket = provider.startDeviceAuth(region)
+                loginLog.info("[${provider.displayName}] 开始设备授权登录（region=${region.ifEmpty { "默认(cn)" }}）")
+                val ticket = try {
+                    provider.startDeviceAuth(region)
+                } catch (e: Exception) {
+                    loginLog.error("[${provider.displayName}] 请求授权链接失败：${e.message}")
+                    throw e
+                }
+                loginLog.info("[${provider.displayName}] 已拿到授权页与轮询 state，等待用户在登录页完成授权")
                 BrowserLoginTicket(ticket.loginUrl, ticket.state)
             }
 
@@ -608,10 +624,12 @@ class GatewayEngine(
                 html
             }.also { it.startServer() }
         } catch (e: Exception) {
+            loginLog.error("监听本地回调端口 $port 失败：${e.message}")
             throw IllegalStateException("无法监听本地回调端口 $port：${e.message}")
         }
         callbackServer = server
         log("已监听本地回调 http://127.0.0.1:$port$path")
+        loginLog.info("已监听本地回调 http://127.0.0.1:$port$path，等待登录回调")
         // 用户长时间不完成登录时释放端口，避免一直占着
         Thread {
             runCatching { Thread.sleep(CALLBACK_TIMEOUT_MS) }
@@ -619,6 +637,7 @@ class GatewayEngine(
                 callbackServer = null
                 runCatching { server.stop() }
                 log("浏览器登录超时，已释放回调端口 $port")
+                loginLog.warn("等待登录回调超时（${CALLBACK_TIMEOUT_MS / 1000} 秒），已释放回调端口 $port")
             }
         }.start()
     }
@@ -649,10 +668,10 @@ class GatewayEngine(
         val support = registry.get(providerId) as? WebLoginSupport
             ?: return LoginOutcome(LoginState.FAILED, error = "该供应商不支持网页登录")
         return try {
-            val account = support.completeWebLogin(callbackUrl)
-            adopt(providerId, account, "登录")
+            adopt(providerId, support.completeWebLogin(callbackUrl), "登录")
         } catch (e: Exception) {
             logWarn("登录失败（$providerId）：${e.message}")
+            loginLog.warn("[${registry.get(providerId)?.displayName ?: providerId}] 登录失败：${e.message}")
             LoginOutcome(LoginState.FAILED, error = e.message ?: "登录失败")
         }
     }
@@ -661,7 +680,15 @@ class GatewayEngine(
     fun sendSmsCode(providerId: String, phone: String, ccode: String = SmsLoginSupport.DEFAULT_CCODE): String {
         val support = registry.get(providerId) as? SmsLoginSupport
             ?: throw IllegalStateException("该供应商不支持短信登录")
-        return support.sendSmsCode(phone, ccode)
+        val name = registry.get(providerId)?.displayName ?: providerId
+        return try {
+            support.sendSmsCode(phone, ccode).also {
+                loginLog.info("[$name] 验证码已发送到 $phone（ccode=$ccode）")
+            }
+        } catch (e: Exception) {
+            loginLog.warn("[$name] 发送验证码失败（ccode=$ccode）：${e.message}")
+            throw e
+        }
     }
 
     fun completeSmsLogin(
@@ -677,6 +704,7 @@ class GatewayEngine(
             adopt(providerId, support.loginBySmsCode(phone, code, msgid, ccode), "登录")
         } catch (e: Exception) {
             logWarn("登录失败（$providerId）：${e.message}")
+            loginLog.warn("[${registry.get(providerId)?.displayName ?: providerId}] 短信登录失败：${e.message}")
             LoginOutcome(LoginState.FAILED, error = e.message ?: "登录失败")
         }
     }
@@ -690,7 +718,25 @@ class GatewayEngine(
     fun pollDeviceAuth(providerId: String, state: String, region: String = ""): DeviceAuthPoll {
         val support = registry.get(providerId) as? DeviceCodeSupport
             ?: return DeviceAuthPoll.Failed("该供应商不支持设备授权登录")
-        val poll = support.pollDeviceAuth(state, region)
+        // 调用方没带区域时回落到设置里的区域，保证轮询与 startDeviceAuth 打同一个端点
+        val effectiveRegion = region.ifEmpty { providerSettings(providerId).option("region", "") }
+        val poll = support.pollDeviceAuth(state, effectiveRegion)
+        val name = registry.get(providerId)?.displayName ?: providerId
+        val pollKey = "$providerId/$state"
+        when (poll) {
+            is DeviceAuthPoll.Pending -> {
+                val count = deviceAuthPollCounts.merge(pollKey, 1, Int::plus)
+                loginLog.info("[$name] 第 $count 次轮询：上游返回等待中（region=${effectiveRegion.ifEmpty { "默认(cn)" }}）")
+            }
+            is DeviceAuthPoll.Success -> {
+                deviceAuthPollCounts.remove(pollKey)
+                // 成功由 adopt 统一写登录日志，这里不重复记
+            }
+            is DeviceAuthPoll.Failed -> {
+                deviceAuthPollCounts.remove(pollKey)
+                loginLog.warn("[$name] 轮询失败：${poll.error}")
+            }
+        }
         if (poll is DeviceAuthPoll.Success) {
             adopt(providerId, poll.account, "登录")
         }
@@ -712,6 +758,7 @@ class GatewayEngine(
             adopt(providerId, support.exchangeCode(code), "登录")
         } catch (e: Exception) {
             logWarn("OAuth 登录失败（$providerId）：${e.message}")
+            loginLog.warn("[${registry.get(providerId)?.displayName ?: providerId}] OAuth 登录失败：${e.message}")
             LoginOutcome(LoginState.FAILED, error = e.message ?: "登录失败")
         }
     }
@@ -726,6 +773,7 @@ class GatewayEngine(
             adopt(providerId, account, "导入")
         } catch (e: Exception) {
             logWarn("导入失败（$providerId）：${e.message}")
+            loginLog.warn("[${provider.displayName}] 导入凭证失败：${e.message}")
             LoginOutcome(LoginState.FAILED, error = e.message ?: "导入失败")
         }
     }
@@ -739,7 +787,9 @@ class GatewayEngine(
     private fun adopt(providerId: String, account: ProviderAccount, verb: String): LoginOutcome {
         pool.upsert(account)
         refreshCredits(providerId, account.uid)
-        log("$verb 成功：${account.nickname.ifEmpty { account.uid }}（$providerId）")
+        val text = "$verb 成功：${account.nickname.ifEmpty { account.uid }}（$providerId）"
+        log(text)
+        loginLog.info(text)
         onAccountsChanged?.invoke()
         return LoginOutcome(LoginState.SUCCESS, account.uid, account.nickname)
     }

@@ -368,7 +368,9 @@ class TraeProvider(
             traceId,
             TraeLogin.buildLoginUrl(machineId, deviceId, callbackUrl, region = target),
             callbackUrl,
-        )
+        ).also {
+            hooks.onLoginLog("[Trae] 已生成登录链接（region=${target.id}），等待用户在登录页完成授权")
+        }
     }
 
     override fun completeWebLogin(callbackUrl: String): ProviderAccount {
@@ -380,6 +382,7 @@ class TraeProvider(
             queryParam(callbackUrl, "loginHost"),
             callback.enterpriseId.ifEmpty { queryParam(callbackUrl, "host") },
         )
+        hooks.onLoginLog("[Trae] 收到登录回调（region=${region.id}，uid=${callback.uid.ifEmpty { "未带" }}）")
         var account = TraeAccount(
             uid = callback.uid,
             accessToken = callback.accessToken,
@@ -392,7 +395,11 @@ class TraeProvider(
             domain = region.id,
             apiHost = region.oauthHost,
         )
-        if (account.refreshToken.isNotEmpty()) account = authClient(region).exchangeToken(account)
+        if (account.refreshToken.isNotEmpty()) {
+            hooks.onLoginLog("[Trae] 用 refreshToken 换取 accessToken（${region.oauthHost}）")
+            account = authClient(region).exchangeToken(account)
+        }
+        hooks.onLoginLog("[Trae] 拉取用户信息（${region.oauthHost}）")
         account = authClient(region).getUserInfo(account)
         if (account.uid.isEmpty()) throw IllegalStateException("无法确定账号 uid，请确认登录已完成")
         return toProviderAccount(account)

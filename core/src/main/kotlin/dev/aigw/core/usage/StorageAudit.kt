@@ -14,6 +14,7 @@ data class StorageReport(
     companion object {
         const val NAME_CALLS = "调用记录（含请求/响应原文）"
         const val NAME_REQUESTS = "请求日志"
+        const val NAME_LOGIN = "登录日志"
         const val NAME_ACCOUNTS = "账号与凭证"
         const val NAME_SETTINGS = "设置"
         const val NAME_PENDING = "登录中间态"
@@ -32,6 +33,7 @@ object StorageAudit {
     private val GROUPS = listOf(
         Triple("logs/calls/", StorageReport.NAME_CALLS, "请求/响应原文，体积主要来源"),
         Triple("logs/requests.json", StorageReport.NAME_REQUESTS, "服务运行日志"),
+        Triple(RequestLog.LOGIN_STORE_KEY, StorageReport.NAME_LOGIN, "登录过程日志（授权链接与轮询）"),
         Triple("account/", StorageReport.NAME_ACCOUNTS, "含 token，请勿外传"),
         Triple("login/pending/", StorageReport.NAME_PENDING, "登录用的设备指纹缓存"),
         Triple("settings/", StorageReport.NAME_SETTINGS, "网关与界面偏好"),

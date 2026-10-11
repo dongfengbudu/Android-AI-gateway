@@ -35,6 +35,8 @@ class LoomyProvider(
     private val defaultModel: () -> String,
     private val nowMillis: () -> Long = System::currentTimeMillis,
     private val pointsClient: LoomyPointsClient = LoomyPointsClient(),
+    /** 登录过程上报，由网关接住写进登录日志。 */
+    private val onLoginLog: (String) -> Unit = {},
 ) : Provider, SmsLoginSupport {
 
     override val id: String = ID
@@ -43,7 +45,7 @@ class LoomyProvider(
     override val capabilities: Set<ProviderCapability> =
         setOf(ProviderCapability.CREDIT_REFRESH, ProviderCapability.TASKS)
 
-    private val authClient = LoomyAuthClient(nowMillis = nowMillis)
+    private val authClient = LoomyAuthClient(nowMillis = nowMillis, onLoginLog = onLoginLog)
     private val chatClient = LoomyChatClient()
     private val taskClient = LoomyTaskClient()
     private val catalog = LoomyModelCatalog(nowMillis = nowMillis)

@@ -13,6 +13,8 @@ class ProviderHooks(
     /** provider 内部刷新了账号凭证时（如 Antigravity 轮换 Token），通知账号池持久化。 */
     val onAccountUpdated: (account: ProviderAccount) -> Unit = {},
     val onLog: (String) -> Unit = {},
+    /** 登录过程日志：provider 上报登录每一步的请求/响应，网关写进独立的登录日志。 */
+    val onLoginLog: (String) -> Unit = {},
     /** 详细日志：provider 上报真实发给上游的内容（如 Antigravity 的 envelope），仅开启详细日志时生效。 */
     val onVerbose: (tag: String, text: String) -> Unit = { _, _ -> },
 )

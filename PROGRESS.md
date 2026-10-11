@@ -1,6 +1,30 @@
 # 进度
 
 ## 当前状态
+登录日志扩展到全部供应商（2026-10-11）：
+- `ProviderHooks` 新增 `onLoginLog`，引擎统一接住写进 `loginLog`；所有登录路径都覆盖：
+  - 引擎层（全部供应商通用）：网页登录/OAuth/设备授权开始、回调端口监听与超时、
+    短信验证码发送、短信/OAuth/网页登录失败、导入失败、adopt 的成功终态；
+  - Trae：生成登录链接（含 region）、收到回调（region/uid）、换 token、拉用户信息；
+  - Antigravity：生成授权链接（redirect_uri）、token 接口状态与响应摘录；
+  - Loomy：`LoomyAuthClient.call` 的路径/状态/响应摘录（`onLoginLog` 注入）；
+  - CodeBuddy：沿用上一轮的 `onLoginLog` 参数；
+  - LongCat / 自定义供应商：Cookie 与凭证导入走 `importAccountJson`，已被引擎层覆盖。
+- 新增 `dev.aigw.core.util.redactSecrets`：登录响应摘录写日志前抹掉
+  accessToken/refreshToken/session/token/secret 类字段，避免凭证随日志落盘。
+
+WorkBuddy 国际版登录修复与登录日志（2026-10-11）：
+- 根因：`beginBrowserLogin` 拿到 ticket 后调 `pollDeviceLogin` 未传 region，拿
+  workbuddy.ai 签发的 state 去轮询国内端点（copilot.tencent.com），上游对未知 state 永远返回
+  等待中（code=11217）→ 界面一直「等待授权完成」。另外 `beginDeviceLogin` 写区域设置
+  走的是异步协程，与 `beginBrowserLogin` 读设置存在竞态。
+- 修复：`pollDeviceLogin` 现在带上 `deviceRegions` 里的区域；`beginDeviceLogin` 改为
+  同步落盘区域后再开登录；引擎 `pollDeviceAuth` 在 region 为空时回落到设置里的区域兜底。
+- 新增登录日志：`GatewayEngine.loginLog`（独立存储键 `logs/login.json`，容量 600），
+  CodeBuddyProvider 通过 `onLoginLog` 上报每次授权链接请求/轮询的 URL、HTTP 状态、
+  code 与响应摘录（SNIPPET_LIMIT=300）；引擎侧记录开始登录、轮询次数与终态。
+  「记录」页新增「登录日志」Tab（LogTab.Login）；存储占用页新增对应分组（NAME_LOGIN）。
+
 代码审查修复（2026-10-11）已完成：清理误提交到仓库根目录的构建产物并补 `.gitignore`、
 `ARCHITECTURE.md` 与代码同步（START_NOT_STICKY、新增模块补登）、网关启停入口聚拢到
 `GatewayService.start/stop`、首页 Tile 边框顺序修复、CodeBuddy 登录/账号卡片布局重排、

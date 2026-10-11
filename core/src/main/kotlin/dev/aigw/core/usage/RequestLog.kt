@@ -28,6 +28,7 @@ class RequestLog(
     private val capacity: Int = 300,
     private val persistIntervalMillis: Long = 2_000,
     private val nowMillis: () -> Long = System::currentTimeMillis,
+    private val storeKey: String = STORE_KEY,
 ) {
     private val lines = ArrayDeque<LogLine>()
     private var lastPersistAt = 0L
@@ -75,11 +76,11 @@ class RequestLog(
                 addProperty("text", line.text)
             })
         }
-        store.write(STORE_KEY, array.toString())
+        store.write(storeKey, array.toString())
     }
 
     private fun load() {
-        val raw = store.read(STORE_KEY) ?: return
+        val raw = store.read(storeKey) ?: return
         val array = runCatching { JsonParser.parseString(raw).asJsonArray }.getOrNull() ?: return
         for (element in array) {
             val obj = runCatching { element.asJsonObject }.getOrNull() ?: continue
@@ -95,5 +96,8 @@ class RequestLog(
 
     companion object {
         const val STORE_KEY = "logs/requests.json"
+
+        /** 登录过程日志（授权链接请求、每次轮询的上游响应），与请求日志分开存。 */
+        const val LOGIN_STORE_KEY = "logs/login.json"
     }
 }

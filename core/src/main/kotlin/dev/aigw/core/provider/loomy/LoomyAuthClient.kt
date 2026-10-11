@@ -16,6 +16,8 @@ class LoomyAuthClient(
     private val accessKeySecret: String = LoomyConstants.ACCESS_KEY_SECRET,
     private val appId: String = LoomyConstants.APP_ID,
     private val nowMillis: () -> Long = System::currentTimeMillis,
+    /** 登录过程上报（请求路径、状态与响应摘录），由网关接住写进登录日志。 */
+    private val onLoginLog: (String) -> Unit = {},
 ) {
 
     /**
@@ -116,12 +118,18 @@ class LoomyAuthClient(
     /** 签名 → 请求 → 解出 `data`。业务码非成功时抛 [LoomyApiException]。 */
     private fun call(path: String, body: String): JsonObject {
         val signed = LoomySign.authorization(accessKeyId, accessKeySecret, "POST", path, body)
-        val (status, responseBody) = httpJson(
-            url = accountBase + path,
-            method = "POST",
-            headers = signed.toHeaders(),
-            body = body,
-        )
+        val (status, responseBody) = try {
+            httpJson(
+                url = accountBase + path,
+                method = "POST",
+                headers = signed.toHeaders(),
+                body = body,
+            )
+        } catch (e: Exception) {
+            onLoginLog("[Loomy] 请求 $path 异常：${e.message}")
+            throw e
+        }
+        onLoginLog("[Loomy] 响应 $path HTTP $status：${dev.aigw.core.util.redactSecrets(responseBody, 300)}")
         return decodeEnvelope(status, responseBody).objOrNull("data") ?: JsonObject()
     }
 }

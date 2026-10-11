@@ -51,7 +51,7 @@ import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
 
-private enum class LogTab(val label: String) { Calls("调用记录"), Requests("请求日志") }
+private enum class LogTab(val label: String) { Calls("调用记录"), Requests("请求日志"), Login("登录日志") }
 
 private enum class StatusFilter(val label: String) {
     ALL("全部"), SUCCESS("成功"), FAILED("失败"), ABORTED("中断"),
@@ -86,7 +86,7 @@ fun LogsScreen(state: AppUiState, viewModel: AppViewModel) {
 
     PageScaffold(
         title = "记录",
-        subtitle = "调用与请求日志",
+        subtitle = "调用、请求与登录日志",
         actions = {
             IconButton(onClick = { viewModel.refresh() }) {
                 Icon(MiuixIcons.Refresh, contentDescription = "刷新")
@@ -102,6 +102,7 @@ fun LogsScreen(state: AppUiState, viewModel: AppViewModel) {
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     ChoiceChip(LogTab.Calls.label, tab == LogTab.Calls) { tab = LogTab.Calls }
                     ChoiceChip(LogTab.Requests.label, tab == LogTab.Requests) { tab = LogTab.Requests }
+                    ChoiceChip(LogTab.Login.label, tab == LogTab.Login) { tab = LogTab.Login }
                 }
                 if (tab == LogTab.Calls) {
                     Text(
@@ -121,12 +122,16 @@ fun LogsScreen(state: AppUiState, viewModel: AppViewModel) {
                     )
                 } else {
                     Text(
-                        text = "共 ${state.logs.size} 条日志",
+                        text = if (tab == LogTab.Requests) "共 ${state.logs.size} 条日志" else "共 ${state.loginLogs.size} 条日志",
                         style = MiuixTheme.textStyles.headline2,
                         fontWeight = FontWeight.SemiBold,
                     )
                     Text(
-                        text = "网关与上游交互的流水，仅保留最近若干条。",
+                        text = if (tab == LogTab.Requests) {
+                            "网关与上游交互的流水，仅保留最近若干条。"
+                        } else {
+                            "各供应商登录每一步的端点、状态码与响应摘录；登录卡住时先看这里。"
+                        },
                         style = MiuixTheme.textStyles.footnote1,
                         color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
                     )
@@ -148,6 +153,21 @@ fun LogsScreen(state: AppUiState, viewModel: AppViewModel) {
                 items(calls, key = { it.id }) { record ->
                     SectionCard {
                         CallRow(record, onClick = { detail = record }, onLongClick = { pendingDelete = record })
+                    }
+                }
+            }
+        } else if (tab == LogTab.Login) {
+            if (state.loginLogs.isEmpty()) {
+                item(key = "empty-login") {
+                    SectionCard {
+                        EmptyHint("暂无登录日志", "发起任一供应商的登录后，这里会记录每个请求的端点与上游响应。")
+                    }
+                }
+            } else {
+                itemsIndexed(state.loginLogs, key = { i, line -> "login-${line.atMillis}-$i" }) { index, line ->
+                    LogRow(line)
+                    if (index != state.loginLogs.lastIndex) {
+                        HorizontalDivider(modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp))
                     }
                 }
             }

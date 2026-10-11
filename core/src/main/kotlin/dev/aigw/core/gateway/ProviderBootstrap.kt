@@ -40,6 +40,7 @@ internal fun registerBuiltinProviders(engine: GatewayEngine) {
         LoomyProvider(
             defaultModel = { engine.providerSettings(LoomyProvider.ID).defaultModel },
             nowMillis = { engine.now() },
+            onLoginLog = { engine.loginLog.info(it) },
         ),
     )
 
@@ -54,6 +55,7 @@ internal fun registerBuiltinProviders(engine: GatewayEngine) {
         CodeBuddyProvider(
             region = { engine.providerSettings(CodeBuddyProvider.ID).option("region", CodeBuddyProvider.REGION_CN) },
             nowMillis = { engine.now() },
+            onLoginLog = { engine.loginLog.info(it) },
         ),
     )
 

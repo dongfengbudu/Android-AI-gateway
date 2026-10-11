@@ -318,6 +318,7 @@ class AntigravityProvider(
 
     override fun buildAuthUrl(): String {
         val state = UUID.randomUUID().toString().replace("-", "")
+        hooks.onLoginLog("[Antigravity] 生成 OAuth 授权链接（redirect_uri=${redirectUri()}）")
         return buildString {
             append(AUTH_ENDPOINT)
             append("?client_id=").append(encode(CLIENT_ID))
@@ -362,6 +363,7 @@ class AntigravityProvider(
             "grant_type" to "authorization_code",
         )
         val (status, body) = postForm(tokenEndpoint, form)
+        hooks.onLoginLog("[Antigravity] token 接口 HTTP $status：${dev.aigw.core.util.redactSecrets(body, 300)}")
         if (status !in 200..299) throw IllegalStateException("换取 token 失败（HTTP $status）：${body.take(200)}")
         val obj = runCatching { JsonParser.parseString(body).asJsonObject }.getOrNull()
             ?: throw IllegalStateException("token 响应不是合法 JSON")

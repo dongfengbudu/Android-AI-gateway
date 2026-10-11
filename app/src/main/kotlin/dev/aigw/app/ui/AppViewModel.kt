@@ -210,6 +210,8 @@ data class AppUiState(
     /** 已拉取的成长任务明细，键为 `providerId/uid`。 */
     val taskLists: Map<String, dev.aigw.core.provider.ProviderTaskListView> = emptyMap(),
     val logs: List<LogLine> = emptyList(),
+    /** 登录过程日志（授权链接请求、每次轮询的上游响应），供「登录日志」页排查登录问题。 */
+    val loginLogs: List<LogLine> = emptyList(),
     val settings: GatewaySettings = GatewaySettings(),
     /**
      * 非空表示需要打开内嵌登录页（URL）。
@@ -277,6 +279,7 @@ private class Snapshot(
     val customProviders: List<CustomProviderConfig>,
     val calls: List<CallRecord>,
     val logs: List<LogLine>,
+    val loginLogs: List<LogLine>,
     val settings: GatewaySettings,
     val proxy: ProxySettings,
     val keepAlive: KeepAliveStatus,
@@ -369,6 +372,7 @@ class AppViewModel(
                     customProviders = engine.settingsRepository.loadCustomProviders(),
                     calls = engine.callLogStore.list(),
                     logs = engine.requestLog.lines(),
+                    loginLogs = engine.loginLog.lines(),
                     settings = engine.settings(),
                     proxy = engine.proxySettings(),
                     keepAlive = KeepAlive.status(app),
@@ -391,6 +395,7 @@ class AppViewModel(
                 customProviders = snapshot.customProviders,
                 calls = snapshot.calls,
                 logs = snapshot.logs,
+                loginLogs = snapshot.loginLogs,
                 settings = snapshot.settings,
                 proxy = snapshot.proxy,
                 keepAlive = snapshot.keepAlive,
@@ -409,10 +414,10 @@ class AppViewModel(
      */
     fun refreshRecords() {
         viewModelScope.launch {
-            val (calls, logs) = withContext(Dispatchers.IO) {
-                engine.callLogStore.list() to engine.requestLog.lines()
+            val (calls, logs, loginLogs) = withContext(Dispatchers.IO) {
+                Triple(engine.callLogStore.list(), engine.requestLog.lines(), engine.loginLog.lines())
             }
-            _state.value = _state.value.copy(calls = calls, logs = logs)
+            _state.value = _state.value.copy(calls = calls, logs = logs, loginLogs = loginLogs)
         }
     }
 
@@ -649,9 +654,19 @@ class AppViewModel(
      */
     fun beginDeviceLogin(providerId: String, region: String) {
         deviceRegions[providerId] = region
-        val settings = providerSettings(providerId)
-        engine.updateProviderSettings(providerId, settings.copy(options = settings.options + ("region" to region)))
-        beginBrowserLogin(providerId)
+        viewModelScope.launch {
+            // 区域必须先同步落盘，beginBrowserLogin 读设置才能拿到正确端点；
+            // 走 updateProviderSettings 的异步协程会与后面的读操作竞态
+            withContext(Dispatchers.IO) {
+                val settings = providerSettings(providerId)
+                engine.updateProviderSettings(
+                    providerId,
+                    settings.copy(options = settings.options + ("region" to region)),
+                )
+            }
+            refresh()
+            beginBrowserLogin(providerId)
+        }
     }
 
     fun providerOption(providerId: String, key: String, fallback: String = ""): String =
@@ -684,7 +699,9 @@ class AppViewModel(
                     }
                     if (ticket.pollState.isNotEmpty()) {
                         deviceStates[providerId] = ticket.pollState
-                        pollDeviceLogin(providerId, ticket.pollState)
+                        // 轮询必须带上本轮登录的区域，否则 WorkBuddy 国际版会拿
+                        // workbuddy.ai 签发的 state 去问国内端点，上游永远返回等待中
+                        pollDeviceLogin(providerId, ticket.pollState, deviceRegions[providerId].orEmpty())
                     } else {
                         _state.value = _state.value.copy(notice = "已在浏览器打开登录页，完成后会自动添加账号")
                     }
@@ -771,7 +788,7 @@ class AppViewModel(
                     }
                     is DeviceAuthPoll.Failed -> {
                         message = poll.error
-                        engine.requestLog.warn("设备授权轮询失败（$providerId，区域 $region）：${poll.error}")
+                        engine.loginLog.warn("设备授权轮询失败（$providerId，区域 $region）：${poll.error}")
                         break
                     }
                 }
@@ -1184,6 +1201,7 @@ class AppViewModel(
 
     fun clearLogs() = action {
         engine.requestLog.clear()
+        engine.loginLog.clear()
         "请求日志已清空"
     }
 

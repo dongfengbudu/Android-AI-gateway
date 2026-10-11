@@ -10,6 +10,7 @@ import dev.aigw.core.provider.AuthKind
 import dev.aigw.core.provider.ChatCall
 import dev.aigw.core.provider.CreditInfo
 import dev.aigw.core.provider.DeviceAuthPoll
+import dev.aigw.core.util.redactSecrets
 import dev.aigw.core.provider.DeviceAuthTicket
 import dev.aigw.core.provider.DeviceCodeSupport
 import dev.aigw.core.provider.ErrorKind
@@ -49,6 +50,8 @@ import java.util.Locale
 class CodeBuddyProvider(
     private val region: () -> String = { REGION_CN },
     private val nowMillis: () -> Long = System::currentTimeMillis,
+    /** 登录过程上报（请求/轮询的 URL、状态与响应摘录），由网关接住写进登录日志。 */
+    private val onLoginLog: (String) -> Unit = {},
 ) : Provider, DeviceCodeSupport, dev.aigw.core.provider.RegionAwareSupport {
 
     override val id: String = ID
@@ -676,11 +679,15 @@ class CodeBuddyProvider(
 
     override fun startDeviceAuth(region: String): DeviceAuthTicket {
         val base = if (region == REGION_GLOBAL) GLOBAL_CHAT_BASE else CN_CHAT_BASE
+        val url = "$base$PATH_AUTH_STATE?platform=CLI"
+        onLoginLog("[$displayName] 请求授权链接 POST $url")
         val (status, text) = try {
-            postJson("$base$PATH_AUTH_STATE?platform=CLI", null, "{}", emptyMap())
+            postJson(url, null, "{}", emptyMap())
         } catch (e: Exception) {
+            onLoginLog("[$displayName] 请求授权链接异常：${e.message}")
             throw IllegalStateException("请求授权链接失败：${e.message}")
         }
+        onLoginLog("[$displayName] 授权链接响应 HTTP $status：${redactSecrets(text, SNIPPET_LIMIT)}")
         if (status !in 200..299) throw IllegalStateException("请求授权链接失败（HTTP $status）")
         val data = envelopeData(text) ?: throw IllegalStateException("授权响应异常：${text.take(200)}")
         val state = data.get("state")?.asString.orEmpty()
@@ -692,16 +699,25 @@ class CodeBuddyProvider(
     override fun pollDeviceAuth(state: String, region: String): DeviceAuthPoll {
         val base = if (region == REGION_GLOBAL) GLOBAL_CHAT_BASE else CN_CHAT_BASE
         val encoded = URLEncoder.encode(state, "UTF-8")
+        val url = "$base$PATH_AUTH_TOKEN?state=$encoded"
         val (status, text) = try {
-            getJson("$base$PATH_AUTH_TOKEN?state=$encoded")
+            getJson(url)
         } catch (e: Exception) {
+            onLoginLog("[$displayName] 轮询请求异常 $url：${e.message}")
             return DeviceAuthPoll.Failed(e.message ?: "轮询失败")
         }
-        if (status !in 200..299) return DeviceAuthPoll.Failed("轮询失败（HTTP $status）")
+        if (status !in 200..299) {
+            onLoginLog("[$displayName] 轮询响应 HTTP $status：${redactSecrets(text, SNIPPET_LIMIT)}")
+            return DeviceAuthPoll.Failed("轮询失败（HTTP $status）")
+        }
         val obj = runCatching { JsonParser.parseString(text).asJsonObject }.getOrNull()
             ?: return DeviceAuthPoll.Failed("轮询响应不是合法 JSON")
         val code = obj.get("code")?.asLong ?: -1L
-        if (code == CODE_LOGIN_PENDING) return DeviceAuthPoll.Pending
+        if (code == CODE_LOGIN_PENDING) {
+            onLoginLog("[$displayName] 轮询响应 HTTP $status code=$code（等待授权）")
+            return DeviceAuthPoll.Pending
+        }
+        onLoginLog("[$displayName] 轮询响应 HTTP $status code=$code：${redactSecrets(text, SNIPPET_LIMIT)}")
         if (code != 0L) {
             val message = obj.get("msg")?.asString.orEmpty()
             return DeviceAuthPoll.Failed(message.ifEmpty { "登录未完成（code=$code）" })
@@ -995,6 +1011,9 @@ class CodeBuddyProvider(
 
     companion object {
         const val ID = "codebuddy"
+
+        /** 登录日志里响应报文的摘录上限，避免环包缓冲被单条日志占满。 */
+        private const val SNIPPET_LIMIT = 300
 
         const val ACTION_CHECKIN = dev.aigw.core.provider.ACTION_CHECKIN
 
