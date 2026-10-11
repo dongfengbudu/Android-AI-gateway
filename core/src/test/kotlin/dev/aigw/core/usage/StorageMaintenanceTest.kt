@@ -216,7 +216,7 @@ class StorageMaintenanceTest {
     fun `存储统计按前缀归类并算出总量`() {
         val store = InMemoryKeyValueStore()
         store.write("logs/calls/a", "x".repeat(2_000))
-        store.write("logs/requests.json", "y".repeat(500))
+        store.write("logs/operations.json", "y".repeat(500))
         store.write("account/trae/u1", "z".repeat(300))
 
         val report = StorageAudit.audit(store)
