@@ -197,7 +197,7 @@ private fun usage(engine: GatewayEngine) {
 }
 
 private fun logs(engine: GatewayEngine) {
-    for (line in engine.requestLog.lines().take(60)) println(line.render())
+    for (entry in engine.operationLog.entries().take(60)) println("${java.util.Date(entry.atMillis)} [${entry.level}] ${entry.message}")
 }
 
 private fun option(args: List<String>, name: String): String? {

@@ -4,6 +4,7 @@ import android.content.Intent
 import android.service.quicksettings.Tile
 import android.service.quicksettings.TileService
 import dev.aigw.app.gatewayEngine
+import dev.aigw.core.usage.OperationLog
 
 /**
  * 控制中心的网关开关磁贴。
@@ -23,10 +24,10 @@ class GatewayTileService : TileService() {
         val tile = qsTile ?: return
         if (engine.isRunning()) {
             GatewayService.stop(applicationContext)
-            engine.requestLog.info("控制中心磁贴停止了网关")
+            engine.operationLog.info(OperationLog.CATEGORY_REQUEST, "控制中心磁贴停止了网关")
         } else {
             val error = GatewayService.start(applicationContext)
-            engine.requestLog.info(if (error == null) "控制中心磁贴启动了网关" else "磁贴启动网关失败")
+            engine.operationLog.info(OperationLog.CATEGORY_REQUEST, if (error == null) "控制中心磁贴启动了网关" else "磁贴启动网关失败")
         }
         updateTile()
         // 主界面可能正开着：让它的状态也刷新

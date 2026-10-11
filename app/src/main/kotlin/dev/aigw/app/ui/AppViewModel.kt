@@ -43,6 +43,7 @@ import dev.aigw.core.provider.codebuddy.CodeBuddyProvider
 import dev.aigw.core.provider.trae.TraeProvider
 import dev.aigw.core.store.KeyValueStore
 import dev.aigw.core.usage.CallRecord
+import dev.aigw.core.usage.OperationLog
 import dev.aigw.core.usage.OperationEntry
 import dev.aigw.core.usage.StorageAudit
 import dev.aigw.core.usage.StorageReport
@@ -784,7 +785,7 @@ class AppViewModel(
                     }
                     is DeviceAuthPoll.Failed -> {
                         message = poll.error
-                        engine.loginLog.warn("设备授权轮询失败（$providerId，区域 $region）：${poll.error}")
+                        engine.operationLog.warn(OperationLog.CATEGORY_LOGIN, "设备授权轮询失败（$providerId，区域 $region）：${poll.error}")
                         break
                     }
                 }

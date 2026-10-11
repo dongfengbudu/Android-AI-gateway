@@ -15,6 +15,7 @@ import dev.aigw.app.MainActivity
 import dev.aigw.app.R
 import dev.aigw.app.AiGatewayApp
 import dev.aigw.app.gatewayEngine
+import dev.aigw.core.usage.OperationLog
 
 /**
  * 只负责「让进程活着」：网关本身由 UI 侧启动，成功后拉起本服务，
@@ -35,7 +36,7 @@ class GatewayService : Service() {
         startForeground(NOTIFICATION_ID, buildNotification(engine.settings().port))
         val started = engine.isRunning() || runCatching { engine.start() }.isSuccess
         if (started) {
-            engine.requestLog.info("前台服务已拉起，通知已发布")
+            engine.operationLog.info(OperationLog.CATEGORY_REQUEST, "前台服务已拉起，通知已发布")
             acquireLocks()
             // START_NOT_STICKY：进程被杀后不自重建（自重建是灰色软件检测的典型特征）。
             // 代价：系统回收后网关不会自动恢复，用户需重新打开 App 或点磁贴。
