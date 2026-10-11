@@ -854,7 +854,9 @@ class GatewayEngine(
             val statuses = pool.statuses(routed.providerId).associateBy { it.uid }
             val regionAware = registry.get(routed.providerId) as? dev.aigw.core.provider.RegionAwareSupport
             accounts.any { account ->
-                statuses[account.uid]?.usable == true &&
+                val status = statuses[account.uid] ?: return@any false
+                // 与「只看可用」口径一致：启用、未失效，且额度已知时必须 > 0
+                status.usable && (!status.creditsKnown || status.credits > 0) &&
                     (regionAware == null || routed.region == null || regionAware.regionOf(account) == routed.region)
             }
         }

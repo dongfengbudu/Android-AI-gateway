@@ -203,6 +203,8 @@ data class AppUiState(
     val modelLoadStates: Map<String, ModelLoadState> = emptyMap(),
     /** 模型测速状态，键为 `model.fullId`。 */
     val modelTestLatencies: Map<String, ModelTestStatus> = emptyMap(),
+    /** 有可用账号（启用且有额度）的路由前缀集合；「只看可用」据此过滤分组。 */
+    val usablePrefixes: Set<String> = emptySet(),
     val calls: List<CallRecord> = emptyList(),
     /** 存储中的记录条数（含未载入内存的，仅供「数据管理」展示）。 */
     val storedCalls: Int = 0,
