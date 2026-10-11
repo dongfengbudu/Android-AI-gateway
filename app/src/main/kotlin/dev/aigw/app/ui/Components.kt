@@ -97,7 +97,25 @@ fun PageScaffold(
             contentPadding = PaddingValues(top = paddingValues.calculateTopPadding()),
             overscrollEffect = null,
         ) {
-            item { Spacer(Modifier.height(12.dp)) }
+            item {
+                Column {
+                    Spacer(Modifier.height(12.dp))
+                    // miuix 0.8.8 的 TopAppBar 没有 subtitle 参数，副标题由页面内容区首行展示
+                    if (subtitle.isNotEmpty()) {
+                        Text(
+                            text = subtitle,
+                            style = MiuixTheme.textStyles.footnote1,
+                            color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
+                            maxLines = 1,
+                            overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(horizontal = 26.dp)
+                                .padding(bottom = 4.dp),
+                        )
+                    }
+                }
+            }
             content()
             item { Spacer(Modifier.height(paddingValues.calculateBottomPadding())) }
         }

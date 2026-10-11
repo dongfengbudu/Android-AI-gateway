@@ -3,7 +3,6 @@ package dev.aigw.app.service
 import android.content.Intent
 import android.service.quicksettings.Tile
 import android.service.quicksettings.TileService
-import androidx.core.content.ContextCompat
 import dev.aigw.app.gatewayEngine
 
 /**
@@ -23,20 +22,11 @@ class GatewayTileService : TileService() {
         val engine = runCatching { gatewayEngine }.getOrNull() ?: return
         val tile = qsTile ?: return
         if (engine.isRunning()) {
-            engine.stop()
-            applicationContext.stopService(Intent(applicationContext, GatewayService::class.java))
+            GatewayService.stop(applicationContext)
             engine.requestLog.info("控制中心磁贴停止了网关")
         } else {
-            // 磁贴点击允许直接拉前台服务（用户交互），引擎启动失败再撤
-            ContextCompat.startForegroundService(
-                applicationContext,
-                Intent(applicationContext, GatewayService::class.java),
-            )
-            val ok = runCatching { engine.start() }.isSuccess
-            if (!ok) {
-                applicationContext.stopService(Intent(applicationContext, GatewayService::class.java))
-            }
-            engine.requestLog.info(if (ok) "控制中心磁贴启动了网关" else "磁贴启动网关失败")
+            val error = GatewayService.start(applicationContext)
+            engine.requestLog.info(if (error == null) "控制中心磁贴启动了网关" else "磁贴启动网关失败")
         }
         updateTile()
         // 主界面可能正开着：让它的状态也刷新

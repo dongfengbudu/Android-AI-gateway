@@ -10,6 +10,7 @@ import android.os.Build
 import android.os.IBinder
 import android.os.PowerManager
 import androidx.core.app.NotificationCompat
+import androidx.core.content.ContextCompat
 import dev.aigw.app.MainActivity
 import dev.aigw.app.R
 import dev.aigw.app.AiGatewayApp
@@ -108,5 +109,21 @@ class GatewayService : Service() {
         const val NOTIFICATION_ID = 1001
         private const val WAKE_LOCK_TAG = "aigw:gateway"
         private const val WIFI_LOCK_TAG = "aigw:gateway-wifi"
+
+        /**
+         * UI 与磁贴共用的启动入口：拉起前台服务并确保引擎已运行。
+         * 成功返回 null，失败返回错误文案。
+         */
+        fun start(context: Context): String? {
+            ContextCompat.startForegroundService(context, Intent(context, GatewayService::class.java))
+            return runCatching { context.gatewayEngine.start() }
+                .exceptionOrNull()?.let { it.message ?: "启动失败" }
+        }
+
+        /** UI 与磁贴共用的停止入口：停引擎并撤掉前台服务。 */
+        fun stop(context: Context) {
+            runCatching { context.gatewayEngine.stop() }
+            context.stopService(Intent(context, GatewayService::class.java))
+        }
     }
 }

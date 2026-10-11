@@ -13,3 +13,15 @@ keystore.properties
 
 # 只用于本地构建/诊断，不进仓库
 scripts/
+
+# 构建产物曾误提交到仓库根目录（APK 解包内容），禁止再次入库
+/.taixu/
+/AndroidManifest.xml
+/DebugProbesKt.bin
+/META-INF/
+/classes.dex
+/resources.arsc
+/kotlin/
+/lib/
+/res/
+/codebuddy-models-*.json

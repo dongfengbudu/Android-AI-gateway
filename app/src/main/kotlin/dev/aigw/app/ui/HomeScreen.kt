@@ -462,9 +462,11 @@ private fun Tile(modifier: Modifier, label: String, content: @Composable ColumnS
         modifier = modifier
             .heightIn(min = 112.dp)
             .clip(RoundedCornerShape(16.dp))
+            // border 必须在 background 之前：否则边框画在 padding 内缩的矩形上，
+            // 背景铺满整格、看起来内容溢出边框
+            .border(1.dp, MiuixTheme.colorScheme.outline, RoundedCornerShape(16.dp))
             .background(MiuixTheme.colorScheme.surface)
-            .padding(12.dp)
-            .border(1.dp, MiuixTheme.colorScheme.outline, RoundedCornerShape(16.dp)),
+            .padding(12.dp),
         verticalArrangement = Arrangement.spacedBy(6.dp),
     ) {
         Text(
@@ -473,6 +475,7 @@ private fun Tile(modifier: Modifier, label: String, content: @Composable ColumnS
             letterSpacing = 0.8.sp,
             color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
             maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
         )
         content()
     }
@@ -511,6 +514,7 @@ private fun TileNote(text: String) {
         color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
         maxLines = 1,
         overflow = TextOverflow.Ellipsis,
+        modifier = Modifier.fillMaxWidth(),
     )
 }
 

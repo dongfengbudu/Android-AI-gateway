@@ -41,6 +41,10 @@ import top.yukonga.miuix.kmp.theme.MiuixTheme
 fun KeepAliveScreen(state: AppUiState, viewModel: AppViewModel, onBack: () -> Unit) {
     val context = LocalContext.current
     val status = state.keepAlive
+    // 「后台运行限制」与「流量节省」两行的落点都是应用详情页
+    val openAppDetails = {
+        launch(context, KeepAlive.appDetailsIntent(context), "无法打开应用详情")
+    }
 
     val notificationPermission = rememberLauncherForActivityResult(
         ActivityResultContracts.RequestPermission(),
@@ -111,7 +115,7 @@ fun KeepAliveScreen(state: AppUiState, viewModel: AppViewModel, onBack: () -> Un
                     detail = if (status?.backgroundRestricted == true) "系统已限制本应用后台运行" else "未被系统限制后台运行",
                     ok = status?.backgroundRestricted != true,
                 ) {
-                    launch(context, KeepAlive.appDetailsIntent(context), "无法打开应用详情")
+                    openAppDetails()
                 }
                 HorizontalDivider(modifier = Modifier.fillMaxWidth())
                 StatusRow(
@@ -119,7 +123,7 @@ fun KeepAliveScreen(state: AppUiState, viewModel: AppViewModel, onBack: () -> Un
                     detail = if (status?.dataSaverRestricted == true) "已开启流量节省，后台联网可能受限" else "未开启流量节省",
                     ok = status?.dataSaverRestricted != true,
                 ) {
-                    launch(context, KeepAlive.appDetailsIntent(context), "无法打开应用详情")
+                    openAppDetails()
                 }
             }
         }
@@ -133,15 +137,16 @@ fun KeepAliveScreen(state: AppUiState, viewModel: AppViewModel, onBack: () -> Un
                     style = MiuixTheme.textStyles.footnote1,
                     color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
                 )
+                val hint = KeepAlive.manualHint(Build.MANUFACTURER)
                 ChoiceChip("打开厂商后台设置", false) {
                     val opened = KeepAlive.autoStartIntents().any { launch(context, it, null) }
                     if (!opened) {
                         launch(context, KeepAlive.appDetailsIntent(context), "无法打开系统页面")
                     }
-                    Toast.makeText(context, KeepAlive.manualHint(Build.MANUFACTURER), Toast.LENGTH_LONG).show()
+                    Toast.makeText(context, hint, Toast.LENGTH_LONG).show()
                 }
                 Text(
-                    text = KeepAlive.manualHint(Build.MANUFACTURER),
+                    text = hint,
                     style = MiuixTheme.textStyles.footnote1,
                     color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
                 )
@@ -150,7 +155,8 @@ fun KeepAliveScreen(state: AppUiState, viewModel: AppViewModel, onBack: () -> Un
 
         item {
             Text(
-                text = "说明：本应用用「常驻通知」保持进程存活，不需要额外的唤醒锁（唤醒锁更耗电且没必要）。" +
+                text = "说明：本应用用「常驻通知」保持进程存活，并持有唤醒锁与 Wi-Fi 锁，" +
+                    "避免锁屏后 CPU 休眠、网络挂起导致连接断开。" +
                     "如果系统把本应用放进电池优化名单或限制后台，锁屏一段时间后进程会被冻结，客户端就会连接失败——" +
                     "按上面的检测项逐条处理即可。",
                 style = MiuixTheme.textStyles.footnote1,

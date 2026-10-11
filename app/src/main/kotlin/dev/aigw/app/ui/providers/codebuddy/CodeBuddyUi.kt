@@ -32,6 +32,7 @@ import dev.aigw.app.ui.OutlineActionButton
 import dev.aigw.app.ui.SectionCard
 import dev.aigw.app.ui.SectionHeader
 import dev.aigw.app.ui.accountStatusText
+import top.yukonga.miuix.kmp.basic.SmallTitle
 import dev.aigw.app.ui.providers.ProviderUi
 import dev.aigw.app.ui.providers.ProviderUiActions
 import dev.aigw.core.pool.AccountStatus
@@ -122,9 +123,9 @@ object CodeBuddyUi : ProviderUi {
     @Composable
     private fun LoginSection(global: Boolean, actions: ProviderUiActions) {
         val region = if (global) CodeBuddyProvider.REGION_GLOBAL else CodeBuddyProvider.REGION_CN
-        Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-            SectionCard(enterIndex = 1) {
-                SectionHeader(if (global) "登录 · 国际版 workbuddy.ai" else "登录 · 国内版 copilot.tencent.com")
+        SectionCard(enterIndex = 1) {
+            SectionHeader(if (global) "登录 · 国际版 workbuddy.ai" else "登录 · 国内版 copilot.tencent.com")
+            Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
                 Button(
                     onClick = { actions.onDeviceLogin(id, region) },
                     modifier = Modifier.fillMaxWidth(),
@@ -141,25 +142,26 @@ object CodeBuddyUi : ProviderUi {
     private fun AccountRegionSection(global: Boolean, accounts: List<AccountStatus>, actions: ProviderUiActions) {
         val current = if (global) CodeBuddyProvider.REGION_GLOBAL else CodeBuddyProvider.REGION_CN
         val scoped = remember(accounts, current) { accounts.filter { actions.regionOf(id, it.uid) == current } }
-        Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-            if (scoped.isEmpty()) {
-                SectionCard(enterIndex = 2) {
-                    SectionHeader("账号")
-                    Text(
-                        text = if (global) "还没有国际版账号，先登录" else "还没有国内版账号，先登录",
-                        style = MiuixTheme.textStyles.footnote1,
-                        color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
-                    )
-                }
-                return
-            }
+        if (scoped.isEmpty()) {
             SectionCard(enterIndex = 2) {
-                SectionHeader("账号 · ${scoped.size} 个")
-                for (account in scoped) {
-                    AccountBlock(account, actions)
-                }
-                OutlineActionButton("刷新额度") { actions.onRefreshCredits(id, null) }
+                SectionHeader("账号")
+                Text(
+                    text = if (global) "还没有国际版账号，先登录" else "还没有国内版账号，先登录",
+                    style = MiuixTheme.textStyles.footnote1,
+                    color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
+                )
             }
+            return
+        }
+        SmallTitle("账号 · ${scoped.size} 个")
+        // 每个账号一张独立卡片，避免多个账号混在一张卡里分不清边界（与 CustomUi 一致）
+        scoped.forEachIndexed { index, account ->
+            SectionCard(enterIndex = 2 + index) {
+                AccountBlock(account, actions)
+            }
+        }
+        SectionCard(enterIndex = 2 + scoped.size) {
+            OutlineActionButton("刷新额度") { actions.onRefreshCredits(id, null) }
         }
     }
 

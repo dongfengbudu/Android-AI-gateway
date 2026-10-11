@@ -92,19 +92,18 @@ object KeepAlive {
         }
     }
 
-    /** 厂商引导的手动路径提示，跳转失败时展示。 */
-    fun manualHint(manufacturer: String): String = when {
-        manufacturer.contains("xiaomi", true) || manufacturer.contains("redmi", true) ->
-            "小米：设置 → 应用设置 → 应用管理 → 本应用 → 省电策略选「无限制」"
-        manufacturer.contains("huawei", true) || manufacturer.contains("honor", true) ->
-            "华为/荣耀：设置 → 应用 → 应用启动管理 → 本应用改为「手动管理」并勾选全部"
-        manufacturer.contains("oppo", true) || manufacturer.contains("realme", true) || manufacturer.contains("oneplus", true) ->
-            "OPPO/一加：设置 → 电池 → 更多设置 → 应用耗电管理 → 允许完全后台行为"
-        manufacturer.contains("vivo", true) || manufacturer.contains("iqoo", true) ->
-            "vivo/iQOO：设置 → 电池 → 后台高耗电 → 允许本应用"
-        manufacturer.contains("meizu", true) ->
-            "魅族：手机管家 → 权限管理 → 后台管理 → 允许后台运行"
-        else ->
-            "在系统设置的电池 / 应用管理里，把本应用的省电策略改为「无限制」并允许后台运行"
-    }
+    /** 厂商引导的手动路径提示，跳转失败时展示。品牌名 → 提示，按序匹配。 */
+    private val MANUAL_HINTS = listOf(
+        listOf("xiaomi", "redmi") to "小米：设置 → 应用设置 → 应用管理 → 本应用 → 省电策略选「无限制」",
+        listOf("huawei", "honor") to "华为/荣耀：设置 → 应用 → 应用启动管理 → 本应用改为「手动管理」并勾选全部",
+        listOf("oppo", "realme", "oneplus") to "OPPO/一加：设置 → 电池 → 更多设置 → 应用耗电管理 → 允许完全后台行为",
+        listOf("vivo", "iqoo") to "vivo/iQOO：设置 → 电池 → 后台高耗电 → 允许本应用",
+        listOf("meizu") to "魅族：手机管家 → 权限管理 → 后台管理 → 允许后台运行",
+    )
+
+    fun manualHint(manufacturer: String): String =
+        MANUAL_HINTS
+            .firstOrNull { (brands, _) -> brands.any { manufacturer.contains(it, ignoreCase = true) } }
+            ?.second
+            ?: "在系统设置的电池 / 应用管理里，把本应用的省电策略改为「无限制」并允许后台运行"
 }

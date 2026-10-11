@@ -7,7 +7,6 @@ import android.net.Uri
 import android.os.Build
 import android.service.quicksettings.TileService
 import androidx.compose.ui.graphics.Color
-import androidx.core.content.ContextCompat
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.google.gson.JsonObject
@@ -519,12 +518,7 @@ class AppViewModel(
     fun startGateway() {
         viewModelScope.launch {
             _state.value = _state.value.copy(busy = "正在启动服务")
-            // 先拉前台服务再启动引擎：startForegroundService 立即弹出通知，
-            // engine.start() 幂等（server != null 直接返回），Service 里会再调一次兑底
-            ContextCompat.startForegroundService(app, Intent(app, GatewayService::class.java))
-            val error = withContext(Dispatchers.IO) {
-                runCatching { engine.start() }.exceptionOrNull()?.let { it.message ?: "启动失败" }
-            }
+            val error = withContext(Dispatchers.IO) { GatewayService.start(app) }
             _state.value = _state.value.copy(busy = "")
             if (error != null) {
                 // 引擎没起来就撤掉前台通知，避免「通知说运行中、端口没人听」
@@ -538,8 +532,7 @@ class AppViewModel(
 
     fun stopGateway() {
         viewModelScope.launch {
-            withContext(Dispatchers.IO) { engine.stop() }
-            app.stopService(Intent(app, GatewayService::class.java))
+            withContext(Dispatchers.IO) { GatewayService.stop(app) }
             _state.value = _state.value.copy(notice = "服务已停止")
             refresh()
             requestTileUpdate()
