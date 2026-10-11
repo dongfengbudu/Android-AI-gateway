@@ -80,7 +80,7 @@ class GatewayHttpServer(
 
     private fun models(session: NanoHTTPD.IHTTPSession): NanoHTTPD.Response {
         if (!authorized(session)) return unauthorized(session)
-        return json(200, OpenAiApi.modelList(engine.models()))
+        return json(200, OpenAiApi.modelList(engine.exposedModels()))
     }
 
     /** 聚合额度与配额查询端点：包含各供应商剩余额度及 Antigravity 的四个进度条指标。 */
@@ -189,6 +189,10 @@ class GatewayHttpServer(
 
         val primaryRoute = engine.resolveRoute(requestedModel)
             ?: return errorResponse(400, "invalid_request", "缺少 model 参数")
+        // 模型暴露管控：被用户隐藏的模型拒绝对话（与 /v1/models 列表口径一致）
+        if (requestedModel.trim() in engine.settings().hiddenModels) {
+            return errorResponse(404, "model_not_found", "模型 $requestedModel 已在网关中隐藏")
+        }
 
         val startedAt = System.currentTimeMillis()
         var lastError = ""

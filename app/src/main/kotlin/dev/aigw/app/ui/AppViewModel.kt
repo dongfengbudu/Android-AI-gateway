@@ -562,6 +562,13 @@ class AppViewModel(
         }
     }
 
+    /** 切换某个模型是否对外（/v1/models 与对话路由）暴露。 */
+    fun toggleModelHidden(fullId: String, hidden: Boolean) {
+        val current = _state.value.settings
+        val next = if (hidden) current.hiddenModels + fullId else current.hiddenModels - fullId
+        updateSettings(current.copy(hiddenModels = next))
+    }
+
     fun updateSecuritySettings(updated: dev.aigw.core.security.SecuritySettings) {
         viewModelScope.launch {
             withContext(Dispatchers.IO) { engine.updateSecuritySettings(updated) }

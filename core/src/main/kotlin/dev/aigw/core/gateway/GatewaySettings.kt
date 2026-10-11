@@ -18,6 +18,8 @@ data class GatewaySettings(
     val exposeLan: Boolean = true,
     /** 「只看可用模型」开关：隐藏上游的非对话内部条目。 */
     val onlyUsableModels: Boolean = false,
+    /** 对外（API /v1/models 与对话路由）隐藏的模型，元素为 `routePrefix/modelId` 全名。 */
+    val hiddenModels: Set<String> = emptySet(),
     /** token 预刷新窗口。 */
     val refreshSkewSeconds: Long = 24L * 3600,
     /** 单次请求最多换号次数。 */
@@ -35,6 +37,7 @@ data class GatewaySettings(
         addProperty("allowNoKey", allowNoKey)
         addProperty("exposeLan", exposeLan)
         addProperty("onlyUsableModels", onlyUsableModels)
+        add("hiddenModels", JsonArray().apply { hiddenModels.forEach { add(it) } })
         addProperty("refreshSkewSeconds", refreshSkewSeconds)
         addProperty("maxRotate", maxRotate)
         addProperty("verboseLogging", verboseLogging)
@@ -60,6 +63,8 @@ data class GatewaySettings(
                 allowNoKey = obj.boolOr("allowNoKey", defaults.allowNoKey),
                 exposeLan = obj.boolOr("exposeLan", defaults.exposeLan),
                 onlyUsableModels = obj.boolOr("onlyUsableModels", defaults.onlyUsableModels),
+                hiddenModels = obj.arrayOrNull("hiddenModels")
+                    ?.mapNotNull { runCatching { it.asString }.getOrNull() }?.toSet() ?: defaults.hiddenModels,
                 refreshSkewSeconds = obj.longOr("refreshSkewSeconds", defaults.refreshSkewSeconds),
                 maxRotate = obj.intOr("maxRotate", defaults.maxRotate),
                 verboseLogging = obj.boolOr("verboseLogging", defaults.verboseLogging),

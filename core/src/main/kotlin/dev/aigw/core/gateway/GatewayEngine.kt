@@ -464,6 +464,8 @@ class GatewayEngine(
     fun setAccountEnabled(providerId: String, uid: String, enabled: Boolean) {
         pool.setEnabled(providerId, uid, enabled, reason = if (enabled) "" else "手动停用")
         log("${if (enabled) "启用" else "停用"}账号：$providerId/$uid")
+        // 账号启停会影响模型暴露（/v1/models 与模型页），通知界面刷新
+        onAccountsChanged?.invoke()
     }
 
     /**
@@ -831,6 +833,33 @@ class GatewayEngine(
     /** 阻塞聚合版：HTTP `/v1/models`、CLI 等需要一次性完整列表的场景使用。 */
     fun models(): List<RoutedModel> = modelsStreaming { }.models
 
+    /**
+     * 对外暴露的模型列表：在原始目录基础上做两层过滤——
+     * 1. 账号启停联动：只保留「有可用（未被硬禁用且未被用户停用）账号」的供应商/区域分组；
+     * 2. 用户隐藏：剔除 settings.hiddenModels 里的条目。
+     * `/v1/models` 端点与界面模型页共用本入口，保证客户端看到的与 App 内一致。
+     */
+    fun exposedModels(): List<RoutedModel> {
+        val hidden = settings.hiddenModels
+        if (hidden.isEmpty()) return filterByUsableAccounts(models())
+        return filterByUsableAccounts(models()).filter { it.fullId !in hidden }
+    }
+
+    /** 账号启停联动：供应商没有任何可用账号时整组剔除；区域型供应商按区域分别判断。 */
+    private fun filterByUsableAccounts(models: List<RoutedModel>): List<RoutedModel> {
+        if (models.isEmpty()) return models
+        return models.filter { routed ->
+            val accounts = pool.accounts(routed.providerId)
+            if (accounts.isEmpty()) return@filter true // 无账号（如自定义 API Key 型）不过滤
+            val statuses = pool.statuses(routed.providerId).associateBy { it.uid }
+            val regionAware = registry.get(routed.providerId) as? dev.aigw.core.provider.RegionAwareSupport
+            accounts.any { account ->
+                statuses[account.uid]?.usable == true &&
+                    (regionAware == null || routed.region == null || regionAware.regionOf(account) == routed.region)
+            }
+        }
+    }
+
     /** 拉取单个供应商的模型目录（id 带 `provider/` 前缀；区域型供应商按区域拆成多组）。 */
     private fun fetchProviderModels(provider: Provider): ProviderModelsChunk {
         return try {
@@ -850,7 +879,12 @@ class GatewayEngine(
             val models = ArrayList<RoutedModel>()
             val regionAware = provider as? dev.aigw.core.provider.RegionAwareSupport
             for (model in view.models) {
-                if (settings.onlyUsableModels && provider.isInternalModel(model.id)) continue
+                val internal = settings.onlyUsableModels && provider.isInternalModel(model.id)
+                if (internal) continue
+                val enriched = if (provider.isInternalModel(model.id)) {
+                    // 给 UI 层留标记：展示层「只看可用」过滤与上游拉取层口径一致
+                    model.copy(extra = model.extra + ("internal" to "true"))
+                } else model
                 if (regionAware != null) {
                     for (region in regionAware.regions()) {
                         val label = when (region) {
@@ -862,14 +896,14 @@ class GatewayEngine(
                             RoutedModel(
                                 provider.id,
                                 "${provider.displayName}（$label）",
-                                model,
+                                enriched,
                                 routePrefix = "${provider.id}-$region",
                                 region = region,
                             ),
                         )
                     }
                 } else {
-                    models.add(RoutedModel(provider.id, provider.displayName, model))
+                    models.add(RoutedModel(provider.id, provider.displayName, enriched))
                 }
             }
             // 供应商自报错误只在拿不到任何模型时才算失败；带内置快照的回退

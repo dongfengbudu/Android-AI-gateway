@@ -65,7 +65,16 @@ fun ModelsScreen(state: AppUiState, viewModel: AppViewModel) {
     // 这里不能用 remember { derivedStateOf { ... } }：state 是普通参数而非 State，
     // derivedStateOf 只追踪快照状态的读取，remember 无 key 又会一直返回首次创建的实例，
     // 结果分组被冻结在首次组合时的 models 上，刷新后列表永远不更新。
-    val grouped = remember(state.models) { state.models.groupBy { it.routePrefix } }
+    // 展示层实时过滤（修复「只看可用」切缓存不生效的问题）：
+    // 1. onlyUsableModels 时隐藏上游内部条目（与拉取层口径一致）；
+    // 2. 始终隐藏用户在设置里关掉暴露的模型（hiddenModels）。
+    // 这样切换开关后无需重新拉目录，缓存数据立即生效。
+    val grouped = remember(state.models, state.settings.onlyUsableModels, state.settings.hiddenModels) {
+        state.models
+            .filter { it.fullId !in state.settings.hiddenModels }
+            .filter { !state.settings.onlyUsableModels || !it.model.extra["internal"].toBoolean() }
+            .groupBy { it.routePrefix }
+    }
     // 折叠状态：记「被展开」的分组（默认全部折叠，点分组头才展开）。用 rememberSaveable 让旋转屏幕后保持。
     val expanded = rememberSaveable(
         saver = androidx.compose.runtime.saveable.listSaver(
@@ -200,6 +209,8 @@ fun ModelsScreen(state: AppUiState, viewModel: AppViewModel) {
                     models = models,
                     expanded = expanded,
                     testLatencies = state.modelTestLatencies,
+                    hiddenModels = state.settings.hiddenModels,
+                    onToggleExposed = { fullId, expose -> viewModel.toggleModelHidden(fullId, !expose) },
                     onCopy = { id ->
                         clipboard.setText(AnnotatedString(id))
                         Toast.makeText(context, "已复制模型名称：$id", Toast.LENGTH_SHORT).show()
@@ -224,6 +235,8 @@ fun ModelsScreen(state: AppUiState, viewModel: AppViewModel) {
 private fun ModelRow(
     model: RoutedModel,
     testStatus: ModelTestStatus?,
+    exposed: Boolean = true,
+    onToggleExposed: (Boolean) -> Unit = {},
     modifier: Modifier = Modifier,
     onCopy: () -> Unit,
     onTest: () -> Unit,
@@ -336,6 +349,36 @@ private fun ModelRow(
             null -> Unit
         }
 
+        // 暴露开关：关掉后该模型不出现在 /v1/models，对话调用返回 404
+        Column(
+            horizontalAlignment = Alignment.CenterHorizontally,
+            modifier = Modifier.bouncyClick { onToggleExposed(!exposed) },
+        ) {
+            Box(
+                modifier = Modifier
+                    .size(width = 38.dp, height = 22.dp)
+                    .clip(CircleShape)
+                    .background(if (exposed) MiuixTheme.colorScheme.primary
+                        else MiuixTheme.colorScheme.secondaryContainer),
+                contentAlignment = Alignment.CenterStart,
+            ) {
+                Box(
+                    modifier = Modifier
+                        .padding(horizontal = 3.dp)
+                        .size(16.dp)
+                        .graphicsLayer { translationX = if (exposed) 16f else 0f }
+                        .clip(CircleShape)
+                        .background(MiuixTheme.colorScheme.surface),
+                )
+            }
+            Text(
+                text = if (exposed) "已暴露" else "已隐藏",
+                style = MiuixTheme.textStyles.footnote2,
+                color = if (exposed) MiuixTheme.colorScheme.onSurfaceVariantSummary
+                else MiuixTheme.colorScheme.error,
+            )
+        }
+
         // 右侧 Q 弹测试按钮
         Box(
             modifier = Modifier
@@ -436,6 +479,8 @@ private fun LazyListScope.modelGroupSection(
     models: List<RoutedModel>,
     expanded: androidx.compose.runtime.snapshots.SnapshotStateList<String>,
     testLatencies: Map<String, ModelTestStatus>,
+    hiddenModels: Set<String>,
+    onToggleExposed: (String, Boolean) -> Unit,
     onCopy: (String) -> Unit,
     onTest: (RoutedModel) -> Unit,
 ) {
@@ -494,9 +539,13 @@ private fun LazyListScope.modelGroupSection(
 
     if (routePrefix !in expanded) return
     items(models, key = { it.fullId }) { model ->
+        // 与 settings.hiddenModels 反向同步：不在隐藏集合里即视为暴露
+        val hidden = model.fullId in hiddenModels
         ModelRow(
             model = model,
             testStatus = testLatencies[model.fullId],
+            exposed = !hidden,
+            onToggleExposed = { expose -> onToggleExposed(model.fullId, !expose) },
             modifier = Modifier.padding(start = 28.dp, end = 28.dp),
             onCopy = { onCopy(model.fullId) },
             onTest = { onTest(model) },
