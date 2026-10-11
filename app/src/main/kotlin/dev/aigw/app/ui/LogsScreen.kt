@@ -237,6 +237,7 @@ private fun LogRow(line: LogLine) {
     }
 }
 
+@Composable
 private fun levelColor(level: String): Color = when (level) {
     "WARN" -> WarnAmber
     "ERROR" -> MiuixTheme.colorScheme.error
@@ -245,7 +246,8 @@ private fun levelColor(level: String): Color = when (level) {
 
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
-private fun CallRow(record: CallRecord, onClick: () -> Unit, onLongClick: () -> Unit) {    Column(
+private fun CallRow(record: CallRecord, onClick: () -> Unit, onLongClick: () -> Unit) {
+    Column(
         modifier = Modifier
             .fillMaxWidth()
             .combinedClickable(onClick = onClick, onLongClick = onLongClick)
