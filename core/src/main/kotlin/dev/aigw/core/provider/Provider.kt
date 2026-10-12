@@ -45,6 +45,29 @@ const val ACTION_CHECKIN = "checkin"
 const val ACTION_TASKS = "tasks"
 
 /**
+ * 对话活跃上报。
+ *
+ * 上游的成长体系里，连登天数与「领养第一只 Buddy」都靠客户端上报的对话事件点亮，
+ * 账号只登录不对话就不会计入。每天上报一条即可。
+ */
+const val ACTION_ACTIVITY = "activity"
+
+/**
+ * 夜猫子任务（black_cat）补足。
+ *
+ * 上游只在 23:00–08:00 窗口内计数，窗口外调用不发任何请求直接跳过。
+ */
+const val ACTION_BLACKCAT = "blackcat"
+
+/**
+ * 成长任务一键完成。
+ *
+ * `payload.task_code` 为空时跑全部可自动化任务；指定 code 时只跑那一个。
+ * 与 [ACTION_TASKS]（只领已完成的）的区别：这里会先补齐各项任务的前置行为。
+ */
+const val ACTION_AUTO_TASKS = "auto_tasks"
+
+/**
  * 一个额度包/账本条目。
  *
  * 字段缺失一律用 0（金额类）或空串（文本类），不要编造。
