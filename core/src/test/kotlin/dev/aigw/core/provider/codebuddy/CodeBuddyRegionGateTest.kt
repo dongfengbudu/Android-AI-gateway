@@ -1,6 +1,11 @@
 package dev.aigw.core.provider.codebuddy
 
 import com.google.gson.JsonObject
+import dev.aigw.core.provider.ACTION_ACTIVITY
+import dev.aigw.core.provider.ACTION_AUTO_TASKS
+import dev.aigw.core.provider.ACTION_BLACKCAT
+import dev.aigw.core.provider.ACTION_CHECKIN
+import dev.aigw.core.provider.ACTION_TASKS
 import dev.aigw.core.provider.ProviderAccount
 import kotlin.test.Test
 import kotlin.test.assertFalse
@@ -24,11 +29,11 @@ class CodeBuddyRegionGateTest {
     )
 
     private val gatedActions = listOf(
-        CodeBuddyProvider.ACTION_CHECKIN,
-        CodeBuddyProvider.ACTION_TASKS,
-        CodeBuddyProvider.ACTION_ACTIVITY,
-        CodeBuddyProvider.ACTION_BLACKCAT,
-        CodeBuddyProvider.ACTION_AUTO_TASKS,
+        ACTION_CHECKIN,
+        ACTION_TASKS,
+        ACTION_ACTIVITY,
+        ACTION_BLACKCAT,
+        ACTION_AUTO_TASKS,
     )
 
     @Test

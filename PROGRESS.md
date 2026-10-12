@@ -17,6 +17,9 @@
   列表条目加 `animateItem` 切换动画。
 - 版本：versionCode 103→104，versionName 1.1.6→1.1.7。
 - 待办：以上改动本容器无 JDK/Gradle，仅静态交叉验证，待 CI 复核。
+- CI 首轮（`cb45256`）失败在 `:core:test`：新用例写了 `CodeBuddyProvider.ACTION_TASKS` /
+  `ACTION_AUTO_TASKS`，但这两个常量在 `Provider.kt` 顶层（companion 里只别名为 `ACTION_CHECKIN` /
+  `ACTION_ACTIVITY` / `ACTION_BLACKCAT`），引用不存在 → 测试编译不过。已改为 `import dev.aigw.core.provider.ACTION_*`。
 
 自动化任务移植（2026-10-12，来源：workbuddy2api-panel）：
 - 上游能力层：`CodeBuddyProvider` 新增 `ACTION_AUTO_TASKS`（`auto_tasks`）与 `autoTasks(account, payload)`，
