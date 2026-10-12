@@ -35,7 +35,9 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.toMutableStateList
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.platform.LocalContext
@@ -65,26 +67,18 @@ fun ModelsScreen(state: AppUiState, viewModel: AppViewModel) {
     // 这里不能用 remember { derivedStateOf { ... } }：state 是普通参数而非 State，
     // derivedStateOf 只追踪快照状态的读取，remember 无 key 又会一直返回首次创建的实例，
     // 结果分组被冻结在首次组合时的 models 上，刷新后列表永远不更新。
-    // 「只看可用」的可用供应商：存在启用、未失效且有额度（额度未知视为有）的账号。
-    // 直接从 state.accounts 现场推导，账号启停/额度刷新后随 refresh 自动生效。
-    val usablePrefixes = remember(state.accounts) {
-        buildSet {
-            state.accounts.forEach { a ->
-                if (a.usable && (!a.creditsKnown || a.credits > 0)) add(a.providerId)
-            }
-        }
-    }
     // 展示层实时过滤（修复「只看可用」切缓存不生效的问题）：
     // 1. onlyUsableModels 时隐藏上游内部条目，且只显示「有可用账号（启用且有额度）」的分组；
+    //    可用前缀用引擎的 usableRoutePrefixes（区域型按区域判断），与 /v1/models 口径一致；
     // 2. 隐藏的模型仍保留在列表里（标灰显示「已隐藏」可再点开），只是不进 /v1/models——
     //    若在此处过滤，点隐藏后行直接消失将无法再点回暴露。
     val grouped = remember(
         state.models, state.settings.onlyUsableModels,
-        state.settings.hiddenModels, usablePrefixes,
+        state.settings.hiddenModels, state.usableModelPrefixes,
     ) {
         state.models
             .filter { !state.settings.onlyUsableModels || it.model.extra["internal"] != "true" }
-            .filter { !state.settings.onlyUsableModels || it.providerId in usablePrefixes }
+            .filter { !state.settings.onlyUsableModels || it.routePrefix in state.usableModelPrefixes }
             .groupBy { it.routePrefix }
     }
     // 折叠状态：记「被展开」的分组（默认全部折叠，点分组头才展开）。用 rememberSaveable 让旋转屏幕后保持。
@@ -222,6 +216,7 @@ fun ModelsScreen(state: AppUiState, viewModel: AppViewModel) {
                     expanded = expanded,
                     testLatencies = state.modelTestLatencies,
                     hiddenModels = state.settings.hiddenModels,
+                    usable = routePrefix in state.usableModelPrefixes,
                     onToggleExposed = { fullId, expose -> viewModel.toggleModelHidden(fullId, !expose) },
                     onCopy = { id ->
                         clipboard.setText(AnnotatedString(id))
@@ -492,6 +487,8 @@ private fun LazyListScope.modelGroupSection(
     expanded: androidx.compose.runtime.snapshots.SnapshotStateList<String>,
     testLatencies: Map<String, ModelTestStatus>,
     hiddenModels: Set<String>,
+    /** 与 /v1/models 口径一致：该分组是否有可用账号；无则整组置灰标注。 */
+    usable: Boolean,
     onToggleExposed: (String, Boolean) -> Unit,
     onCopy: (String) -> Unit,
     onTest: (RoutedModel) -> Unit,
@@ -532,7 +529,15 @@ private fun LazyListScope.modelGroupSection(
                     text = title,
                     style = MiuixTheme.textStyles.body2,
                     fontWeight = FontWeight.SemiBold,
+                    color = if (usable) Color.Unspecified else MiuixTheme.colorScheme.onSurfaceVariantSummary,
                 )
+                if (!usable) {
+                    Text(
+                        text = "无可用账号",
+                        style = MiuixTheme.textStyles.footnote2,
+                        color = MiuixTheme.colorScheme.error,
+                    )
+                }
             }
             Box(
                 modifier = Modifier
@@ -550,6 +555,7 @@ private fun LazyListScope.modelGroupSection(
     }
 
     if (routePrefix !in expanded) return
+    val rowGrey = if (usable) Modifier else Modifier.alpha(0.45f)
     items(models, key = { it.fullId }) { model ->
         // 与 settings.hiddenModels 反向同步：不在隐藏集合里即视为暴露
         val hidden = model.fullId in hiddenModels
@@ -557,8 +563,8 @@ private fun LazyListScope.modelGroupSection(
             model = model,
             testStatus = testLatencies[model.fullId],
             exposed = !hidden,
-            onToggleExposed = { expose -> onToggleExposed(model.fullId, !expose) },
-            modifier = Modifier.padding(start = 28.dp, end = 28.dp),
+            onToggleExposed = { expose -> onToggleExposed(model.fullId, expose) },
+            modifier = Modifier.padding(start = 28.dp, end = 28.dp).then(rowGrey),
             onCopy = { onCopy(model.fullId) },
             onTest = { onTest(model) },
         )

@@ -196,6 +196,8 @@ data class AppUiState(
     val accounts: List<AccountStatus> = emptyList(),
     val customProviders: List<CustomProviderConfig> = emptyList(),
     val models: List<RoutedModel> = emptyList(),
+    /** 有可用账号的路由前缀（区域型按区域判断，口径同 /v1/models 的 filterByUsableAccounts）；供模型页标注「无可用账号」分组。 */
+    val usableModelPrefixes: Set<String> = emptySet(),
     val modelsError: String = "",
     /** 模型目录是否正在流式加载（各供应商就绪即增量写入 [models]）。 */
     val modelsLoading: Boolean = false,
@@ -279,6 +281,7 @@ private class Snapshot(
     val providers: List<ProviderInfo>,
     val accounts: List<AccountStatus>,
     val customProviders: List<CustomProviderConfig>,
+    val usableModelPrefixes: Set<String>,
     val calls: List<CallRecord>,
     val operations: List<OperationEntry>,
     val settings: GatewaySettings,
@@ -358,6 +361,8 @@ class AppViewModel(
 
     fun refresh() {
         viewModelScope.launch {
+            // 可用前缀按当前已展示的模型算：停用/启用账号后无需重拉目录即可更新置灰状态
+            val currentModels = _state.value.models
             val snapshot = withContext(Dispatchers.IO) {
                 Snapshot(
                     running = engine.isRunning(),
@@ -371,6 +376,7 @@ class AppViewModel(
                     providers = engine.providers(),
                     accounts = engine.accounts(),
                     customProviders = engine.settingsRepository.loadCustomProviders(),
+                    usableModelPrefixes = engine.usableRoutePrefixes(currentModels),
                     calls = engine.callLogStore.list(),
                     operations = engine.operationLog.entries(),
                     settings = engine.settings(),
@@ -393,6 +399,7 @@ class AppViewModel(
                 providers = snapshot.providers,
                 accounts = snapshot.accounts,
                 customProviders = snapshot.customProviders,
+                usableModelPrefixes = snapshot.usableModelPrefixes,
                 calls = snapshot.calls,
                 operations = snapshot.operations,
                 settings = snapshot.settings,
@@ -465,8 +472,12 @@ class AppViewModel(
             if (gen != modelsGeneration) return@launch
             // 全部完成后用最终聚合覆盖：失败供应商的旧条目随之清除（与整体刷新语义一致）
             val providerError = catalog.failures.entries.joinToString("；") { "${it.key}：${it.value}" }
+            val usablePrefixes = withContext(Dispatchers.IO) {
+                engine.usableRoutePrefixes(catalog.models)
+            }
             _state.value = _state.value.copy(
                 models = catalog.models,
+                usableModelPrefixes = usablePrefixes,
                 modelsLoading = false,
                 modelsError = listOf(error, providerError).filter { it.isNotEmpty() }.joinToString("；"),
                 busy = if (quiet) _state.value.busy else "",
@@ -483,10 +494,15 @@ class AppViewModel(
         val failure = chunk.error
         states[chunk.providerId] =
             if (failure != null) ModelLoadState.Failed(failure) else ModelLoadState.Done(chunk.models.size)
+        val models = current.models.filter { it.providerId != chunk.providerId } + chunk.models
         _state.value = current.copy(
-            models = current.models.filter { it.providerId != chunk.providerId } + chunk.models,
+            models = models,
             modelLoadStates = states,
         )
+        viewModelScope.launch {
+            val prefixes = withContext(Dispatchers.IO) { engine.usableRoutePrefixes(models) }
+            _state.value = _state.value.copy(usableModelPrefixes = prefixes)
+        }
     }
 
     /** 对指定模型执行一次轻量连通性与延迟探测。 */

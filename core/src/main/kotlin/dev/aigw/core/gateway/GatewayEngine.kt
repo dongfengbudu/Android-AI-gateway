@@ -862,6 +862,13 @@ class GatewayEngine(
         }
     }
 
+    /**
+     * 有可用账号的路由前缀（口径与 [filterByUsableAccounts] 一致，区域型按区域判断）；
+     * 模型页据此把「无可用账号」的分组置灰标注，与 `/v1/models` 实际暴露口径对齐。
+     */
+    fun usableRoutePrefixes(models: List<RoutedModel>): Set<String> =
+        filterByUsableAccounts(models).mapTo(HashSet()) { it.routePrefix }
+
     /** 拉取单个供应商的模型目录（id 带 `provider/` 前缀；区域型供应商按区域拆成多组）。 */
     private fun fetchProviderModels(provider: Provider): ProviderModelsChunk {
         return try {
