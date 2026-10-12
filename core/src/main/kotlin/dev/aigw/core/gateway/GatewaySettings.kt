@@ -31,6 +31,19 @@ data class GatewaySettings(
     /** 模型名不带 provider 前缀时落到哪个供应商。 */
     val defaultProvider: String = "trae",
 ) {
+    /**
+     * 把某个模型设为暴露（[exposed]=true）或隐藏（false），返回新设置。
+     *
+     * 语义放在这里而不是界面层：界面此前用「隐藏开关」表达「暴露开关」，
+     * 回调链上连取反两次，点一下等于没点（开关看起来卡死）。
+     */
+    fun withModelExposed(fullId: String, exposed: Boolean): GatewaySettings =
+        copy(hiddenModels = if (exposed) hiddenModels - fullId else hiddenModels + fullId)
+
+    /** 全部开启＝清空隐藏集合；全部关闭＝把 [modelIds] 全部隐藏。 */
+    fun withAllModelsExposed(exposed: Boolean, modelIds: Collection<String>): GatewaySettings =
+        copy(hiddenModels = if (exposed) emptySet() else modelIds.toSet())
+
     fun toJson(): JsonObject = JsonObject().apply {
         addProperty("port", port)
         addProperty("apiKey", apiKey)

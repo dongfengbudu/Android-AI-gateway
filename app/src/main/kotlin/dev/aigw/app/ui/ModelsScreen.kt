@@ -25,13 +25,16 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyListScope
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.selection.toggleable
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.mutableStateListOf
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
 import androidx.compose.runtime.toMutableStateList
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -41,6 +44,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -51,6 +55,8 @@ import top.yukonga.miuix.kmp.basic.Icon
 import top.yukonga.miuix.kmp.basic.LinearProgressIndicator
 import top.yukonga.miuix.kmp.basic.ProgressIndicatorDefaults
 import top.yukonga.miuix.kmp.basic.Text
+import top.yukonga.miuix.kmp.basic.TextButton
+import top.yukonga.miuix.kmp.extra.WindowDialog
 import top.yukonga.miuix.kmp.icon.MiuixIcons
 import top.yukonga.miuix.kmp.icon.extended.Copy
 import top.yukonga.miuix.kmp.icon.extended.Refresh
@@ -88,6 +94,9 @@ fun ModelsScreen(state: AppUiState, viewModel: AppViewModel) {
             restore = { it.toMutableStateList() },
         ),
     ) { mutableStateListOf<String>() }
+
+    // 「全部关闭」二次确认（一键把全部模型从 /v1/models 摘掉，影响面大）
+    var confirmHideAll by remember { mutableStateOf(false) }
 
     // 刷新按钮旋转动效：仅在加载中才创建无限过渡，停止后不空转每帧插值
     val spinAngle = if (state.modelsLoading) {
@@ -175,6 +184,30 @@ fun ModelsScreen(state: AppUiState, viewModel: AppViewModel) {
             }
         }
 
+        // 批量暴露开关：一键开启/关闭当前目录里全部模型
+        if (state.models.isNotEmpty()) {
+            item(key = "bulk-expose") {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 12.dp)
+                        .padding(bottom = 8.dp),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                ) {
+                    TextButton(
+                        text = "全部开启",
+                        onClick = { viewModel.setAllModelsExposed(true) },
+                        modifier = Modifier.weight(1f),
+                    )
+                    TextButton(
+                        text = "全部关闭",
+                        onClick = { confirmHideAll = true },
+                        modifier = Modifier.weight(1f),
+                    )
+                }
+            }
+        }
+
         if (state.modelsError.isNotEmpty()) {
             item(key = "error") {
                 SectionCard(enterIndex = 0) {
@@ -217,7 +250,7 @@ fun ModelsScreen(state: AppUiState, viewModel: AppViewModel) {
                     testLatencies = state.modelTestLatencies,
                     hiddenModels = state.settings.hiddenModels,
                     usable = routePrefix in state.usableModelPrefixes,
-                    onToggleExposed = { fullId, expose -> viewModel.toggleModelHidden(fullId, !expose) },
+                    onExposeChange = { fullId, exposed -> viewModel.setModelExposed(fullId, exposed) },
                     onCopy = { id ->
                         clipboard.setText(AnnotatedString(id))
                         Toast.makeText(context, "已复制模型名称：$id", Toast.LENGTH_SHORT).show()
@@ -235,15 +268,36 @@ fun ModelsScreen(state: AppUiState, viewModel: AppViewModel) {
             }
         }
     }
+
+    // 一键关闭全部模型前先确认：关闭后客户端（/v1/models）会看不到任何模型
+    WindowDialog(
+        show = confirmHideAll,
+        title = "全部关闭",
+        onDismissRequest = { confirmHideAll = false },
+    ) {
+        Text(
+            text = "将把当前目录里的 ${state.models.size} 个模型全部设为已隐藏，" +
+                "支持 OpenAI 协议的客户端会看不到它们；可随时点「全部开启」恢复。",
+            style = MiuixTheme.textStyles.main,
+        )
+        DialogButtonRow(
+            confirmText = "全部关闭",
+            onCancel = { confirmHideAll = false },
+            onConfirm = {
+                viewModel.setAllModelsExposed(false)
+                confirmHideAll = false
+            },
+        )
+    }
 }
 
-/** 单个模型行：左侧模型 id 与信息（点击复制），中部测速状态，右侧测速按钮。 */
+/** 单个模型行：左侧模型 id 与信息（点击复制），中部测速状态，右侧暴露开关与测速按钮。 */
 @Composable
 private fun ModelRow(
     model: RoutedModel,
     testStatus: ModelTestStatus?,
     exposed: Boolean = true,
-    onToggleExposed: (Boolean) -> Unit = {},
+    onExposeChange: (Boolean) -> Unit = {},
     modifier: Modifier = Modifier,
     onCopy: () -> Unit,
     onTest: () -> Unit,
@@ -356,10 +410,19 @@ private fun ModelRow(
             null -> Unit
         }
 
-        // 暴露开关：关掉后该模型不出现在 /v1/models，对话调用返回 404
+        // 暴露开关：关掉后该模型不出现在 /v1/models，对话调用返回 404。
+        // 用 toggleable 而不是自定义按压手势：自定义手势靠 pointerInput 自己等抬手，
+        // 在列表里容易被滚动吞掉（按下没反馈）；toggleable 是标准点击语义，且带无障碍开关角色。
         Column(
             horizontalAlignment = Alignment.CenterHorizontally,
-            modifier = Modifier.bouncyClick { onToggleExposed(!exposed) },
+            modifier = Modifier
+                .clip(RoundedCornerShape(10.dp))
+                .toggleable(
+                    value = exposed,
+                    role = Role.Switch,
+                    onValueChange = onExposeChange,
+                )
+                .padding(horizontal = 6.dp, vertical = 4.dp),
         ) {
             Box(
                 modifier = Modifier
@@ -373,7 +436,9 @@ private fun ModelRow(
                     modifier = Modifier
                         .padding(horizontal = 3.dp)
                         .size(16.dp)
-                        .graphicsLayer { translationX = if (exposed) 16f else 0f }
+                        // 位移必须换算成像素：直接写 16f 是 16 像素，高密度屏上只有 5~8dp，
+                        // 滑块几乎不动，看上去就像开关坏了
+                        .graphicsLayer { translationX = if (exposed) 16.dp.toPx() else 0f }
                         .clip(CircleShape)
                         .background(MiuixTheme.colorScheme.surface),
                 )
@@ -489,7 +554,7 @@ private fun LazyListScope.modelGroupSection(
     hiddenModels: Set<String>,
     /** 与 /v1/models 口径一致：该分组是否有可用账号；无则整组置灰标注。 */
     usable: Boolean,
-    onToggleExposed: (String, Boolean) -> Unit,
+    onExposeChange: (String, Boolean) -> Unit,
     onCopy: (String) -> Unit,
     onTest: (RoutedModel) -> Unit,
 ) {
@@ -563,7 +628,7 @@ private fun LazyListScope.modelGroupSection(
             model = model,
             testStatus = testLatencies[model.fullId],
             exposed = !hidden,
-            onToggleExposed = { expose -> onToggleExposed(model.fullId, expose) },
+            onExposeChange = { exposed -> onExposeChange(model.fullId, exposed) },
             modifier = Modifier.padding(start = 28.dp, end = 28.dp).then(rowGrey),
             onCopy = { onCopy(model.fullId) },
             onTest = { onTest(model) },

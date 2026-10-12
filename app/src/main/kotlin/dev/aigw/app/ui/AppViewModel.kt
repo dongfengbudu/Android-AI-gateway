@@ -54,6 +54,8 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 import java.net.HttpURLConnection
 import java.net.URL
@@ -329,6 +331,9 @@ class AppViewModel(
     @Volatile
     private var modelsGeneration = 0
 
+    /** 设置落盘串行锁：保证连点开关时写入顺序与点击顺序一致。 */
+    private val settingsWriteLock = Mutex()
+
     /** 模型目录缓存的存储键；手动刷新成功后落盘，启动时直接读缓存展示。 */
     private val gson = com.google.gson.Gson()
 
@@ -580,11 +585,38 @@ class AppViewModel(
         }
     }
 
-    /** 切换某个模型是否对外（/v1/models 与对话路由）暴露。 */
-    fun toggleModelHidden(fullId: String, hidden: Boolean) {
-        val current = _state.value.settings
-        val next = if (hidden) current.hiddenModels + fullId else current.hiddenModels - fullId
-        updateSettings(current.copy(hiddenModels = next))
+    /**
+     * 设置某个模型是否对外（/v1/models 与对话路由）暴露。
+     *
+     * [exposed] 是「期望的最终状态」：界面直接把开关的目标值传进来，
+     * 不再经过任何取反，避免语义在回调链上被翻错。
+     */
+    fun setModelExposed(fullId: String, exposed: Boolean) {
+        applyHiddenModels(_state.value.settings.withModelExposed(fullId, exposed))
+    }
+
+    /** 全部开启/全部关闭模型暴露（全部关闭作用于当前目录里的全部模型）。 */
+    fun setAllModelsExposed(exposed: Boolean) {
+        applyHiddenModels(
+            _state.value.settings.withAllModelsExposed(exposed, _state.value.models.map { it.fullId }),
+        )
+    }
+
+    /**
+     * 写入新的隐藏集合。
+     *
+     * 先乐观更新内存状态再落盘：开关的视觉反馈不等落盘与全量 refresh，否则点一下
+     * 要等好几秒才变色，看起来像没反应。模型暴露只有本页在用，无需重新拉快照。
+     * 落盘用锁串行：连点两个开关时，两次写入必须按点击顺序落地，否则先发的请求后落盘会把后一次改回去。
+     */
+    private fun applyHiddenModels(updated: GatewaySettings) {
+        if (updated == _state.value.settings) return
+        _state.value = _state.value.copy(settings = updated)
+        viewModelScope.launch {
+            settingsWriteLock.withLock {
+                withContext(Dispatchers.IO) { engine.updateSettings(updated) }
+            }
+        }
     }
 
     fun updateSecuritySettings(updated: dev.aigw.core.security.SecuritySettings) {
