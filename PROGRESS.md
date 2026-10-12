@@ -15,10 +15,12 @@
   与开关持久化（`settings/tasks.<id>`，默认开）；`AutoTaskScheduler` 挂在网关前台服务内，60 秒核对挂钟 + 
   按「日-时-类别」幂等标记触发，服务被杀即随之中止（`START_NOT_STICKY`）。
 - 界面：任务中心页新增「一键完成成长任务」与四类定时开关，并显示下次执行时间。
+  一键完成会同步跑完全部 25 项（耗时可达数分钟），重入直接拒绝并提示，避免重复上报白耗配额。
 - 与 wb2api 的差异（两处，已在代码与本文说明）：旅行礼物（wb2api 排 9/21）已并入成长中心一键领取，
   随成长任务时段（1 点）执行；保活（wb2api 22 点：逐账号刷新 OAuth token，连续 session dead 则停用账号）
   **未移植**——本项目 token 在每次请求前按需刷新，缺的是「主动探测失效会话并停用账号」这层账号健康巡检，属独立范围。
-- 验证：CI（GitHub Actions）已编译通过 dfb3100；本轮排程与界面改动待 CI 复核（本容器无 JDK/Gradle）。
+- 验证：CI（GitHub Actions）已编译通过 dfb3100（核心层）与 f8d6a36（排程+界面）；
+  企业版门控与本次重入互斥改动待 CI 复核（本容器无 JDK/Gradle，只能静态交叉验证）。
 
 主题体系重做（2026-10-12）：
 - 完全放弃黑金主题：删除 `AppColors`/`LocalAppColors`/`GoldAccent`/`GoldText`/`HairlineBorder`
