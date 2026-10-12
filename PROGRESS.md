@@ -1,6 +1,23 @@
 # 进度
 
 ## 当前状态
+自动化任务移植（2026-10-12，来源：workbuddy2api-panel）：
+- 上游能力层：`CodeBuddyProvider` 新增 `ACTION_AUTO_TASKS`（`auto_tasks`）与 `autoTasks(account, payload)`，
+  内含 25 个任务码的动作表（`chat_5` / `first_buddy` / `Model_chat_GLM5.2` / `RichMeow_Chat` / `Buddy_App` /
+  `Buddy_App_QQ` / `automation_1` / `Library_read` / `template_5` / `playbook_prompt` / `create_canvas` /
+  `expert_5` / `Expert_team_use_3` / `Hp_Appearance` / `skill_1` / `Expert_lighthouse` / `black_cat` /
+  `school_season` / `Sequential_Tasks_1..7`），顺序即执行顺序，与 wb2api `internal/panel/autotask.go` 逐条对齐。
+- 新增 `CodeBuddyDesktopEvents.kt`（独立文件、纯数据、无网络 IO）：桌面端行为指纹与小程序端事件的载荷构造，
+  由 provider 侧负责 POST。
+- 门控：国际版跳过签到/成长/活跃/夜猫子；企业版（`credential.enterpriseId` 非空）同样跳过，返回成功并说明
+  「企业版账号没有个人成长体系」——上游对这类账号一律 400/403，不执行才是正确结果。
+- 定时排程：`app/data/TaskSchedule.kt` 定义 `AutoTaskKind`（签到 9/21、活跃 10、成长任务 1、夜猫子 23）
+  与开关持久化（`settings/tasks.<id>`，默认开）；`AutoTaskScheduler` 挂在网关前台服务内，60 秒核对挂钟 + 
+  按「日-时-类别」幂等标记触发，服务被杀即随之中止（`START_NOT_STICKY`）。
+- 界面：任务中心页新增「一键完成成长任务」与四类定时开关，并显示下次执行时间。
+- 未移植：wb2api 的旅行礼物（9/21）与保活（22）两类单独时段（其行为已挂在成长中心接口内，不另设开关）。
+- 验证：CI（GitHub Actions）已编译通过 dfb3100；本轮排程与界面改动待 CI 复核（本容器无 JDK/Gradle）。
+
 主题体系重做（2026-10-12）：
 - 完全放弃黑金主题：删除 `AppColors`/`LocalAppColors`/`GoldAccent`/`GoldText`/`HairlineBorder`
   /`HeroGradient`/`HeroBrush` 与 `goldStart`/`goldEnd` 持久化键，全仓无 gold 引用残留。

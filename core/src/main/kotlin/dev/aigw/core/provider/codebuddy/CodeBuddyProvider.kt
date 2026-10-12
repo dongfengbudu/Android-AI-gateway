@@ -228,6 +228,9 @@ class CodeBuddyProvider(
                 else -> ProviderActionResult.unsupported(action)
             }
         }
+        if (credential != null && credential.enterpriseId.isNotBlank()) {
+            enterpriseSkip(action)?.let { return it }
+        }
         return when (action) {
             ACTION_CHECKIN -> checkin(account)
             ACTION_TASKS -> growth(account)
@@ -236,6 +239,18 @@ class CodeBuddyProvider(
             ACTION_AUTO_TASKS -> autoTasks(account, payload)
             else -> ProviderActionResult.unsupported(action)
         }
+    }
+
+    /**
+     * 企业版账号没有个人成长体系：签到接口上游直接 400「企业账号不支持该操作」，
+     * 成长/活跃/夜猫子接口一律 403。这类调用白跑一趟且日志无异常，所以提前挡掉。
+     *
+     * 返回成功而不是失败——对这类账号「不执行」才是正确结果，不是错误。
+     */
+    private fun enterpriseSkip(action: String): ProviderActionResult? = when (action) {
+        ACTION_CHECKIN, ACTION_TASKS, ACTION_ACTIVITY, ACTION_BLACKCAT, ACTION_AUTO_TASKS ->
+            ProviderActionResult.success("企业版账号没有个人成长体系，已跳过")
+        else -> null
     }
 
     /**
