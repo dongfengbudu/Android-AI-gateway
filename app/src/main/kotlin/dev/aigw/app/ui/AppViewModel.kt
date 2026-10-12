@@ -12,6 +12,9 @@ import com.google.gson.JsonObject
 import com.google.gson.JsonParser
 import dev.aigw.app.data.KeepAlive
 import dev.aigw.app.data.KeepAliveStatus
+import dev.aigw.app.data.AutoTaskKind
+import dev.aigw.app.data.TaskScheduleStore
+import dev.aigw.app.data.nextAutoTaskAt
 import dev.aigw.app.gatewayEngine
 import dev.aigw.app.ui.theme.BackgroundTone
 import dev.aigw.app.ui.theme.ThemeAccent
@@ -30,6 +33,7 @@ import dev.aigw.core.gateway.ProviderSettings
 import dev.aigw.core.gateway.ProxySettings
 import dev.aigw.core.pool.AccountStatus
 import dev.aigw.core.pool.PoolSummary
+import dev.aigw.core.provider.ACTION_AUTO_TASKS
 import dev.aigw.core.provider.ACTION_CHECKIN
 import dev.aigw.core.provider.ACTION_TASKS
 import dev.aigw.core.provider.DeviceAuthPoll
@@ -263,6 +267,10 @@ data class AppUiState(
     val updateInfo: UpdateInfo? = null,
     /** 是否自动检查更新（启动时每天最多一次）。 */
     val autoCheckUpdate: Boolean = true,
+    /** 自动化任务的定时开关（键为任务类别）。 */
+    val taskSwitches: Map<AutoTaskKind, Boolean> = emptyMap(),
+    /** 下一个自动化任务的执行时刻（毫秒）；全部关闭时为 null。 */
+    val nextTaskAt: Long? = null,
 ) {
     /** 某个供应商的账号。 */
     fun accountsOf(providerId: String): List<AccountStatus> = accounts.filter { it.providerId == providerId }
@@ -303,6 +311,7 @@ class AppViewModel(
 
     private val appearance = AppearanceStore(engine.store())
     private val updateStore = UpdateStore(engine.store())
+    private val taskSchedule = TaskScheduleStore(engine.store())
 
     private val _state = MutableStateFlow(
         AppUiState(
@@ -311,6 +320,8 @@ class AppViewModel(
             themeMode = appearance.themeMode(),
             backgroundTone = appearance.backgroundTone(),
             accentHue = appearance.accentHue(),
+            taskSwitches = taskSwitches(),
+            nextTaskAt = nextAutoTaskAt(taskSchedule.enabledKinds()),
         ),
     )
     val state: StateFlow<AppUiState> = _state.asStateFlow()
@@ -413,6 +424,7 @@ class AppViewModel(
                 security = snapshot.security,
                 evidences = snapshot.evidences,
                 sanitizerRulesCount = snapshot.sanitizerRulesCount,
+                nextTaskAt = nextAutoTaskAt(taskSchedule.enabledKinds()),
             )
         }
     }
@@ -1100,6 +1112,52 @@ class AppViewModel(
         val result: ProviderActionResult = engine.performAction(providerId, uid, action, payload)
         if (!result.ok) throw IllegalStateException(result.message)
         result.message.ifEmpty { "操作完成" }
+    }
+
+    /** 自动化任务开关的当前状态，供界面直接渲染。 */
+    private fun taskSwitches(): Map<AutoTaskKind, Boolean> =
+        AutoTaskKind.entries.associateWith { taskSchedule.enabled(it) }
+
+    /** 切换某一类自动化任务的定时开关；执行时点写死在 [AutoTaskKind]，界面上只给开关。 */
+    fun setTaskEnabled(kind: AutoTaskKind, enabled: Boolean) {
+        taskSchedule.setEnabled(kind, enabled)
+        _state.value = _state.value.copy(
+            taskSwitches = taskSwitches(),
+            nextTaskAt = nextAutoTaskAt(taskSchedule.enabledKinds()),
+        )
+    }
+
+    /**
+     * 一键完成：逐项补齐并领取成长任务。
+     *
+     * 比 [runAllTasks] 重得多——每项任务都要先上报行为、回读进度、达标后再领奖，
+     * 耗时可达数分钟，所以只列进度摘要，不做逐项细节展示。
+     */
+    fun runAutoTasks() = action {
+        val targets = engine.providers()
+            .filter { ProviderCapability.TASKS in it.capabilities }
+            .flatMap { info -> engine.accounts(info.id) }
+            .filter { account ->
+                account.usable &&
+                    (account.providerId != CodeBuddyProvider.ID ||
+                        accountRegion(account.providerId, account.uid) != CodeBuddyProvider.REGION_GLOBAL)
+            }
+        if (targets.isEmpty()) throw IllegalStateException("还没有支持成长任务的账号")
+
+        val results = targets.map { account ->
+            account to engine.performAction(account.providerId, account.uid, ACTION_AUTO_TASKS)
+        }
+        val failed = results.filter { !it.second.ok }
+        if (failed.isNotEmpty()) {
+            throw IllegalStateException(
+                failed.joinToString("；") {
+                    "${it.first.nickname.ifEmpty { it.first.uid }}：${it.second.message}"
+                },
+            )
+        }
+        results.joinToString("；") {
+            "${it.first.nickname.ifEmpty { it.first.uid }}：${it.second.message}"
+        }
     }
 
     fun updateAccountSecret(providerId: String, uid: String, secret: String) {
