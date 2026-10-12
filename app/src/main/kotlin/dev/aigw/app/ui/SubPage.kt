@@ -32,6 +32,6 @@ sealed interface SubPage {
 
     data object DataManagement : SubPage
 
-    /** 外观主题：明暗模式、配色方案与金色文字。 */
+    /** 外观主题：明暗模式、页面底色与强调色。 */
     data object AppearanceTheme : SubPage
 }

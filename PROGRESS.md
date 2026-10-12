@@ -7,14 +7,19 @@
 - 引入主题强调色模式：`ThemeAccent(hue, chroma)` 一个概念描述配色，`Theme.kt` 内部
   按 HSL 调性阶梯展开整套明/暗 scheme（主色/容器色/表面色/描边色同色相展开，
   点缀色 secondary/tertiary 用色相偏移 +32°/-46° 的同调性衍生）；默认靛蓝 hue=258。
-- `AiGatewayTheme` 接口收敛为 `themeMode + accent + dynamicColor + backgroundOverride`，
-  MainActivity 传 `ThemeAccent(state.accentHue)`；持久化键
-  `settings/appearance.accentHue`（旧 gold 键不再读写，遗留值自动忽略）。
-- 外观页重写：明暗模式/页面底色/强调色/动态取色四段；金色双轮渐变改为
-  单色相环（仅取 hue）+ 浅/深底可读性实测预览；底色预设「默认金」改「默认」。
-- 验证限制：本容器无 JDK/Gradle（构建链在 aarch64 构建容器），未跑编译；
-  已静态交叉检查 Miuix 字段使用先例（secondary/secondaryContainer/tertiaryContainer
-  等在 UI 既有代码中均有读取先例），`lightColorScheme` 新增参数接受性待构建容器验证。
+- `AiGatewayTheme` 接口为 `themeMode + accent + dynamicColor + backgroundTone`；动态取色
+  开启时嵌套一层 `MiuixTheme` 只覆写 `background`；MainActivity 传
+  `ThemeAccent(state.accentHue)`；强调色持久化键 `settings/appearance.accentHue`。
+- 页面底色改「调性档位」（同日第二轮）：`BackgroundTone`（默认/纯净/微染/浓染）取代自定义
+  HEX 色值，底色与强调色同色相、只改染色浓度，且只在当前明暗极性内浮动（浅档仍浅底、
+  深档仍深底），故 `onBackground` 无需重算；`toneBackground` 用 HSV 调整，
+  `themeBackgroundColor` 供设置页色点预览；键 `settings/appearance.backgroundTone`
+  （旧 `backgroundHex` 弃用，遗留值自动忽略）。
+- 外观页打磨：明暗模式/页面底色/强调色/动态取色四段 + 新增「效果预览」整页样张
+  （底色 + 卡片 + 强调色按钮）；色相环居中；删掉自定义 HEX 输入与固定色值预设。
+- 验证：CI（GitHub Actions）已编译通过 e7ad36c；据此确认 miuix 0.8.8 `Colors` 无
+  `tertiary`/`onTertiary` 参数（已删），`tertiaryContainer`/`onTertiaryContainer` 等可用。
+  本容器无 JDK/Gradle，本轮「调性档位」改动未本地编译，靠 CI 复核。
 
 统一日志页重做（2026-10-11）：
 - 新增 `core/usage/OperationLog`：全部非调用操作的统一日志（环形缓冲 + 节流落盘 + 开放类别），

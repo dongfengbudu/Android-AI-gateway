@@ -125,7 +125,7 @@ dependencies {
     implementation("androidx.lifecycle:lifecycle-runtime-compose:2.8.7")
     implementation("androidx.lifecycle:lifecycle-viewmodel-compose:2.8.7")
 
-    // Miuix（HyperOS 风格 UI 库）；金色 accent 通过 MiuixTheme 自定义 Colors 注入。
+    // Miuix（HyperOS 风格 UI 库）；强调色通过 MiuixTheme 自定义 Colors 注入。
     // 0.9.x 要求 compileSdk 37 + AGP 9.1（超出本地工具链），故取 0.8.8：
     // 单构件 miuix-android（basic/theme/utils/extra 组件），extended 图标在 miuix-icons。
     implementation("top.yukonga.miuix.kmp:miuix-android:0.8.8")

@@ -21,6 +21,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import dev.aigw.app.ui.theme.BackgroundTone
 import dev.aigw.app.ui.theme.SuccessGreen
 import dev.aigw.app.ui.theme.defaultThemeAccent
 import dev.aigw.core.usage.StorageAudit
@@ -94,7 +95,7 @@ fun MeScreen(state: AppUiState, viewModel: AppViewModel, open: (SubPage) -> Unit
                 GroupDivider()
                 SuperArrow(
                     title = "外观主题",
-                    summary = "明暗模式、配色方案与金色文字",
+                    summary = "明暗模式、页面底色与强调色",
                     endActions = {
                         MetaText(appearanceMeta(state))
                     },
@@ -240,7 +241,8 @@ private fun appearanceMeta(state: AppUiState): String {
     }
     val isDefaultHue = state.accentHue == defaultThemeAccent.normalizedHue
     val accentLabel = if (isDefaultHue) "默认靛蓝" else "色相 ${state.accentHue.toInt()}°"
-    return mode + " · " + accentLabel
+    val toneLabel = if (state.backgroundTone == BackgroundTone.Theme) "" else " · " + state.backgroundTone.label
+    return mode + " · " + accentLabel + toneLabel
 }
 
 private fun appVersion(context: android.content.Context): String = runCatching {

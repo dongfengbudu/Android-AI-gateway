@@ -1,8 +1,6 @@
 package dev.aigw.app.ui.theme
 
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.toArgb
-import java.util.Locale
 
 /** 明暗模式：跟随系统 / 强制深色 / 强制浅色。 */
 enum class ThemeMode { Light, Dark, System }
@@ -29,25 +27,31 @@ data class ThemeAccent(
     }
 }
 
+/**
+ * 页面底色档位。
+ *
+ * 底色不走「自定义色值」，而是与强调色同色相展开、只调染色浓度：这样无论怎么换都
+ * 不会出现底色与整套色阶脱节、或深浅模式配错导致文字看不清。
+ */
+enum class BackgroundTone(val label: String) {
+    /** 跟随调色板自带的底色。 */
+    Theme("默认"),
+
+    /** 去色偏的极简底（浅色模式纯白 / 深色模式纯黑）。 */
+    Plain("纯净"),
+
+    /** 比默认略强一点的染色。 */
+    Soft("微染"),
+
+    /** 明显能看出色调的底色。 */
+    Rich("浓染"),
+}
+
 /** 默认强调色：靛蓝，中性底、冷调点缀。 */
 val defaultThemeAccent = ThemeAccent(ThemeAccent.DefaultHue, ThemeAccent.DefaultChroma)
-
-/**
- * 解析 `#RRGGBB` 或 `RRGGBB`（大小写不敏感）为不透明颜色；非法输入返回 null。
- */
-fun parseHexColor(input: String): Color? {
-    val raw = input.trim().removePrefix("#")
-    if (raw.length != 6) return null
-    val value = raw.toLongOrNull(16) ?: return null
-    return Color(0xFF000000L or value)  // miuix-lint:allow 主题/品牌色定义
-}
 
 /** 成功/运行态绿色：语义色固定，不随主题强调色变化。 */
 val SuccessGreen = Color(0xFF10B981)  // miuix-lint:allow 主题/品牌色定义
 
 /** 警示/降速橙：请求中止、额度紧张、慢速账号等中间态（成功态见 [SuccessGreen]）。 */
 val WarnAmber = Color(0xFFEF6C00)  // miuix-lint:allow 主题/品牌色定义
-
-/** 输出 `#RRGGBB`（大写）。 */
-fun formatHex(color: Color): String =
-    String.format(Locale.US, "#%06X", color.toArgb() and 0xFFFFFF)

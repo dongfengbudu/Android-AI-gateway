@@ -13,18 +13,15 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -35,37 +32,25 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.input.pointer.pointerInput
-import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
+import dev.aigw.app.ui.theme.BackgroundTone
+import dev.aigw.app.ui.theme.ThemeAccent
+import dev.aigw.app.ui.theme.ThemeMode
 import dev.aigw.app.ui.theme.defaultThemeAccent
+import dev.aigw.app.ui.theme.isDarkTheme
+import dev.aigw.app.ui.theme.themeBackgroundColor
 import top.yukonga.miuix.kmp.basic.HorizontalDivider
 import top.yukonga.miuix.kmp.basic.SmallTitle
 import top.yukonga.miuix.kmp.basic.Text
-import top.yukonga.miuix.kmp.basic.TextField
 import top.yukonga.miuix.kmp.extra.SuperRadioButton
 import top.yukonga.miuix.kmp.extra.SuperSwitch
 import top.yukonga.miuix.kmp.theme.MiuixTheme
-import dev.aigw.app.ui.theme.ThemeMode
-import dev.aigw.app.ui.theme.formatHex
-import dev.aigw.app.ui.theme.parseHexColor
 import kotlin.math.atan2
 import kotlin.math.cos
 import kotlin.math.hypot
 import kotlin.math.sin
-
-/** 页面底色预设：hex 为 null 表示不覆盖（用默认底色）。 */
-private data class BgPreset(val label: String, val hex: String?)
-
-private val bgPresets = listOf(
-    BgPreset("默认", null),
-    BgPreset("冷银灰", "#F7F7F8"),
-    BgPreset("暖象牙", "#FBF9F5"),
-    BgPreset("曜石黑", "#121214"),
-    BgPreset("深空黑", "#0A0A0B"),
-)
 
 /** 色相环尺寸参数（统一在此定义，保证拖动命中与绘制一致）。 */
 private val WheelSize = 120.dp
@@ -77,7 +62,7 @@ private val WheelThumb = 10.dp
 fun AppearanceThemeScreen(state: AppUiState, viewModel: AppViewModel, onBack: () -> Unit) {
     PageScaffold(
         title = "外观主题",
-        subtitle = "明暗模式 · 强调色 · 底色",
+        subtitle = "明暗模式 · 底色 · 强调色",
         leading = { BackButton(onBack) },
     ) {
         item { SmallTitle("明暗模式") }
@@ -101,35 +86,28 @@ fun AppearanceThemeScreen(state: AppUiState, viewModel: AppViewModel, onBack: ()
         item {
             SectionCard(enterIndex = 1) {
                 Text(
-                    text = "切换后仅替换页面底色（卡片/表面色不变）：",
+                    text = "底色与强调色同色相展开，四档只改染色浓度；深浅由明暗模式自动配对：",
                     style = MiuixTheme.textStyles.footnote1,
                     color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
                 )
+                val accent = ThemeAccent(state.accentHue)
+                val dark = isDarkTheme(state.themeMode)
+                val toneColors = remember(accent, dark) {
+                    BackgroundTone.entries.associateWith { themeBackgroundColor(accent, dark, it) }
+                }
                 Row(
                     modifier = Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
                     horizontalArrangement = Arrangement.spacedBy(10.dp),
                 ) {
-                    val currentHex = state.backgroundOverride?.let { formatHex(it) }
-                    bgPresets.forEach { preset ->
+                    BackgroundTone.entries.forEach { tone ->
                         PresetChip(
-                            label = preset.label,
-                            dotColor = preset.hex?.let { parseHexColor(it) } ?: MiuixTheme.colorScheme.primary,
-                            selected = currentHex == preset.hex,
-                            onClick = { viewModel.setBackgroundOverride(preset.hex) },
+                            label = tone.label,
+                            dotColor = toneColors.getValue(tone),
+                            selected = state.backgroundTone == tone,
+                            onClick = { viewModel.setBackgroundTone(tone) },
                         )
                     }
                 }
-                HexField(
-                    value = state.backgroundOverride?.let { formatHex(it) } ?: "",
-                    label = "自定义页面底色",
-                    onCommit = { viewModel.setBackgroundOverride(it) },
-                    onClear = if (state.backgroundOverride != null) {
-                        { viewModel.setBackgroundOverride(null) }
-                    } else {
-                        null
-                    },
-                    swatch = state.backgroundOverride,
-                )
             }
         }
 
@@ -142,27 +120,28 @@ fun AppearanceThemeScreen(state: AppUiState, viewModel: AppViewModel, onBack: ()
                     color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
                 )
                 val accentSeed = Color.hsv(state.accentHue, 0.62f, 0.95f)
-                Row(
+                Column(
                     modifier = Modifier.fillMaxWidth(),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(16.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.spacedBy(10.dp),
                 ) {
-                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                        HueWheel(
-                            color = accentSeed,
-                            onPick = { picked -> viewModel.setAccentHue(hueOf(picked).toFloat()) },
-                        )
-                        Text(
-                            text = "色相 ${state.accentHue.toInt()}°",
-                            style = MiuixTheme.textStyles.footnote1.copy(fontFamily = FontFamily.Monospace),
-                            color = if (state.accentHue == defaultThemeAccent.normalizedHue) {
-                                MiuixTheme.colorScheme.onSurfaceVariantSummary
-                            } else {
-                                MiuixTheme.colorScheme.primary
-                            },
-                        )
-                    }
-                    AccentPreview(accentSeed, Modifier.weight(1f))
+                    HueWheel(
+                        color = accentSeed,
+                        onPick = { picked -> viewModel.setAccentHue(hueOf(picked).toFloat()) },
+                    )
+                    Text(
+                        text = if (state.accentHue == defaultThemeAccent.normalizedHue) {
+                            "色相 ${state.accentHue.toInt()}° · 默认"
+                        } else {
+                            "色相 ${state.accentHue.toInt()}°"
+                        },
+                        style = MiuixTheme.textStyles.footnote1.copy(fontFamily = FontFamily.Monospace),
+                        color = if (state.accentHue == defaultThemeAccent.normalizedHue) {
+                            MiuixTheme.colorScheme.onSurfaceVariantSummary
+                        } else {
+                            MiuixTheme.colorScheme.primary
+                        },
+                    )
                 }
             }
         }
@@ -172,11 +151,18 @@ fun AppearanceThemeScreen(state: AppUiState, viewModel: AppViewModel, onBack: ()
             SectionCard(enterIndex = 3) {
                 SuperSwitch(
                     title = "动态取色",
-                    summary = "从系统壁纸提取配色，开启后强调色不再生效",
+                    summary = "由系统按壁纸取色生成整套配色（Android 12+），强调色作为取色种子参与生成",
                     checked = state.dynamicColor,
                     onCheckedChange = { viewModel.setDynamicColor(it) },
                     insideMargin = PaddingValues(0.dp),
                 )
+            }
+        }
+
+        item { SmallTitle("效果预览") }
+        item {
+            SectionCard(enterIndex = 4) {
+                PagePreview()
             }
         }
 
@@ -198,7 +184,7 @@ private fun ModeRow(title: String, subtitle: String, selected: Boolean, onClick:
     )
 }
 
-/** 底色预设胶囊：色点 + 名称；选中时主色描边 + 浅主色底。 */
+/** 底色档位胶囊：色点 + 名称；选中时主色描边 + 浅主色底。 */
 @Composable
 private fun PresetChip(label: String, dotColor: Color, selected: Boolean, onClick: () -> Unit) {
     val primary = MiuixTheme.colorScheme.primary
@@ -214,63 +200,19 @@ private fun PresetChip(label: String, dotColor: Color, selected: Boolean, onClic
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(8.dp),
     ) {
-        Box(Modifier.size(12.dp).clip(CircleShape).background(dotColor))
+        Box(
+            Modifier
+                .size(12.dp)
+                .clip(CircleShape)
+                .background(dotColor)
+                .border(1.dp, MiuixTheme.colorScheme.outline, CircleShape),
+        )
         Text(
             text = label,
             style = MiuixTheme.textStyles.footnote1,
             fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal,
             color = if (selected) primaryVariant else MiuixTheme.colorScheme.onSurface,
         )
-    }
-}
-
-/** 等宽 HEX 输入框：满 6 位合法即提交；可选色彩示意块与「清除」入口。 */
-@Composable
-private fun HexField(
-    value: String,
-    label: String,
-    onCommit: (String) -> Unit,
-    onClear: (() -> Unit)? = null,
-    swatch: Color? = null,
-) {
-    var text by remember(value) { mutableStateOf(value.removePrefix("#").uppercase()) }
-    Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-        TextField(
-            value = text,
-            onValueChange = { input ->
-                val cleaned = input.filter { it.isLetterOrDigit() }.take(6).uppercase()
-                text = cleaned
-                if (cleaned.length == 6 && parseHexColor(cleaned) != null) onCommit("#$cleaned")
-            },
-            label = label,
-            leadingIcon = {
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(6.dp),
-                ) {
-                    if (swatch != null) {
-                        Box(Modifier.size(20.dp).clip(RoundedCornerShape(6.dp)).background(swatch))
-                    }
-                    Text(
-                        text = "#",
-                        style = MiuixTheme.textStyles.main,
-                        fontFamily = FontFamily.Monospace,
-                        color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
-                    )
-                }
-            },
-            singleLine = true,
-            textStyle = TextStyle(fontFamily = FontFamily.Monospace, fontWeight = FontWeight.Medium),
-            modifier = Modifier.fillMaxWidth(),
-        )
-        if (onClear != null) {
-            Text(
-                text = "清除覆盖",
-                style = MiuixTheme.textStyles.footnote2,
-                color = MiuixTheme.colorScheme.primary,
-                modifier = Modifier.clickable(onClick = onClear).padding(horizontal = 4.dp, vertical = 2.dp),
-            )
-        }
     }
 }
 
@@ -320,46 +262,58 @@ private fun HueWheel(color: Color, onPick: (Color) -> Unit) {
     }
 }
 
-/** 强调色实测：色块 + 浅底/深底上的文字样张，直观检验两种模式下的可读性。 */
+/** 整页样张：底色 + 卡片 + 强调色按钮的组合效果，用于直接判断好不好看。 */
 @Composable
-private fun AccentPreview(accent: Color, modifier: Modifier = Modifier) {
-    Column(modifier = modifier, verticalArrangement = Arrangement.spacedBy(8.dp)) {
-        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            Box(
-                Modifier
-                    .weight(1f)
-                    .height(36.dp)
-                    .clip(RoundedCornerShape(8.dp))
-                    .background(Color.White)  // miuix-lint:allow 主题/品牌色定义（预览用固定浅底）
-                    .border(1.dp, MiuixTheme.colorScheme.outline, RoundedCornerShape(8.dp)),
-                contentAlignment = Alignment.Center,
-            ) {
-                Text("浅色底", style = MiuixTheme.textStyles.footnote1, color = accent)
+private fun PagePreview() {
+    val cs = MiuixTheme.colorScheme
+    Box(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(16.dp))
+            .background(cs.background)
+            .border(1.dp, cs.outline, RoundedCornerShape(16.dp))
+            .padding(14.dp),
+    ) {
+        Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text(
+                    text = "页面标题",
+                    style = MiuixTheme.textStyles.main,
+                    fontWeight = FontWeight.SemiBold,
+                    color = cs.onBackground,
+                )
+                Spacer(Modifier.weight(1f))
+                Box(
+                    modifier = Modifier
+                        .clip(CircleShape)
+                        .background(cs.primary)
+                        .padding(horizontal = 12.dp, vertical = 5.dp),
+                ) {
+                    Text("操作", style = MiuixTheme.textStyles.footnote2, color = cs.onPrimary)
+                }
             }
             Box(
-                Modifier
-                    .weight(1f)
-                    .height(36.dp)
-                    .clip(RoundedCornerShape(8.dp))
-                    .background(Color(0xFF141414))  // miuix-lint:allow 主题/品牌色定义（预览用固定深底）
-                    .border(1.dp, MiuixTheme.colorScheme.outline, RoundedCornerShape(8.dp)),
-                contentAlignment = Alignment.Center,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clip(RoundedCornerShape(12.dp))
+                    .background(cs.surfaceContainer)
+                    .padding(12.dp),
             ) {
-                Text("深色底", style = MiuixTheme.textStyles.footnote1, color = accent)
+                Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                    Text(
+                        text = "卡片标题",
+                        style = MiuixTheme.textStyles.footnote1,
+                        fontWeight = FontWeight.Medium,
+                        color = cs.onSurface,
+                    )
+                    Text(
+                        text = "卡片上的次要说明文字",
+                        style = MiuixTheme.textStyles.footnote2,
+                        color = cs.onSurfaceVariantSummary,
+                    )
+                }
             }
         }
-        Box(
-            Modifier
-                .fillMaxWidth()
-                .height(24.dp)
-                .clip(CircleShape)
-                .background(accent),
-        )
-        Text(
-            text = formatHex(accent),
-            style = MiuixTheme.textStyles.footnote2.copy(fontFamily = FontFamily.Monospace),
-            color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
-        )
     }
 }
 

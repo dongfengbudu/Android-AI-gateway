@@ -6,7 +6,6 @@ import android.content.Intent
 import android.net.Uri
 import android.os.Build
 import android.service.quicksettings.TileService
-import androidx.compose.ui.graphics.Color
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.google.gson.JsonObject
@@ -14,11 +13,10 @@ import com.google.gson.JsonParser
 import dev.aigw.app.data.KeepAlive
 import dev.aigw.app.data.KeepAliveStatus
 import dev.aigw.app.gatewayEngine
+import dev.aigw.app.ui.theme.BackgroundTone
 import dev.aigw.app.ui.theme.ThemeAccent
 import dev.aigw.app.ui.theme.ThemeMode
 import dev.aigw.app.ui.theme.defaultThemeAccent
-import dev.aigw.app.ui.theme.formatHex
-import dev.aigw.app.ui.theme.parseHexColor
 import dev.aigw.app.service.GatewayService
 import dev.aigw.app.service.GatewayTileService
 import dev.aigw.core.gateway.CustomProviderConfig
@@ -101,11 +99,24 @@ class AppearanceStore(private val store: KeyValueStore) {
         )
     }
 
-    /** 页面底色覆盖；null 或空串表示无覆盖（用默认底色）。 */
-    fun backgroundHex(): String? = store.read(KEY_BG)?.takeIf { it.isNotBlank() }
+    /** 页面底色档位（同色相下改染色浓度）。 */
+    fun backgroundTone(): BackgroundTone = when (store.read(KEY_BG_TONE)) {
+        "plain" -> BackgroundTone.Plain
+        "soft" -> BackgroundTone.Soft
+        "rich" -> BackgroundTone.Rich
+        else -> BackgroundTone.Theme
+    }
 
-    fun setBackgroundHex(hex: String?) {
-        if (hex.isNullOrBlank()) store.delete(KEY_BG) else store.write(KEY_BG, hex)
+    fun setBackgroundTone(tone: BackgroundTone) {
+        store.write(
+            KEY_BG_TONE,
+            when (tone) {
+                BackgroundTone.Theme -> "theme"
+                BackgroundTone.Plain -> "plain"
+                BackgroundTone.Soft -> "soft"
+                BackgroundTone.Rich -> "rich"
+            },
+        )
     }
 
     /** 主题强调色相（0..360）；非法或缺失时回落默认。 */
@@ -120,14 +131,14 @@ class AppearanceStore(private val store: KeyValueStore) {
     /** 清空全部自定义外观，恢复默认。 */
     fun reset() {
         store.delete(KEY_MODE)
-        store.delete(KEY_BG)
+        store.delete(KEY_BG_TONE)
         store.delete(KEY_ACCENT_HUE)
     }
 
     companion object {
         private const val KEY_DYNAMIC = "settings/appearance.dynamicColor"
         private const val KEY_MODE = "settings/appearance.themeMode"
-        private const val KEY_BG = "settings/appearance.backgroundHex"
+        private const val KEY_BG_TONE = "settings/appearance.backgroundTone"
         private const val KEY_ACCENT_HUE = "settings/appearance.accentHue"
     }
 }
@@ -231,8 +242,8 @@ data class AppUiState(
     val dynamicColor: Boolean = false,
     /** 明暗模式。 */
     val themeMode: ThemeMode = ThemeMode.System,
-    /** 页面底色覆盖；null 表示用默认底色。 */
-    val backgroundOverride: Color? = null,
+    /** 页面底色档位。 */
+    val backgroundTone: BackgroundTone = BackgroundTone.Theme,
     /** 主题强调色相（0..360）。 */
     val accentHue: Float = defaultThemeAccent.normalizedHue,
     val keepAlive: KeepAliveStatus? = null,
@@ -298,8 +309,7 @@ class AppViewModel(
             dynamicColor = appearance.dynamicColor(),
             autoCheckUpdate = updateStore.autoCheck(),
             themeMode = appearance.themeMode(),
-            // 存储里的非法 HEX 一律回落到默认值，不让坏数据把界面卡死
-            backgroundOverride = appearance.backgroundHex()?.let { parseHexColor(it) },
+            backgroundTone = appearance.backgroundTone(),
             accentHue = appearance.accentHue(),
         ),
     )
@@ -639,20 +649,10 @@ class AppViewModel(
         _state.value = _state.value.copy(themeMode = mode)
     }
 
-    /** 设置页面底色；[hex] 为 null 表示清除覆盖（恢复默认底色）。 */
-    fun setBackgroundOverride(hex: String?) {
-        if (hex == null) {
-            appearance.setBackgroundHex(null)
-            _state.value = _state.value.copy(backgroundOverride = null)
-            return
-        }
-        val parsed = parseHexColor(hex)
-        if (parsed == null) {
-            notice("颜色代码需要是 #RRGGBB 格式")
-            return
-        }
-        appearance.setBackgroundHex(formatHex(parsed))
-        _state.value = _state.value.copy(backgroundOverride = parsed)
+    /** 设置页面底色档位。 */
+    fun setBackgroundTone(tone: BackgroundTone) {
+        appearance.setBackgroundTone(tone)
+        _state.value = _state.value.copy(backgroundTone = tone)
     }
 
     /** 设置主题强调色相；越界自动归一化。 */
@@ -667,7 +667,7 @@ class AppViewModel(
         appearance.reset()
         _state.value = _state.value.copy(
             themeMode = ThemeMode.System,
-            backgroundOverride = null,
+            backgroundTone = BackgroundTone.Theme,
             accentHue = defaultThemeAccent.normalizedHue,
         )
         notice("外观主题已恢复默认")

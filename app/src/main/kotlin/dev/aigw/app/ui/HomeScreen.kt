@@ -552,7 +552,7 @@ private fun ReadinessTile(state: AppUiState, modifier: Modifier) {
     }
 }
 
-/** 环形进度：金色弧 + 灰底环，中间百分比。 */
+/** 环形进度：主色弧 + 灰底环，中间百分比。 */
 @Composable
 private fun ReadinessRing(percent: Int, fraction: Float) {
     val ringColor = MiuixTheme.colorScheme.primary

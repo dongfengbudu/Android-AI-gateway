@@ -219,7 +219,7 @@ fun AccountInfoRow(
     }
 }
 
-/** 「运行中 / 已停止」状态胶囊：圆点 + 文案（运行中金色带浅光环）。 */
+/** 「运行中 / 已停止」状态胶囊：圆点 + 文案（运行中主色带浅光环）。 */
 @Composable
 fun StatusChip(running: Boolean) {
     val accent = MiuixTheme.colorScheme.primary
@@ -353,7 +353,7 @@ fun EmptyHint(title: String, message: String) {
     }
 }
 
-/** 小节头：左小灰大写标题 + 右侧可选金色小链接（仅用于内容卡内部，分组标题一律用 SmallTitle）。 */
+/** 小节头：左小灰大写标题 + 右侧可选主色小链接（仅用于内容卡内部，分组标题一律用 SmallTitle）。 */
 @Composable
 fun SectionHeader(title: String, action: String? = null, onAction: (() -> Unit)? = null) {
     val accentVariant = MiuixTheme.colorScheme.primaryVariant

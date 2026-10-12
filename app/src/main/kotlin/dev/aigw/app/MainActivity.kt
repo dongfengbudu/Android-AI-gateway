@@ -136,7 +136,7 @@ class MainActivity : ComponentActivity() {
                 themeMode = state.themeMode,
                 accent = ThemeAccent(state.accentHue),
                 dynamicColor = state.dynamicColor,
-                backgroundOverride = state.backgroundOverride,
+                backgroundTone = state.backgroundTone,
             ) {
                 AppRoot(vm, state)
             }
