@@ -296,7 +296,7 @@ private fun PagePreview() {
                 modifier = Modifier
                     .fillMaxWidth()
                     .clip(RoundedCornerShape(12.dp))
-                    .background(cs.surfaceContainer)
+                    .background(cs.surfaceContainerHighest)
                     .padding(12.dp),
             ) {
                 Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
@@ -304,7 +304,7 @@ private fun PagePreview() {
                         text = "卡片标题",
                         style = MiuixTheme.textStyles.footnote1,
                         fontWeight = FontWeight.Medium,
-                        color = cs.onSurface,
+                        color = cs.onSurfaceContainerHighest,
                     )
                     Text(
                         text = "卡片上的次要说明文字",
