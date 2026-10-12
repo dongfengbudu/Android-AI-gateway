@@ -1588,14 +1588,15 @@ class CodeBuddyProvider(
         experts.forEachIndexed { index, expert ->
             if (done >= count) return@forEachIndexed
             val ok = runCatching {
-                val request = desktopChatWithExpert(credential, expert.expertId)
-                    ?: throw IllegalStateException("真实对话未拿到服务端 requestId")
-                val (conversationId, requestId) = request
+                // 顺序跟真实客户端一致：先召唤（点击「立即召唤」），再发生真实对话，最后报使用链。
                 reportDesktopOrThrow(
                     credential,
                     "专家召唤链",
                     CodeBuddyDesktopEvents.expertSummonSequence(expert),
                 )
+                val request = desktopChatWithExpert(credential, expert.expertId)
+                    ?: throw IllegalStateException("真实对话未拿到服务端 requestId")
+                val (conversationId, requestId) = request
                 reportDesktopOrThrow(
                     credential,
                     "专家使用链",
@@ -1721,6 +1722,11 @@ class CodeBuddyProvider(
                 event
             }
         } + CodeBuddyDesktopEvents.expertActualUseEvent(expert, conversationId, requestId, "LOCAL")
+            .apply {
+                // 真实样本里轻量云专家的 actual_use 是 type 空、cost 0（与 expert_5 不同）。
+                addProperty("type", "")
+                addProperty("cost", 0)
+            }
         reportDesktopOrThrow(credential, "专家使用链", events)
         return "已上报轻量云专家召唤 + 使用链（真实对话 requestId）"
     }

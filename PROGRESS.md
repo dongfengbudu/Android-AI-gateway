@@ -20,7 +20,9 @@
   随成长任务时段（1 点）执行；保活（wb2api 22 点：逐账号刷新 OAuth token，连续 session dead 则停用账号）
   **未移植**——本项目 token 在每次请求前按需刷新，缺的是「主动探测失效会话并停用账号」这层账号健康巡检，属独立范围。
 - 验证：CI（GitHub Actions）已编译通过 dfb3100（核心层）与 f8d6a36（排程+界面）；
-  企业版门控与本次重入互斥改动待 CI 复核（本容器无 JDK/Gradle，只能静态交叉验证）。
+  保真度核对（与 wb2api 逐函数对比 25 个任务码）已做，修掉两处偏差：专家批量链的顺序（改为与真实客户端一致的
+  召唤 → 对话 → 使用链）、轻量云专家 `actual_use` 的 `type`/`cost` 覆写。
+  企业版门控、重入互斥与上述两处修正待 CI 复核（本容器无 JDK/Gradle，只能静态交叉验证）。
 
 主题体系重做（2026-10-12）：
 - 完全放弃黑金主题：删除 `AppColors`/`LocalAppColors`/`GoldAccent`/`GoldText`/`HairlineBorder`
