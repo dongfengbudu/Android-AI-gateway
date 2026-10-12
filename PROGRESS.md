@@ -1,6 +1,23 @@
 # 进度
 
 ## 当前状态
+评审修复（2026-10-13，对 `d51ba75..HEAD` 的 code-review 结论）：
+- 国际版门控改标 `unsupported`：`CodeBuddyProvider.performAction` 对国际版账号的 5 个动作原返回 `failure`，
+  而排程侧只按 `unsupported` 跳过（`GatewayService`），导致国际版账号每次定时任务都被记一条「失败」。
+  改后与「国际版跳过签到/成长/活跃/夜猫子」口径一致；补 `CodeBuddyRegionGateTest`（不触网）。
+- 一键完成不再被不支持的供应商拖垮：`AppViewModel.runAutoTasks` 原来把 `unsupported` 也算失败
+  （Loomy 声明了 TASKS 能力但没有 `auto_tasks`），有 Loomy 账号时整批抛错、CodeBuddy 的成功结果被吞。
+  现与排程侧同口径跳过 `unsupported`；全部被跳过时提示「没有可执行的成长任务账号」。
+- 重入互斥覆盖排程：新增 `AutoTaskGate`（`app/data/TaskSchedule.kt`），手动「一键完成」与 `AutoTaskScheduler`
+  共用；排程拿不到闸门时不标 `fired`、下个 tick 重试，避免手动跑一次就把该时段排程吞掉。
+- 领奖端点：成长中心领奖由 CLI 域 `tasks/accept` 换成 Web 域 `activity/growth/tasks/{code}/claim`
+  （接单与领奖是两个端点，此前用的那个领不到）。
+- `Expert_lighthouse`（轻量云专家）事件补 `type=""` / `cost=0` 兜底。
+- 界面：任务中心账号信息改每账号一张卡 + 「左标签右值」对齐行；日志页筛选栏改等宽胶囊铺满整行，
+  列表条目加 `animateItem` 切换动画。
+- 版本：versionCode 103→104，versionName 1.1.6→1.1.7。
+- 待办：以上改动本容器无 JDK/Gradle，仅静态交叉验证，待 CI 复核。
+
 自动化任务移植（2026-10-12，来源：workbuddy2api-panel）：
 - 上游能力层：`CodeBuddyProvider` 新增 `ACTION_AUTO_TASKS`（`auto_tasks`）与 `autoTasks(account, payload)`，
   内含 25 个任务码的动作表（`chat_5` / `first_buddy` / `Model_chat_GLM5.2` / `RichMeow_Chat` / `Buddy_App` /
@@ -17,12 +34,12 @@
 - 界面：任务中心页新增「一键完成成长任务」与四类定时开关，并显示下次执行时间。
   一键完成会同步跑完全部 25 项（耗时可达数分钟），重入直接拒绝并提示，避免重复上报白耗配额。
 - 与 wb2api 的差异（两处，已在代码与本文说明）：旅行礼物（wb2api 排 9/21）已并入成长中心一键领取，
-  随成长任务时段（1 点）执行；保活（wb2api 22 点：逐账号刷新 OAuth token，连续 session dead 则停用账号）
+  随签到时段（9/21，即 `AutoTaskKind.CHECKIN`）执行；保活（wb2api 22 点：逐账号刷新 OAuth token，连续 session dead 则停用账号）
   **未移植**——本项目 token 在每次请求前按需刷新，缺的是「主动探测失效会话并停用账号」这层账号健康巡检，属独立范围。
 - 验证：CI（GitHub Actions）已编译通过 dfb3100（核心层）与 f8d6a36（排程+界面）；
   保真度核对（与 wb2api 逐函数对比 25 个任务码）已做，修掉两处偏差：专家批量链的顺序（改为与真实客户端一致的
   召唤 → 对话 → 使用链）、轻量云专家 `actual_use` 的 `type`/`cost` 覆写。
-  企业版门控、重入互斥与上述两处修正待 CI 复核（本容器无 JDK/Gradle，只能静态交叉验证）。
+  企业版门控（3ea3e68）、重入互斥（2e72e76）与上述两处修正（2e68400）均已 CI 通过。
 
 主题体系重做（2026-10-12）：
 - 完全放弃黑金主题：删除 `AppColors`/`LocalAppColors`/`GoldAccent`/`GoldText`/`HairlineBorder`

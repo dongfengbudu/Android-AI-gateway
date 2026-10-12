@@ -7,6 +7,7 @@ import dev.aigw.core.provider.ACTION_CHECKIN
 import dev.aigw.core.provider.ACTION_TASKS
 import dev.aigw.core.store.KeyValueStore
 import java.util.Calendar
+import java.util.concurrent.atomic.AtomicBoolean
 
 /**
  * 自动化任务类别。时点写死在 [hours]（沿用 workbuddy2api 的默认排程），界面上只给开关。
@@ -54,6 +55,23 @@ enum class AutoTaskKind(
     /** 形如「09:00、21:00」，供界面展示时点。 */
     val hourText: String
         get() = hours.joinToString("、") { it.toString().padStart(2, '0') + ":00" }
+}
+
+/**
+ * 自动化任务全局闸门：手动「一键完成成长任务」与整点排程共用。
+ *
+ * 一轮任务要逐项上报、耗时几分钟，两边同时跑会重复上报同一批行为链、白耗上游配额；
+ * 闸门放在这里而不是 ViewModel，是因为排程跑在 GatewayService 里，两边必须看同一个标志。
+ */
+object AutoTaskGate {
+
+    private val running = AtomicBoolean(false)
+
+    fun tryAcquire(): Boolean = running.compareAndSet(false, true)
+
+    fun release() {
+        running.set(false)
+    }
 }
 
 /** 自动化任务开关的持久化；缺省全开，与 workbuddy2api 的默认排程一致。 */

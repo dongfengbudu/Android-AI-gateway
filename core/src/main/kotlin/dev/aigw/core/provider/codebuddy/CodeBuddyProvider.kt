@@ -219,12 +219,14 @@ class CodeBuddyProvider(
         action: String,
         payload: JsonObject,
     ): ProviderActionResult {
-        // 国际版（workbuddy.ai）没有签到制度与成长中心，这两个操作只对国内版有意义
+        // 国际版（workbuddy.ai）没有签到制度与成长中心，这两个操作只对国内版有意义。
+        // 标 unsupported 而不是 failure：排程侧按 unsupported 跳过（不记失败日志），
+        // 标 failure 会让国际版账号每次排程都被记成一条「失败」。
         val credential = parse(account)
         if (credential != null && regionOf(credential) == REGION_GLOBAL) {
             return when (action) {
                 ACTION_CHECKIN, ACTION_TASKS, ACTION_ACTIVITY, ACTION_BLACKCAT, ACTION_AUTO_TASKS ->
-                    ProviderActionResult.failure("国际版没有签到与成长中心")
+                    ProviderActionResult(false, "国际版没有签到与成长中心", unsupported = true)
                 else -> ProviderActionResult.unsupported(action)
             }
         }

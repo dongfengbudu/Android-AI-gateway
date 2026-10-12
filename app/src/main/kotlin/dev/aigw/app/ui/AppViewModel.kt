@@ -12,6 +12,7 @@ import com.google.gson.JsonObject
 import com.google.gson.JsonParser
 import dev.aigw.app.data.KeepAlive
 import dev.aigw.app.data.KeepAliveStatus
+import dev.aigw.app.data.AutoTaskGate
 import dev.aigw.app.data.AutoTaskKind
 import dev.aigw.app.data.TaskScheduleStore
 import dev.aigw.app.data.nextAutoTaskAt
@@ -62,7 +63,6 @@ import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 import java.net.HttpURLConnection
 import java.net.URL
-import java.util.concurrent.atomic.AtomicBoolean
 
 /** 验证码重发间隔（秒）：上游有频率限制，连点只会被拒。 */
 private const val SMS_RESEND_INTERVAL_MS = 60_000L
@@ -345,9 +345,6 @@ class AppViewModel(
 
     /** 设置落盘串行锁：保证连点开关时写入顺序与点击顺序一致。 */
     private val settingsWriteLock = Mutex()
-
-    /** 成长任务一轮可能跑几分钟，用它与重复点击互斥。 */
-    private val autoTasksRunning = AtomicBoolean(false)
 
     /** 模型目录缓存的存储键；手动刷新成功后落盘，启动时直接读缓存展示。 */
     private val gson = com.google.gson.Gson()
@@ -1139,8 +1136,9 @@ class AppViewModel(
      */
     fun runAutoTasks() = action {
         // 这一轮可能跑几分钟，期间按钮仍可点：重入会重复上报同样的行为链，白耗上游配额。
-        if (!autoTasksRunning.compareAndSet(false, true)) {
-            throw IllegalStateException("成长任务正在执行中，等这一轮跑完再试")
+        // 闸门与整点排程共用（见 AutoTaskGate）——手动触发与定时触发不能同时跑。
+        if (!AutoTaskGate.tryAcquire()) {
+            throw IllegalStateException("已有自动化任务在执行中，等这一轮跑完再试")
         }
         try {
             val targets = engine.providers()
@@ -1156,7 +1154,10 @@ class AppViewModel(
             val results = targets.map { account ->
                 account to engine.performAction(account.providerId, account.uid, ACTION_AUTO_TASKS)
             }
-            val failed = results.filter { !it.second.ok }
+            // 供应商没有这个动作（如 Loomy 只声明了 TASKS 能力、没有 auto_tasks）不算失败，
+            // 与排程侧同一口径（GatewayService 按 unsupported 跳过）——否则一个 Loomy 账号
+            // 就会把 CodeBuddy 已成功的结果一起吞掉。
+            val failed = results.filter { !it.second.ok && !it.second.unsupported }
             if (failed.isNotEmpty()) {
                 throw IllegalStateException(
                     failed.joinToString("；") {
@@ -1164,11 +1165,16 @@ class AppViewModel(
                     },
                 )
             }
-            results.joinToString("；") {
-                "${it.first.nickname.ifEmpty { it.first.uid }}：${it.second.message}"
+            val done = results.filter { it.second.ok }
+            if (done.isEmpty()) {
+                "没有可执行的成长任务账号"
+            } else {
+                done.joinToString("；") {
+                    "${it.first.nickname.ifEmpty { it.first.uid }}：${it.second.message}"
+                }
             }
         } finally {
-            autoTasksRunning.set(false)
+            AutoTaskGate.release()
         }
     }
 

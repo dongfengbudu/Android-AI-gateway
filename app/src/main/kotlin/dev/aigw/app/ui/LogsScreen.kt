@@ -4,7 +4,6 @@ import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
-import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -15,7 +14,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.itemsIndexed
-import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
@@ -143,30 +141,41 @@ fun LogsScreen(state: AppUiState, viewModel: AppViewModel) {
                 modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 4.dp),
                 verticalArrangement = Arrangement.spacedBy(10.dp),
             ) {
+                // 等宽铺满整行：横滑胶囊全挤在左边，既不齐也看不出是可选项
                 Row(
-                    modifier = Modifier.horizontalScroll(rememberScrollState()),
+                    modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.spacedBy(8.dp),
                 ) {
-                    ChoiceChip("全部", category == null) { category = null }
-                    ChoiceChip(categoryLabel(KEY_CALL), category == KEY_CALL) { category = KEY_CALL }
+                    ChoiceChip("全部", category == null, modifier = Modifier.weight(1f)) { category = null }
+                    ChoiceChip(
+                        categoryLabel(KEY_CALL),
+                        category == KEY_CALL,
+                        modifier = Modifier.weight(1f),
+                    ) { category = KEY_CALL }
                     ChoiceChip(
                         categoryLabel(OperationLog.CATEGORY_REQUEST),
                         category == OperationLog.CATEGORY_REQUEST,
+                        modifier = Modifier.weight(1f),
                     ) { category = OperationLog.CATEGORY_REQUEST }
                     ChoiceChip(
                         categoryLabel(OperationLog.CATEGORY_LOGIN),
                         category == OperationLog.CATEGORY_LOGIN,
+                        modifier = Modifier.weight(1f),
                     ) { category = OperationLog.CATEGORY_LOGIN }
                     unknownCategories(state.operations).forEach { extra ->
-                        ChoiceChip(categoryLabel(extra), category == extra) { category = extra }
+                        ChoiceChip(
+                            categoryLabel(extra),
+                            category == extra,
+                            modifier = Modifier.weight(1f),
+                        ) { category = extra }
                     }
                 }
                 Row(
-                    modifier = Modifier.horizontalScroll(rememberScrollState()),
+                    modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.spacedBy(8.dp),
                 ) {
                     LevelFilter.entries.forEach { option ->
-                        ChoiceChip(option.label, level == option) { level = option }
+                        ChoiceChip(option.label, level == option, modifier = Modifier.weight(1f)) { level = option }
                     }
                 }
                 Text(
@@ -195,16 +204,20 @@ fun LogsScreen(state: AppUiState, viewModel: AppViewModel) {
             }
         } else {
             itemsIndexed(items, key = { _, item -> itemKey(item) }) { index, item ->
-                when (item) {
-                    is LogItem.Call -> CallRow(
-                        record = item.record,
-                        onClick = { detail = item },
-                        onLongClick = { pendingDelete = item.record },
-                    )
-                    is LogItem.Op -> OperationRow(entry = item.entry, onClick = { detail = item })
-                }
-                if (index != items.lastIndex) {
-                    HorizontalDivider(modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp))
+                // 换筛选条件时整批条目淡入淡出 + 位移（animateItem 按 key 识别增删），
+                // 让「列表换了」看得见。
+                Column(modifier = Modifier.animateItem()) {
+                    when (item) {
+                        is LogItem.Call -> CallRow(
+                            record = item.record,
+                            onClick = { detail = item },
+                            onLongClick = { pendingDelete = item.record },
+                        )
+                        is LogItem.Op -> OperationRow(entry = item.entry, onClick = { detail = item })
+                    }
+                    if (index != items.lastIndex) {
+                        HorizontalDivider(modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp))
+                    }
                 }
             }
         }

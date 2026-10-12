@@ -286,11 +286,17 @@ fun StatCell(
     }
 }
 
-/** 分段/筛选胶囊。选中=深底浅字，未选中=浅底描边。 */
+/**
+ * 分段/筛选胶囊。选中=深底浅字，未选中=浅底描边。
+ *
+ * [modifier] 供调用方传入 `Modifier.weight(1f)` 做等宽铺满；内容居中，
+ * 胶囊比文字宽时文字不会贴左。
+ */
 @Composable
 fun ChoiceChip(
     text: String,
     selected: Boolean,
+    modifier: Modifier = Modifier,
     onClick: () -> Unit,
 ) {
     val container by animateColorAsState(
@@ -300,12 +306,13 @@ fun ChoiceChip(
     )
     val content = if (selected) MiuixTheme.colorScheme.surface else MiuixTheme.colorScheme.onSurface
     Box(
-        modifier = Modifier
+        modifier = modifier
             .pressScale()
             .clip(CircleShape)
             .background(container)
             .clickable(onClick = onClick)
             .padding(horizontal = 16.dp, vertical = 10.dp),
+        contentAlignment = Alignment.Center,
     ) {
         Text(text, style = MiuixTheme.textStyles.footnote1, color = content)
     }

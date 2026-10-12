@@ -11,6 +11,7 @@ import androidx.compose.ui.unit.dp
 import dev.aigw.app.data.AutoTaskKind
 import top.yukonga.miuix.kmp.basic.Button
 import top.yukonga.miuix.kmp.basic.ButtonDefaults
+import top.yukonga.miuix.kmp.basic.HorizontalDivider
 import top.yukonga.miuix.kmp.basic.SmallTitle
 import top.yukonga.miuix.kmp.basic.Text
 import top.yukonga.miuix.kmp.basic.TextButton
@@ -115,24 +116,26 @@ fun TaskCenterScreen(state: AppUiState, viewModel: AppViewModel, onBack: () -> U
             val accounts = state.accountsOf(info.id)
             if (accounts.isEmpty()) continue
             item(key = info.id) { SmallTitle(info.displayName) }
-            item(key = "${info.id}/card") {
-                SectionCard(enterIndex = 3) {
-                    for (account in accounts) {
-                        Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+            // 每个账号一张独立卡片（与供应商页一致）：多账号同卡时账号之间没有边界，
+            // 且额度/状态挤在一行左对齐，看不出哪项属于哪个账号。
+            accounts.forEachIndexed { index, account ->
+                item(key = "${info.id}/${account.uid}") {
+                    SectionCard(enterIndex = 3 + index) {
+                        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                             Text(
                                 text = account.nickname.ifEmpty { account.uid },
                                 style = MiuixTheme.textStyles.body2,
                                 fontWeight = FontWeight.SemiBold,
                             )
-                            Text(
-                                text = buildString {
-                                    append("额度 ")
-                                    append(if (account.creditsKnown) account.credits.toString() else "—")
-                                    append(" · ")
-                                    append(accountStatusText(account))
-                                },
-                                style = MiuixTheme.textStyles.footnote1,
-                                color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
+                            HorizontalDivider(modifier = Modifier.fillMaxWidth())
+                            AccountInfoRow(
+                                label = "额度",
+                                value = if (account.creditsKnown) account.credits.toString() else "—",
+                            )
+                            AccountInfoRow(
+                                label = "状态",
+                                value = accountStatusText(account),
+                                valueColor = MiuixTheme.colorScheme.onSurface,
                             )
                             if (account.detail.isNotEmpty()) {
                                 Text(

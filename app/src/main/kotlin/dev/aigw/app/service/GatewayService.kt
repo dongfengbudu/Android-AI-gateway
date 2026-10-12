@@ -14,6 +14,7 @@ import androidx.core.content.ContextCompat
 import dev.aigw.app.MainActivity
 import dev.aigw.app.R
 import dev.aigw.app.AiGatewayApp
+import dev.aigw.app.data.AutoTaskGate
 import dev.aigw.app.data.AutoTaskKind
 import dev.aigw.app.data.TaskScheduleStore
 import dev.aigw.app.data.nextAutoTaskAt
@@ -197,10 +198,19 @@ class AutoTaskScheduler(private val engine: GatewayEngine) {
         val hour = hourOf(now)
         for (kind in AutoTaskKind.entries) {
             if (hour !in kind.hours || !schedule.enabled(kind)) continue
-            if (!fired.add("$day-$hour-${kind.id}")) continue
+            val key = "$day-$hour-${kind.id}"
+            if (key in fired) continue
+            // 手动「一键完成成长任务」可能正在跑（共用 AutoTaskGate）。拿不到闸门就留到下个 tick 重试，
+            // 不标 fired——否则手动跑一次就会把该时段的排程整个吞掉。
+            if (!AutoTaskGate.tryAcquire()) continue
+            fired.add(key)
             scope.launch {
-                runCatching { runKind(kind) }.onFailure {
-                    engine.operationLog.warn(OperationLog.CATEGORY_REQUEST, "${kind.label}执行异常：${it.message}")
+                try {
+                    runCatching { runKind(kind) }.onFailure {
+                        engine.operationLog.warn(OperationLog.CATEGORY_REQUEST, "${kind.label}执行异常：${it.message}")
+                    }
+                } finally {
+                    AutoTaskGate.release()
                 }
             }
         }

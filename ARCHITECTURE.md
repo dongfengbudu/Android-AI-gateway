@@ -96,11 +96,12 @@
 | 文件 | 职责 |
 |---|---|
 | `AiGatewayApp.kt` | Application：构造引擎（单例）+ 通知渠道 |
-| `service/GatewayService.kt` | 前台服务：`startForeground` 必须在 `onStartCommand` 第一行（系统超时 5s 强杀），START_NOT_STICKY 不自重建（进程被杀后网关不自动恢复，需用户重开 App 或点磁贴），WakeLock+WifiLock 保持锁屏后 CPU/网络常醒；伴侣对象 `start(context)`/`stop(context)` 是 UI 与磁贴共用的启停入口 |
+| `service/GatewayService.kt` | 前台服务：`startForeground` 必须在 `onStartCommand` 第一行（系统超时 5s 强杀），START_NOT_STICKY 不自重建（进程被杀后网关不自动恢复，需用户重开 App 或点磁贴），WakeLock+WifiLock 保持锁屏后 CPU/网络常醒；伴侣对象 `start(context)`/`stop(context)` 是 UI 与磁贴共用的启停入口。内含 `AutoTaskScheduler`：60s tick，按「日期-小时-类别」幂等触发自动化任务（服务停则停） |
 | `service/GatewayTileService.kt` | 控制中心磁贴开关 |
 | `data/EncryptedKeyValueStore.kt` | 写操作用 `commit()`（同步）而非 `apply()`——换 token 后必须立刻可读 |
 | `data/KeepAlive.kt` | 保活状态检测（通知/电池优化/后台限制/流量节省）+ 厂商后台管理页跳转与手动路径提示 |
 | `data/LanAddresses.kt` | 取当前网络局域网 IPv4 地址，供首页「局域网」接入地址展示 |
+| `data/TaskSchedule.kt` | 自动化任务类别 `AutoTaskKind`（时点写死：签到 9/21、活跃 10、成长 1、夜猫子 23）、开关持久化 `TaskScheduleStore`（缺省全开）、下次触发时刻计算 `nextAutoTaskAt`（界面与排程共用同一份）、`AutoTaskGate`（手动与排程共用的互斥闸门） |
 | `ui/ModelsScreen.kt` | 模型列表：点击复制、Q弹测速按钮 |
 | `ui/KeepAliveScreen.kt` | 保活与权限页：逐项检测 + 一键跳转系统设置 |
 | `ui/SecurityProtectionScreen.kt` | 安全防护页：反审核脱敏、账号级限速等防护模块 |
