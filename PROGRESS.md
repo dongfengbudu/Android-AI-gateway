@@ -1,6 +1,21 @@
 # 进度
 
 ## 当前状态
+主题体系重做（2026-10-12）：
+- 完全放弃黑金主题：删除 `AppColors`/`LocalAppColors`/`GoldAccent`/`GoldText`/`HairlineBorder`
+  /`HeroGradient`/`HeroBrush` 与 `goldStart`/`goldEnd` 持久化键，全仓无 gold 引用残留。
+- 引入主题强调色模式：`ThemeAccent(hue, chroma)` 一个概念描述配色，`Theme.kt` 内部
+  按 HSL 调性阶梯展开整套明/暗 scheme（主色/容器色/表面色/描边色同色相展开，
+  点缀色 secondary/tertiary 用色相偏移 +32°/-46° 的同调性衍生）；默认靛蓝 hue=258。
+- `AiGatewayTheme` 接口收敛为 `themeMode + accent + dynamicColor + backgroundOverride`，
+  MainActivity 传 `ThemeAccent(state.accentHue)`；持久化键
+  `settings/appearance.accentHue`（旧 gold 键不再读写，遗留值自动忽略）。
+- 外观页重写：明暗模式/页面底色/强调色/动态取色四段；金色双轮渐变改为
+  单色相环（仅取 hue）+ 浅/深底可读性实测预览；底色预设「默认金」改「默认」。
+- 验证限制：本容器无 JDK/Gradle（构建链在 aarch64 构建容器），未跑编译；
+  已静态交叉检查 Miuix 字段使用先例（secondary/secondaryContainer/tertiaryContainer
+  等在 UI 既有代码中均有读取先例），`lightColorScheme` 新增参数接受性待构建容器验证。
+
 统一日志页重做（2026-10-11）：
 - 新增 `core/usage/OperationLog`：全部非调用操作的统一日志（环形缓冲 + 节流落盘 + 开放类别），
   接口 `info/warn/error(category, message)` / `entries(category)` / `clear()`；

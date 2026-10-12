@@ -78,8 +78,7 @@ import dev.aigw.app.ui.TaskCenterScreen
 import dev.aigw.app.ui.UsageScreen
 import dev.aigw.app.ui.providers.ProviderUiRegistry
 import dev.aigw.app.ui.theme.AiGatewayTheme
-import dev.aigw.app.ui.theme.AppColors
-import dev.aigw.app.ui.theme.LocalAppColors
+import dev.aigw.app.ui.theme.ThemeAccent
 
 class MainActivity : ComponentActivity() {
 
@@ -134,9 +133,9 @@ class MainActivity : ComponentActivity() {
             }
 
             AiGatewayTheme(
-                dynamicColor = state.dynamicColor,
                 themeMode = state.themeMode,
-                appColors = AppColors(state.goldStart, state.goldEnd),
+                accent = ThemeAccent(state.accentHue),
+                dynamicColor = state.dynamicColor,
                 backgroundOverride = state.backgroundOverride,
             ) {
                 AppRoot(vm, state)

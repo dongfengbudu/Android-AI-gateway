@@ -34,7 +34,6 @@ import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import dev.aigw.app.ui.theme.LocalAppColors
 import dev.aigw.core.pool.AccountStatus
 import top.yukonga.miuix.kmp.basic.Button
 import top.yukonga.miuix.kmp.basic.ButtonDefaults
@@ -223,7 +222,7 @@ fun AccountInfoRow(
 /** 「运行中 / 已停止」状态胶囊：圆点 + 文案（运行中金色带浅光环）。 */
 @Composable
 fun StatusChip(running: Boolean) {
-    val gold = LocalAppColors.current.goldStart
+    val accent = MiuixTheme.colorScheme.primary
     val content by animateColorAsState(
         targetValue = MiuixTheme.colorScheme.onSurface,
         animationSpec = tween(200),
@@ -242,13 +241,13 @@ fun StatusChip(running: Boolean) {
             contentAlignment = Alignment.Center,
         ) {
             if (running) {
-                Box(Modifier.size(14.dp).clip(CircleShape).background(gold.copy(alpha = 0.18f)))
+                Box(Modifier.size(14.dp).clip(CircleShape).background(accent.copy(alpha = 0.18f)))
             }
             Box(
                 Modifier
                     .size(6.dp)
                     .clip(CircleShape)
-                    .background(if (running) gold else MiuixTheme.colorScheme.onSurfaceVariantSummary),
+                    .background(if (running) accent else MiuixTheme.colorScheme.onSurfaceVariantSummary),
             )
         }
         Text(
@@ -357,7 +356,7 @@ fun EmptyHint(title: String, message: String) {
 /** 小节头：左小灰大写标题 + 右侧可选金色小链接（仅用于内容卡内部，分组标题一律用 SmallTitle）。 */
 @Composable
 fun SectionHeader(title: String, action: String? = null, onAction: (() -> Unit)? = null) {
-    val goldText = LocalAppColors.current.goldText
+    val accentVariant = MiuixTheme.colorScheme.primaryVariant
     Row(
         modifier = Modifier
             .fillMaxWidth()
@@ -378,7 +377,7 @@ fun SectionHeader(title: String, action: String? = null, onAction: (() -> Unit)?
             Text(
                 text = action,
                 style = MiuixTheme.textStyles.footnote1,
-                color = goldText,
+                color = accentVariant,
                 modifier = if (onAction != null) Modifier.clickable(onClick = onAction) else Modifier,
             )
         }
@@ -390,7 +389,7 @@ fun SectionHeader(title: String, action: String? = null, onAction: (() -> Unit)?
  */
 @Composable
 fun QuotaPackBar(pack: dev.aigw.core.provider.QuotaPack) {
-    val gold = LocalAppColors.current.goldStart
+    val accent = MiuixTheme.colorScheme.primary
     Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
         Row(Modifier.fillMaxWidth()) {
             Text(
@@ -437,7 +436,7 @@ fun QuotaPackBar(pack: dev.aigw.core.provider.QuotaPack) {
                         .background(
                             when {
                                 fraction > 0.5f -> MiuixTheme.colorScheme.onSurface
-                                fraction > 0.2f -> gold
+                                fraction > 0.2f -> accent
                                 else -> MiuixTheme.colorScheme.error
                             },
                         ),

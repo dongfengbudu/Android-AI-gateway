@@ -40,7 +40,7 @@ import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import dev.aigw.app.ui.theme.LocalAppColors
+import dev.aigw.app.ui.theme.defaultThemeAccent
 import top.yukonga.miuix.kmp.basic.HorizontalDivider
 import top.yukonga.miuix.kmp.basic.SmallTitle
 import top.yukonga.miuix.kmp.basic.Text
@@ -60,7 +60,7 @@ import kotlin.math.sin
 private data class BgPreset(val label: String, val hex: String?)
 
 private val bgPresets = listOf(
-    BgPreset("默认金", null),
+    BgPreset("默认", null),
     BgPreset("冷银灰", "#F7F7F8"),
     BgPreset("暖象牙", "#FBF9F5"),
     BgPreset("曜石黑", "#121214"),
@@ -72,14 +72,12 @@ private val WheelSize = 120.dp
 private val WheelStroke = 12.dp
 private val WheelThumb = 10.dp
 
-/** 外观主题二级页：明暗模式、配色方案、金色文字、动态取色。 */
+/** 外观主题二级页：明暗模式、页面底色、强调色相、动态取色。 */
 @Composable
 fun AppearanceThemeScreen(state: AppUiState, viewModel: AppViewModel, onBack: () -> Unit) {
-    val gold = LocalAppColors.current.goldStart
-
     PageScaffold(
         title = "外观主题",
-        subtitle = "明暗模式 · 配色方案 · 金色文字",
+        subtitle = "明暗模式 · 强调色 · 底色",
         leading = { BackButton(onBack) },
     ) {
         item { SmallTitle("明暗模式") }
@@ -89,21 +87,21 @@ fun AppearanceThemeScreen(state: AppUiState, viewModel: AppViewModel, onBack: ()
                     viewModel.setThemeMode(ThemeMode.System)
                 }
                 HorizontalDivider(modifier = Modifier.fillMaxWidth())
-                ModeRow("深色模式", "经典黑金暗色调，适合弱光与长时夜间使用", state.themeMode == ThemeMode.Dark) {
+                ModeRow("深色模式", "同套调性色阶的暗色展开，适合弱光与长时夜间使用", state.themeMode == ThemeMode.Dark) {
                     viewModel.setThemeMode(ThemeMode.Dark)
                 }
                 HorizontalDivider(modifier = Modifier.fillMaxWidth())
-                ModeRow("浅色模式", "极简明亮排版，高对比度呈现黑金理性层次", state.themeMode == ThemeMode.Light) {
+                ModeRow("浅色模式", "极简明亮排版，主色与点缀保持同一色相的调性层次", state.themeMode == ThemeMode.Light) {
                     viewModel.setThemeMode(ThemeMode.Light)
                 }
             }
         }
 
-        item { SmallTitle("配色方案") }
+        item { SmallTitle("页面底色") }
         item {
             SectionCard(enterIndex = 1) {
                 Text(
-                    text = "预设黑金系调色基调，切换后仅替换页面底色（卡片/表面色不变）：",
+                    text = "切换后仅替换页面底色（卡片/表面色不变）：",
                     style = MiuixTheme.textStyles.footnote1,
                     color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
                 )
@@ -115,7 +113,7 @@ fun AppearanceThemeScreen(state: AppUiState, viewModel: AppViewModel, onBack: ()
                     bgPresets.forEach { preset ->
                         PresetChip(
                             label = preset.label,
-                            dotColor = preset.hex?.let { parseHexColor(it) } ?: gold,
+                            dotColor = preset.hex?.let { parseHexColor(it) } ?: MiuixTheme.colorScheme.primary,
                             selected = currentHex == preset.hex,
                             onClick = { viewModel.setBackgroundOverride(preset.hex) },
                         )
@@ -135,32 +133,37 @@ fun AppearanceThemeScreen(state: AppUiState, viewModel: AppViewModel, onBack: ()
             }
         }
 
-        item { SmallTitle("金色文字") }
+        item { SmallTitle("强调色") }
         item {
             SectionCard(enterIndex = 2) {
                 Text(
-                    text = "应用主色渐变由起始色与结束色插值生成，可拖动色相环或直接输入代码：",
+                    text = "拖动色相环选择强调色，主色、按钮、点缀色都从同一色相按调性阶梯自动展开：",
                     style = MiuixTheme.textStyles.footnote1,
                     color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
                 )
+                val accentSeed = Color.hsv(state.accentHue, 0.62f, 0.95f)
                 Row(
                     modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(12.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(16.dp),
                 ) {
-                    WheelColumn(
-                        title = "起始色",
-                        color = state.goldStart,
-                        modifier = Modifier.weight(1f),
-                        onPick = { viewModel.setGoldColors(formatHex(it), formatHex(state.goldEnd)) },
-                    )
-                    WheelColumn(
-                        title = "结束色",
-                        color = state.goldEnd,
-                        modifier = Modifier.weight(1f),
-                        onPick = { viewModel.setGoldColors(formatHex(state.goldStart), formatHex(it)) },
-                    )
+                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                        HueWheel(
+                            color = accentSeed,
+                            onPick = { picked -> viewModel.setAccentHue(hueOf(picked).toFloat()) },
+                        )
+                        Text(
+                            text = "色相 ${state.accentHue.toInt()}°",
+                            style = MiuixTheme.textStyles.footnote1.copy(fontFamily = FontFamily.Monospace),
+                            color = if (state.accentHue == defaultThemeAccent.normalizedHue) {
+                                MiuixTheme.colorScheme.onSurfaceVariantSummary
+                            } else {
+                                MiuixTheme.colorScheme.primary
+                            },
+                        )
+                    }
+                    AccentPreview(accentSeed, Modifier.weight(1f))
                 }
-                GradientPreview(state.goldStart, state.goldEnd)
             }
         }
 
@@ -169,7 +172,7 @@ fun AppearanceThemeScreen(state: AppUiState, viewModel: AppViewModel, onBack: ()
             SectionCard(enterIndex = 3) {
                 SuperSwitch(
                     title = "动态取色",
-                    summary = "从系统壁纸提取配色，开启后配色方案不再生效",
+                    summary = "从系统壁纸提取配色，开启后强调色不再生效",
                     checked = state.dynamicColor,
                     onCheckedChange = { viewModel.setDynamicColor(it) },
                     insideMargin = PaddingValues(0.dp),
@@ -183,7 +186,7 @@ fun AppearanceThemeScreen(state: AppUiState, viewModel: AppViewModel, onBack: ()
     }
 }
 
-/** 单选行：miuix 标准单选（选中态由组件给出金色高亮）。 */
+/** 单选行：miuix 标准单选（选中态由组件给出主题高亮）。 */
 @Composable
 private fun ModeRow(title: String, subtitle: String, selected: Boolean, onClick: () -> Unit) {
     SuperRadioButton(
@@ -195,17 +198,17 @@ private fun ModeRow(title: String, subtitle: String, selected: Boolean, onClick:
     )
 }
 
-/** 配色预设胶囊：色点 + 名称；选中时金色描边 + 浅金底。 */
+/** 底色预设胶囊：色点 + 名称；选中时主色描边 + 浅主色底。 */
 @Composable
 private fun PresetChip(label: String, dotColor: Color, selected: Boolean, onClick: () -> Unit) {
-    val gold = LocalAppColors.current.goldStart
-    val goldText = LocalAppColors.current.goldText
+    val primary = MiuixTheme.colorScheme.primary
+    val primaryVariant = MiuixTheme.colorScheme.primaryVariant
     Row(
         modifier = Modifier
             .pressScale()
             .clip(CircleShape)
-            .background(if (selected) gold.copy(alpha = 0.12f) else MiuixTheme.colorScheme.surfaceVariant)
-            .border(if (selected) 1.5.dp else 1.dp, if (selected) gold else MiuixTheme.colorScheme.outline, CircleShape)
+            .background(if (selected) primary.copy(alpha = 0.12f) else MiuixTheme.colorScheme.surfaceVariant)
+            .border(if (selected) 1.5.dp else 1.dp, if (selected) primary else MiuixTheme.colorScheme.outline, CircleShape)
             .clickable(onClick = onClick)
             .padding(horizontal = 14.dp, vertical = 10.dp),
         verticalAlignment = Alignment.CenterVertically,
@@ -216,7 +219,7 @@ private fun PresetChip(label: String, dotColor: Color, selected: Boolean, onClic
             text = label,
             style = MiuixTheme.textStyles.footnote1,
             fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal,
-            color = if (selected) goldText else MiuixTheme.colorScheme.onSurface,
+            color = if (selected) primaryVariant else MiuixTheme.colorScheme.onSurface,
         )
     }
 }
@@ -264,46 +267,10 @@ private fun HexField(
             Text(
                 text = "清除覆盖",
                 style = MiuixTheme.textStyles.footnote2,
-                color = LocalAppColors.current.goldText,
+                color = MiuixTheme.colorScheme.primary,
                 modifier = Modifier.clickable(onClick = onClear).padding(horizontal = 4.dp, vertical = 2.dp),
             )
         }
-    }
-}
-
-/** 单个色相环卡片：标题 + 色相环 + HEX 输入框。 */
-@Composable
-private fun WheelColumn(
-    title: String,
-    color: Color,
-    modifier: Modifier,
-    onPick: (Color) -> Unit,
-) {
-    Column(
-        modifier = modifier,
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.spacedBy(10.dp),
-    ) {
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(6.dp),
-        ) {
-            Box(Modifier.size(8.dp).clip(RoundedCornerShape(6.dp)).background(color))
-            Text(
-                text = title,
-                style = MiuixTheme.textStyles.footnote2,
-                fontWeight = FontWeight.SemiBold,
-                modifier = Modifier.weight(1f),
-            )
-            Text(
-                text = "${hueOf(color)}°",
-                style = MiuixTheme.textStyles.footnote2,
-                color = LocalAppColors.current.goldText,
-            )
-        }
-        HueWheel(color = color, onPick = onPick)
-        HexField(value = formatHex(color), label = "HEX", onCommit = { onPick(requireColor(it)) })
     }
 }
 
@@ -353,36 +320,45 @@ private fun HueWheel(color: Color, onPick: (Color) -> Unit) {
     }
 }
 
-/** START→END 渐变预览条 + 两端代码标注 + 渐变文字实测。 */
+/** 强调色实测：色块 + 浅底/深底上的文字样张，直观检验两种模式下的可读性。 */
 @Composable
-private fun GradientPreview(start: Color, end: Color) {
-    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+private fun AccentPreview(accent: Color, modifier: Modifier = Modifier) {
+    Column(modifier = modifier, verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            Box(
+                Modifier
+                    .weight(1f)
+                    .height(36.dp)
+                    .clip(RoundedCornerShape(8.dp))
+                    .background(Color.White)  // miuix-lint:allow 主题/品牌色定义（预览用固定浅底）
+                    .border(1.dp, MiuixTheme.colorScheme.outline, RoundedCornerShape(8.dp)),
+                contentAlignment = Alignment.Center,
+            ) {
+                Text("浅色底", style = MiuixTheme.textStyles.footnote1, color = accent)
+            }
+            Box(
+                Modifier
+                    .weight(1f)
+                    .height(36.dp)
+                    .clip(RoundedCornerShape(8.dp))
+                    .background(Color(0xFF141414))  // miuix-lint:allow 主题/品牌色定义（预览用固定深底）
+                    .border(1.dp, MiuixTheme.colorScheme.outline, RoundedCornerShape(8.dp)),
+                contentAlignment = Alignment.Center,
+            ) {
+                Text("深色底", style = MiuixTheme.textStyles.footnote1, color = accent)
+            }
+        }
         Box(
-            modifier = Modifier
+            Modifier
                 .fillMaxWidth()
                 .height(24.dp)
                 .clip(CircleShape)
-                .background(Brush.horizontalGradient(listOf(start, end))),
+                .background(accent),
         )
-        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-            Text(
-                text = formatHex(start),
-                style = MiuixTheme.textStyles.footnote2.copy(fontFamily = FontFamily.Monospace),
-                color = start,
-            )
-            Text(
-                text = formatHex(end),
-                style = MiuixTheme.textStyles.footnote2.copy(fontFamily = FontFamily.Monospace),
-                color = end,
-            )
-        }
         Text(
-            text = "黑金渐变文字实测",
-            style = MiuixTheme.textStyles.headline1.copy(
-                brush = Brush.horizontalGradient(listOf(start, end)),
-                fontWeight = FontWeight.Light,
-                letterSpacing = 1.sp,
-            ),
+            text = formatHex(accent),
+            style = MiuixTheme.textStyles.footnote2.copy(fontFamily = FontFamily.Monospace),
+            color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
         )
     }
 }
@@ -409,6 +385,3 @@ private fun hueSatOf(color: Color): Pair<Float, Float> {
 }
 
 private fun hueOf(color: Color): Int = hueSatOf(color).first.toInt()
-
-/** 已校验过的 HEX → 颜色；由 [parseHexColor] 保证非空。 */
-private fun requireColor(hex: String): Color = parseHexColor(hex) ?: Color.Unspecified

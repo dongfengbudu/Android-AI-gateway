@@ -22,7 +22,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import dev.aigw.app.ui.theme.SuccessGreen
-import dev.aigw.app.ui.theme.formatHex
+import dev.aigw.app.ui.theme.defaultThemeAccent
 import dev.aigw.core.usage.StorageAudit
 import top.yukonga.miuix.kmp.basic.HorizontalDivider
 import top.yukonga.miuix.kmp.basic.Icon
@@ -231,15 +231,16 @@ private fun MetaText(text: String) {
     )
 }
 
-/** 外观主题条目的元信息：当前模式 + 是否自定义金色。 */
+/** 外观主题条目的元信息：当前模式 + 强调色相度数（默认时不展示）。 */
 private fun appearanceMeta(state: AppUiState): String {
     val mode = when (state.themeMode) {
         dev.aigw.app.ui.theme.ThemeMode.Light -> "浅色"
         dev.aigw.app.ui.theme.ThemeMode.Dark -> "深色"
         dev.aigw.app.ui.theme.ThemeMode.System -> "自动"
     }
-    val customGold = formatHex(state.goldStart) != "#D4A843" || formatHex(state.goldEnd) != "#B88A20"
-    return mode + " · " + (if (customGold) formatHex(state.goldStart) else "默认金")
+    val isDefaultHue = state.accentHue == defaultThemeAccent.normalizedHue
+    val accentLabel = if (isDefaultHue) "默认靛蓝" else "色相 ${state.accentHue.toInt()}°"
+    return mode + " · " + accentLabel
 }
 
 private fun appVersion(context: android.content.Context): String = runCatching {

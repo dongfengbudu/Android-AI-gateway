@@ -48,7 +48,6 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import dev.aigw.app.ui.theme.LocalAppColors
 import dev.aigw.app.ui.theme.SuccessGreen
 import dev.aigw.core.usage.UsageStats
 import dev.aigw.core.util.startOfDay
@@ -71,8 +70,8 @@ fun HomeScreen(
 ) {
     val context = LocalContext.current
     val clipboard = LocalClipboardManager.current
-    val gold = LocalAppColors.current.goldStart
-    val goldText = LocalAppColors.current.goldText
+    val accent = MiuixTheme.colorScheme.primary
+    val accentVariant = MiuixTheme.colorScheme.primaryVariant
     val lanUrl = state.lanUrls.firstOrNull()
 
     // Android 13+ 通知权限被拒时前台服务照常跑，但常驻通知会被系统静默隐藏，
@@ -146,7 +145,7 @@ fun HomeScreen(
                             verticalAlignment = Alignment.CenterVertically,
                             horizontalArrangement = Arrangement.spacedBy(6.dp),
                         ) {
-                            Box(Modifier.size(6.dp).clip(CircleShape).background(gold))
+                            Box(Modifier.size(6.dp).clip(CircleShape).background(accent))
                             Text(
                                 "批量签到",
                                 style = MiuixTheme.textStyles.footnote1,
@@ -159,7 +158,7 @@ fun HomeScreen(
                         modifier = Modifier
                             .weight(1f)
                             .clip(RoundedCornerShape(10.dp))
-                            .border(1.dp, gold, RoundedCornerShape(10.dp))
+                            .border(1.dp, accent, RoundedCornerShape(10.dp))
                             .clickable { openTaskCenter() }
                             .padding(vertical = 12.dp),
                         contentAlignment = Alignment.Center,
@@ -167,7 +166,7 @@ fun HomeScreen(
                         Text(
                             "任务中心",
                             style = MiuixTheme.textStyles.footnote1,
-                            color = goldText,
+                            color = accentVariant,
                             fontWeight = FontWeight.SemiBold,
                         )
                     }
@@ -191,7 +190,7 @@ private fun ConsoleCard(
     onRefreshCredits: () -> Unit,
     onCopy: (String, String) -> Unit,
 ) {
-    val gold = LocalAppColors.current.goldStart
+    val accent = MiuixTheme.colorScheme.primary
     SectionCard(modifier = Modifier.staggeredAppear(0)) {
         SectionHeader("网关状态")
         Row(
@@ -250,7 +249,7 @@ private fun ConsoleCard(
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.spacedBy(6.dp),
                 ) {
-                    Box(Modifier.size(6.dp).clip(CircleShape).background(gold))
+                    Box(Modifier.size(6.dp).clip(CircleShape).background(accent))
                     Text(
                         text = if (state.running) "停止网关服务" else "启动网关服务",
                         style = MiuixTheme.textStyles.footnote1,
@@ -349,7 +348,7 @@ private fun AddressRow(label: String, value: String, onCopy: (() -> Unit)?) {
 @Composable
 private fun TrendCard(state: AppUiState) {
     val trend = state.daily.takeLast(TREND_DAYS)
-    val gold = LocalAppColors.current.goldStart
+    val accent = MiuixTheme.colorScheme.primary
     SectionCard(modifier = Modifier.staggeredAppear(2)) {
         SectionHeader("消耗趋势", action = if (trend.isEmpty()) null else "近 ${trend.size} 天")
         val drawable = trend.size >= 2 && trend.any { it.promptTokens > 0 || it.completionTokens > 0 }
@@ -359,7 +358,7 @@ private fun TrendCard(state: AppUiState) {
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(16.dp),
             ) {
-                LegendDot(gold, "输入")
+                LegendDot(accent, "输入")
                 LegendDot(MiuixTheme.colorScheme.onSurface, "输出")
             }
         } else {
@@ -386,7 +385,7 @@ private fun LegendDot(color: Color, text: String) {
 
 @Composable
 private fun TrendChart(daily: List<UsageStats>, todayStart: Long) {
-    val gold = LocalAppColors.current.goldStart
+    val accent = MiuixTheme.colorScheme.primary
     val output = MiuixTheme.colorScheme.onSurface
     val gridColor = MiuixTheme.colorScheme.surfaceContainerHighest
     val labelColor = MiuixTheme.colorScheme.onSurfaceVariantSummary
@@ -407,7 +406,7 @@ private fun TrendChart(daily: List<UsageStats>, todayStart: Long) {
         val outY = FloatArray(n) { originY - daily[it].completionTokens.toFloat() / maxValue * chartHeight }
 
         drawLine(gridColor, Offset(gutterLeft, originY), Offset(gutterLeft + chartWidth, originY), strokeWidth = 1f)
-        drawSeries(xs, inY, originY, gold)
+        drawSeries(xs, inY, originY, accent)
         drawSeries(xs, outY, originY, output)
 
         drawIntoCanvas { canvas ->
@@ -556,7 +555,7 @@ private fun ReadinessTile(state: AppUiState, modifier: Modifier) {
 /** 环形进度：金色弧 + 灰底环，中间百分比。 */
 @Composable
 private fun ReadinessRing(percent: Int, fraction: Float) {
-    val ringColor = LocalAppColors.current.goldStart
+    val ringColor = MiuixTheme.colorScheme.primary
     val trackColor = MiuixTheme.colorScheme.surfaceContainerHighest
     Box(modifier = Modifier.size(44.dp), contentAlignment = Alignment.Center) {
         Canvas(Modifier.fillMaxWidth().height(44.dp)) {
@@ -635,11 +634,11 @@ private fun TodayTokensTile(state: AppUiState, modifier: Modifier) {
 @Composable
 private fun CreditsTile(state: AppUiState, modifier: Modifier) {
     val known = state.pool.creditsKnown > 0
-    val goldText = LocalAppColors.current.goldText
+    val accentVariant = MiuixTheme.colorScheme.primaryVariant
     Tile(modifier, "已知额度 · TOTAL CREDITS") {
         BigNumber(
             value = if (known) formatCount(state.pool.totalCredits) else "—",
-            color = if (known) goldText else MiuixTheme.colorScheme.onSurfaceVariantSummary,
+            color = if (known) accentVariant else MiuixTheme.colorScheme.onSurfaceVariantSummary,
         )
         TileNote(if (known) "已同步 ${state.pool.creditsKnown} 个账号" else "尚未同步额度")
     }

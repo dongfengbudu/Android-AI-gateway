@@ -14,8 +14,9 @@ import com.google.gson.JsonParser
 import dev.aigw.app.data.KeepAlive
 import dev.aigw.app.data.KeepAliveStatus
 import dev.aigw.app.gatewayEngine
+import dev.aigw.app.ui.theme.ThemeAccent
 import dev.aigw.app.ui.theme.ThemeMode
-import dev.aigw.app.ui.theme.defaultAppColors
+import dev.aigw.app.ui.theme.defaultThemeAccent
 import dev.aigw.app.ui.theme.formatHex
 import dev.aigw.app.ui.theme.parseHexColor
 import dev.aigw.app.service.GatewayService
@@ -75,7 +76,7 @@ private const val UPDATE_UA = "ai-gateway-android"
 /** 模型目录缓存：手动刷新成功后落盘，启动直接展示，不再自动拉取。 */
 private const val MODELS_CACHE_KEY = "cache/models.json"
 
-/** 外观偏好：动态取色、明暗模式、页面底色与金色渐变两端。 */
+/** 外观偏好：动态取色、明暗模式、页面底色与主题强调色相。 */
 class AppearanceStore(private val store: KeyValueStore) {
     fun dynamicColor(): Boolean = store.read(KEY_DYNAMIC) == "1"
 
@@ -107,35 +108,27 @@ class AppearanceStore(private val store: KeyValueStore) {
         if (hex.isNullOrBlank()) store.delete(KEY_BG) else store.write(KEY_BG, hex)
     }
 
-    fun goldStartHex(): String = store.read(KEY_GOLD_START) ?: DEFAULT_GOLD_START
+    /** 主题强调色相（0..360）；非法或缺失时回落默认。 */
+    fun accentHue(): Float =
+        store.read(KEY_ACCENT_HUE)?.toFloatOrNull()?.takeIf { it.isFinite() }
+            ?: defaultThemeAccent.normalizedHue
 
-    fun setGoldStartHex(hex: String) {
-        store.write(KEY_GOLD_START, hex)
-    }
-
-    fun goldEndHex(): String = store.read(KEY_GOLD_END) ?: DEFAULT_GOLD_END
-
-    fun setGoldEndHex(hex: String) {
-        store.write(KEY_GOLD_END, hex)
+    fun setAccentHue(hue: Float) {
+        store.write(KEY_ACCENT_HUE, hue.toString())
     }
 
     /** 清空全部自定义外观，恢复默认。 */
     fun reset() {
         store.delete(KEY_MODE)
         store.delete(KEY_BG)
-        store.delete(KEY_GOLD_START)
-        store.delete(KEY_GOLD_END)
+        store.delete(KEY_ACCENT_HUE)
     }
 
     companion object {
-        const val DEFAULT_GOLD_START = "#D4A843"
-        const val DEFAULT_GOLD_END = "#B88A20"
-
         private const val KEY_DYNAMIC = "settings/appearance.dynamicColor"
         private const val KEY_MODE = "settings/appearance.themeMode"
         private const val KEY_BG = "settings/appearance.backgroundHex"
-        private const val KEY_GOLD_START = "settings/appearance.goldStartHex"
-        private const val KEY_GOLD_END = "settings/appearance.goldEndHex"
+        private const val KEY_ACCENT_HUE = "settings/appearance.accentHue"
     }
 }
 
@@ -240,10 +233,8 @@ data class AppUiState(
     val themeMode: ThemeMode = ThemeMode.System,
     /** 页面底色覆盖；null 表示用默认底色。 */
     val backgroundOverride: Color? = null,
-    /** 金色渐变起始色。 */
-    val goldStart: Color = defaultAppColors.goldStart,
-    /** 金色渐变结束色（也是金色文字色）。 */
-    val goldEnd: Color = defaultAppColors.goldEnd,
+    /** 主题强调色相（0..360）。 */
+    val accentHue: Float = defaultThemeAccent.normalizedHue,
     val keepAlive: KeepAliveStatus? = null,
     /** 存储占用明细（含各类记录与设置）。 */
     val storage: StorageReport? = null,
@@ -309,8 +300,7 @@ class AppViewModel(
             themeMode = appearance.themeMode(),
             // 存储里的非法 HEX 一律回落到默认值，不让坏数据把界面卡死
             backgroundOverride = appearance.backgroundHex()?.let { parseHexColor(it) },
-            goldStart = parseHexColor(appearance.goldStartHex()) ?: defaultAppColors.goldStart,
-            goldEnd = parseHexColor(appearance.goldEndHex()) ?: defaultAppColors.goldEnd,
+            accentHue = appearance.accentHue(),
         ),
     )
     val state: StateFlow<AppUiState> = _state.asStateFlow()
@@ -665,27 +655,20 @@ class AppViewModel(
         _state.value = _state.value.copy(backgroundOverride = parsed)
     }
 
-    /** 设置金色渐变两端；任一非法则整组忽略并提示。 */
-    fun setGoldColors(startHex: String, endHex: String) {
-        val start = parseHexColor(startHex)
-        val end = parseHexColor(endHex)
-        if (start == null || end == null) {
-            notice("颜色代码需要是 #RRGGBB 格式")
-            return
-        }
-        appearance.setGoldStartHex(formatHex(start))
-        appearance.setGoldEndHex(formatHex(end))
-        _state.value = _state.value.copy(goldStart = start, goldEnd = end)
+    /** 设置主题强调色相；越界自动归一化。 */
+    fun setAccentHue(hue: Float) {
+        val normalized = ThemeAccent(hue).normalizedHue
+        appearance.setAccentHue(normalized)
+        _state.value = _state.value.copy(accentHue = normalized)
     }
 
-    /** 恢复默认外观（明暗模式、页面底色、金色渐变）。 */
+    /** 恢复默认外观（明暗模式、页面底色、强调色相）。 */
     fun resetAppearance() {
         appearance.reset()
         _state.value = _state.value.copy(
             themeMode = ThemeMode.System,
             backgroundOverride = null,
-            goldStart = defaultAppColors.goldStart,
-            goldEnd = defaultAppColors.goldEnd,
+            accentHue = defaultThemeAccent.normalizedHue,
         )
         notice("外观主题已恢复默认")
     }
