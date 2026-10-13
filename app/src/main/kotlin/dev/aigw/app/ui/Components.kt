@@ -34,7 +34,10 @@ import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import dev.aigw.app.ui.theme.WarnAmber
 import dev.aigw.core.pool.AccountStatus
+import dev.aigw.core.usage.LogLevel
+import dev.aigw.core.usage.OperationLog
 import top.yukonga.miuix.kmp.basic.Button
 import top.yukonga.miuix.kmp.basic.ButtonDefaults
 import top.yukonga.miuix.kmp.basic.Card
@@ -460,4 +463,24 @@ fun QuotaPackBar(pack: dev.aigw.core.provider.QuotaPack) {
             )
         }
     }
+}
+
+/** 日志类别的中文名；未内置的类别（新功能自带）原样显示。 */
+internal fun categoryLabel(category: String): String = when (category) {
+    KEY_CALL -> "调用"
+    OperationLog.CATEGORY_REQUEST -> "请求"
+    OperationLog.CATEGORY_LOGIN -> "登录"
+    OperationLog.CATEGORY_TASK -> "任务"
+    else -> category
+}
+
+/** 调用记录的伪类别：与 OperationEntry.category 同域，界面里统一当一类展示。 */
+internal const val KEY_CALL = "call"
+
+/** 级别语义色：错误红随主题，警示橙/信息灰是固定语义色（Miuix 无 warning token）。 */
+@Composable
+internal fun levelColor(level: LogLevel): Color = when (level) {
+    LogLevel.WARN -> WarnAmber
+    LogLevel.ERROR -> MiuixTheme.colorScheme.error
+    LogLevel.INFO -> MiuixTheme.colorScheme.onSurfaceVariantSummary
 }

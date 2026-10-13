@@ -167,5 +167,8 @@ class OperationLog(
 
         /** 各供应商登录过程的端点、状态码与响应摘录。 */
         const val CATEGORY_LOGIN = "login"
+
+        /** 账号动作（签到、任务领取、活跃上报等）的执行结果。 */
+        const val CATEGORY_TASK = "task"
     }
 }

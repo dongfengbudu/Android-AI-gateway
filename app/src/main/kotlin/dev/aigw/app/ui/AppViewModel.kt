@@ -446,6 +446,18 @@ class AppViewModel(
     }
 
     /**
+     * 只刷新操作日志。
+     *
+     * 供任务中心的日志面板轮询用：那里每 2 秒刷一次，没必要顺带读调用记录（体量大）。
+     */
+    fun refreshOperations() {
+        viewModelScope.launch {
+            val operations = withContext(Dispatchers.IO) { engine.operationLog.entries() }
+            _state.value = _state.value.copy(operations = operations)
+        }
+    }
+
+    /**
      * 单独刷新「数据管理」的存储占用。
      *
      * 刻意不放在 [refresh] 里：它要扫全部加密存储键并遍历缓存目录，代价高，
@@ -1038,9 +1050,15 @@ class AppViewModel(
 
     /** 刷新全部供应商的额度。 */
     fun refreshAllCredits() = action {
+        engine.operationLog.info(OperationLog.CATEGORY_TASK, "手动触发：刷新全部额度")
         val results = engine.refreshAllCredits()
         if (results.isEmpty()) throw IllegalStateException("还没有账号，先去「供应商」页添加")
         val failed = results.filter { it.error.isNotEmpty() }
+        // 额度刷新是唯一不在引擎里记结果的动作，自己补一条汇总，否则面板上只剩逐账号的请求流水。
+        engine.operationLog.info(
+            OperationLog.CATEGORY_TASK,
+            "额度刷新完成：${results.size} 个账号，失败 ${failed.size} 个",
+        )
         if (failed.isNotEmpty()) {
             throw IllegalStateException(failed.joinToString("；") { "${it.providerId}/${it.uid}：${it.error}" })
         }
@@ -1056,6 +1074,7 @@ class AppViewModel(
      * 逐个执行并把每个账号的上游原话带回，避免用户只看到一句「N 个账号失败」而无法定位。
      */
     fun checkinAll() = action {
+        engine.operationLog.info(OperationLog.CATEGORY_TASK, "手动触发：批量签到")
         val targets = engine.providers()
             .filter { ProviderCapability.CHECKIN in it.capabilities }
             .flatMap { info -> engine.accounts(info.id) }
@@ -1088,6 +1107,7 @@ class AppViewModel(
      *  - Trae：无独立任务中心，每日签到已由 [checkinAll] 覆盖。
      */
     fun runAllTasks() = action {
+        engine.operationLog.info(OperationLog.CATEGORY_TASK, "手动触发：批量任务")
         val targets = engine.providers()
             .filter { ProviderCapability.TASKS in it.capabilities }
             .flatMap { info -> engine.accounts(info.id) }
@@ -1135,6 +1155,7 @@ class AppViewModel(
      * 耗时可达数分钟，所以只列进度摘要，不做逐项细节展示。
      */
     fun runAutoTasks() = action {
+        engine.operationLog.info(OperationLog.CATEGORY_TASK, "手动触发：一键完成成长任务")
         // 这一轮可能跑几分钟，期间按钮仍可点：重入会重复上报同样的行为链，白耗上游配额。
         // 闸门与整点排程共用（见 AutoTaskGate）——手动触发与定时触发不能同时跑。
         if (!AutoTaskGate.tryAcquire()) {

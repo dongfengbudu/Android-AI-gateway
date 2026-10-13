@@ -1,14 +1,31 @@
 package dev.aigw.app.ui
 
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import dev.aigw.app.data.AutoTaskKind
+import dev.aigw.core.usage.OperationEntry
+import kotlinx.coroutines.delay
 import top.yukonga.miuix.kmp.basic.Button
 import top.yukonga.miuix.kmp.basic.ButtonDefaults
 import top.yukonga.miuix.kmp.basic.HorizontalDivider
@@ -17,7 +34,10 @@ import top.yukonga.miuix.kmp.basic.Text
 import top.yukonga.miuix.kmp.basic.TextButton
 import top.yukonga.miuix.kmp.extra.SuperSwitch
 import top.yukonga.miuix.kmp.theme.MiuixTheme
+import java.text.SimpleDateFormat
 import java.util.Calendar
+import java.util.Date
+import java.util.Locale
 
 /**
  * 任务中心：批量操作、定时任务开关与账号状态。
@@ -74,6 +94,13 @@ fun TaskCenterScreen(state: AppUiState, viewModel: AppViewModel, onBack: () -> U
             }
         }
 
+        item { SmallTitle("运行日志") }
+        item {
+            SectionCard(enterIndex = 1) {
+                TaskLogPanel(state.operations, viewModel)
+            }
+        }
+
         item { SmallTitle("定时任务") }
         item {
             GroupCard {
@@ -89,7 +116,7 @@ fun TaskCenterScreen(state: AppUiState, viewModel: AppViewModel, onBack: () -> U
             }
         }
         item {
-            SectionCard(enterIndex = 1) {
+            SectionCard(enterIndex = 2) {
                 Text(
                     text = "下次执行：" + nextRunText(state.nextTaskAt),
                     style = MiuixTheme.textStyles.body2,
@@ -97,7 +124,7 @@ fun TaskCenterScreen(state: AppUiState, viewModel: AppViewModel, onBack: () -> U
                 )
                 Text(
                     text = "定时任务跟着网关前台服务跑：服务停掉或被系统回收后不再触发，重新打开网关即恢复。" +
-                        "执行记录见「运行日志」。",
+                        "执行记录见上方「运行日志」或「日志」页。",
                     style = MiuixTheme.textStyles.footnote1,
                     color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
                 )
@@ -106,7 +133,7 @@ fun TaskCenterScreen(state: AppUiState, viewModel: AppViewModel, onBack: () -> U
 
         if (state.providers.none { state.accountsOf(it.id).isNotEmpty() }) {
             item {
-                SectionCard(enterIndex = 2) {
+                SectionCard(enterIndex = 3) {
                     EmptyHint("还没有账号", "先去「供应商」页添加账号，再回来签到。")
                 }
             }
@@ -120,7 +147,7 @@ fun TaskCenterScreen(state: AppUiState, viewModel: AppViewModel, onBack: () -> U
             // 且额度/状态挤在一行左对齐，看不出哪项属于哪个账号。
             accounts.forEachIndexed { index, account ->
                 item(key = "${info.id}/${account.uid}") {
-                    SectionCard(enterIndex = 3 + index) {
+                    SectionCard(enterIndex = 4 + index) {
                         Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                             Text(
                                 text = account.nickname.ifEmpty { account.uid },
@@ -166,3 +193,105 @@ private fun nextRunText(at: Long?): String {
 
 private fun sameDay(a: Calendar, b: Calendar): Boolean =
     a.get(Calendar.YEAR) == b.get(Calendar.YEAR) && a.get(Calendar.DAY_OF_YEAR) == b.get(Calendar.DAY_OF_YEAR)
+
+/** 面板最多展示的条数：日志池留 1000 条，面板只给最近一段，免得越滚越长。 */
+private const val LOG_PANEL_LIMIT = 200
+
+/** 面板固定高度：高于一屏的一半就会把操作按钮顶出视野。 */
+private const val LOG_PANEL_HEIGHT_DP = 220
+
+/** 批量任务要跑几分钟，日志是边跑边写的，停在本页时按这个间隔轮询。 */
+private const val LOG_PANEL_REFRESH_MILLIS = 2_000L
+
+private val LOG_TIME_FORMAT = SimpleDateFormat("MM-dd HH:mm:ss", Locale.getDefault())
+
+/**
+ * 运行日志面板：固定高度、内部独立滚动、最新在上。
+ *
+ * 用 LazyColumn 而不是 Column：日志最多 200 条，普通 Column 会把它们全部组合出来，
+ * 每 2 秒一次刷新就是一次全量重组。
+ */
+@Composable
+private fun TaskLogPanel(operations: List<OperationEntry>, viewModel: AppViewModel) {
+    LaunchedEffect(Unit) {
+        viewModel.refreshOperations()
+        while (true) {
+            delay(LOG_PANEL_REFRESH_MILLIS)
+            viewModel.refreshOperations()
+        }
+    }
+    val entries = operations.take(LOG_PANEL_LIMIT)
+    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+            Text(
+                text = "最近 ${entries.size} 条",
+                style = MiuixTheme.textStyles.footnote1,
+                color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
+                modifier = Modifier.weight(1f),
+            )
+            Text(
+                text = "完整记录见「日志」页",
+                style = MiuixTheme.textStyles.footnote2,
+                color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
+            )
+        }
+        if (entries.isEmpty()) {
+            EmptyHint("暂无日志", "按上面的按钮或发起对话后，记录会出现在这里。")
+        } else {
+            LazyColumn(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(LOG_PANEL_HEIGHT_DP.dp)
+                    .clip(RoundedCornerShape(10.dp))
+                    .background(MiuixTheme.colorScheme.surfaceVariant),
+            ) {
+                itemsIndexed(entries, key = { _, entry -> entry.id }) { index, entry ->
+                    if (index > 0) {
+                        HorizontalDivider(modifier = Modifier.fillMaxWidth().padding(horizontal = 10.dp))
+                    }
+                    LogEntryLine(entry)
+                }
+            }
+        }
+    }
+}
+
+/** 一行日志：级别彩点 + 类别 + 时间在上，正文在下（正文放不下就截断，详情去「日志」页看）。 */
+@Composable
+private fun LogEntryLine(entry: OperationEntry) {
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 10.dp, vertical = 6.dp),
+        verticalArrangement = Arrangement.spacedBy(2.dp),
+    ) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Box(
+                Modifier
+                    .size(6.dp)
+                    .clip(CircleShape)
+                    .background(levelColor(entry.level)),
+            )
+            Spacer(Modifier.width(6.dp))
+            Text(
+                text = categoryLabel(entry.category),
+                style = MiuixTheme.textStyles.footnote2,
+                fontWeight = FontWeight.SemiBold,
+                color = levelColor(entry.level),
+            )
+            Spacer(Modifier.weight(1f))
+            Text(
+                text = LOG_TIME_FORMAT.format(Date(entry.atMillis)),
+                style = MiuixTheme.textStyles.footnote2,
+                color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
+            )
+        }
+        Text(
+            text = entry.message,
+            style = MiuixTheme.textStyles.footnote1,
+            maxLines = 2,
+            overflow = TextOverflow.Ellipsis,
+            modifier = Modifier.fillMaxWidth(),
+        )
+    }
+}

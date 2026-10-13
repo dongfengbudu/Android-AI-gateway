@@ -83,15 +83,6 @@ private fun levelOf(record: CallRecord): LogLevel = when (record.status) {
     CallStatus.SUCCESS -> LogLevel.INFO
 }
 
-private fun categoryLabel(category: String): String = when (category) {
-    KEY_CALL -> "调用"
-    OperationLog.CATEGORY_REQUEST -> "请求"
-    OperationLog.CATEGORY_LOGIN -> "登录"
-    else -> category
-}
-
-private const val KEY_CALL = "call"
-
 @Composable
 fun LogsScreen(state: AppUiState, viewModel: AppViewModel) {
     var category by rememberSaveable { mutableStateOf<String?>(null) }
@@ -325,14 +316,6 @@ private fun OperationRow(entry: OperationEntry, onClick: () -> Unit) {
             maxLines = 3,
         )
     }
-}
-
-/** 级别语义色：错误红随主题，警示橙/信息灰是固定语义色（Miuix 无 warning token）。 */
-@Composable
-private fun levelColor(level: LogLevel): Color = when (level) {
-    LogLevel.WARN -> WarnAmber
-    LogLevel.ERROR -> MiuixTheme.colorScheme.error
-    LogLevel.INFO -> MiuixTheme.colorScheme.onSurfaceVariantSummary
 }
 
 @OptIn(ExperimentalFoundationApi::class)

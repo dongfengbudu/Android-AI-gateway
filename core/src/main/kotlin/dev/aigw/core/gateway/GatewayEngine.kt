@@ -23,6 +23,7 @@ import dev.aigw.core.provider.RoutedModel
 import dev.aigw.core.provider.SmsLoginSupport
 import dev.aigw.core.provider.WebLoginSupport
 import dev.aigw.core.provider.WebLoginTicket
+import dev.aigw.core.provider.actionLabel
 import dev.aigw.core.provider.antigravity.AntigravityProvider
 import dev.aigw.core.provider.custom.CustomProvider
 import dev.aigw.core.provider.trae.TraeProvider
@@ -551,9 +552,38 @@ class GatewayEngine(
     ): ProviderActionResult {
         val provider = registry.get(providerId) ?: return ProviderActionResult.failure("未知供应商")
         val account = pool.account(providerId, uid) ?: return ProviderActionResult.failure("账号不存在")
-        val result = provider.performAction(account, action, payload)
+        val result = try {
+            provider.performAction(account, action, payload)
+        } catch (e: Exception) {
+            // 抛异常也要留一条，否则「一键完成成长任务」中途炸掉时日志里什么都没有。
+            logAction(provider, account, action, ProviderActionResult.failure(e.message ?: "执行异常"))
+            throw e
+        }
+        logAction(provider, account, action, result)
         if (result.ok) refreshCredits(providerId, uid)
         return result
+    }
+
+    /**
+     * 动作结果统一记到 task 类别。
+     *
+     * 记在引擎这一层，是因为任务中心按钮、供应商页按钮、整点排程都从这里过，各写各的必漏；
+     * [ProviderActionResult.unsupported] 属常态（如国际版没有签到），记了只会刷屏。
+     */
+    private fun logAction(
+        provider: Provider,
+        account: ProviderAccount,
+        action: String,
+        result: ProviderActionResult,
+    ) {
+        if (result.unsupported) return
+        val who = "${provider.displayName}/${account.nickname.ifBlank { account.uid.take(8) }}"
+        val text = "$who·${actionLabel(action)}：${result.message.ifBlank { if (result.ok) "完成" else "失败" }}"
+        if (result.ok) {
+            operationLog.info(OperationLog.CATEGORY_TASK, text)
+        } else {
+            operationLog.warn(OperationLog.CATEGORY_TASK, text)
+        }
     }
 
     /** 无参数动作的便捷重载（调用方不必依赖 JsonObject）。 */

@@ -221,14 +221,12 @@ class AutoTaskScheduler(private val engine: GatewayEngine) {
             if (!provider.enabled || ProviderCapability.TASKS !in provider.capabilities) continue
             for (account in engine.accounts(provider.id)) {
                 if (!account.usable) continue
-                val who = "${provider.displayName}/${account.nickname.ifBlank { account.uid.take(8) }}"
                 for (action in kind.actions) {
                     val result = runCatching { engine.performAction(provider.id, account.uid, action) }
                         .getOrElse { ProviderActionResult.failure(it.message ?: "执行异常") }
-                    // 供应商不支持该动作属常态（如国际版没有签到），不记日志、也不影响后续动作。
+                    // 供应商不支持该动作属常态（如国际版没有签到），不影响后续动作。
+                    // 逐账号结果由引擎统一记日志（task 类别），这里不再重复记。
                     if (result.unsupported) continue
-                    val outcome = if (result.ok) result.message.ifBlank { "完成" } else "失败·${result.message}"
-                    engine.operationLog.info(OperationLog.CATEGORY_REQUEST, "${kind.label}·$who：$outcome")
                     delay(ACCOUNT_GAP_MS)
                 }
             }

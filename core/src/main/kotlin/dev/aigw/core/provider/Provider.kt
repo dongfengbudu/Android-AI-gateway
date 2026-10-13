@@ -67,6 +67,16 @@ const val ACTION_BLACKCAT = "blackcat"
  */
 const val ACTION_AUTO_TASKS = "auto_tasks"
 
+/** 动作的中文名，供日志与界面提示共用；未知动作原样返回。 */
+fun actionLabel(action: String): String = when (action) {
+    ACTION_CHECKIN -> "签到"
+    ACTION_TASKS -> "任务领取"
+    ACTION_ACTIVITY -> "活跃上报"
+    ACTION_BLACKCAT -> "夜猫子"
+    ACTION_AUTO_TASKS -> "成长任务"
+    else -> action
+}
+
 /**
  * 一个额度包/账本条目。
  *
