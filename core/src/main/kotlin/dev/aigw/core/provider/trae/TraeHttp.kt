@@ -1,5 +1,6 @@
 package dev.aigw.core.provider.trae
 
+import dev.aigw.core.usage.TaskTrace
 import java.io.ByteArrayOutputStream
 import java.io.InputStream
 import java.net.HttpURLConnection
@@ -26,6 +27,7 @@ internal object TraeHttp {
         readTimeoutMs: Int,
         applyHeaders: (HttpURLConnection) -> Unit,
     ): HttpURLConnection {
+        TaskTrace.request("POST ${url.removePrefix("https://")} $body")
         val conn = (URL(url).openConnection() as HttpURLConnection).apply {
             requestMethod = "POST"
             doOutput = true
@@ -49,7 +51,9 @@ internal object TraeHttp {
         } catch (_: Exception) {
             conn.errorStream ?: return ""
         }
-        return stream.use { readLimited(it, limit) }
+        val text = stream.use { readLimited(it, limit) }
+        TaskTrace.response("${runCatching { conn.responseCode }.getOrDefault(0)} $text")
+        return text
     }
 
     private fun readLimited(input: InputStream, limit: Int): String {

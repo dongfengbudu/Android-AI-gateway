@@ -32,6 +32,8 @@ import dev.aigw.core.usage.CallLogStore
 import dev.aigw.core.usage.OperationLog
 import dev.aigw.core.usage.StorageAudit
 import dev.aigw.core.usage.StorageReport
+import dev.aigw.core.usage.TaskRunLog
+import dev.aigw.core.usage.TaskTrace
 import dev.aigw.core.usage.UsageStats
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.Executors
@@ -138,6 +140,9 @@ class GatewayEngine(
     val pool = AccountPool(store, nowMillis)
     val callLogStore = CallLogStore(store)
     val operationLog = OperationLog(store, nowMillis = nowMillis)
+
+    /** 任务执行的实时流水（请求/响应/进度），只在内存里，供任务中心面板轮询。 */
+    val taskRunLog = TaskRunLog(nowMillis = nowMillis)
     val registry = ProviderRegistry()
 
     val sanitizer = dev.aigw.core.security.RequestSanitizer(nowMillis)
@@ -552,14 +557,23 @@ class GatewayEngine(
     ): ProviderActionResult {
         val provider = registry.get(providerId) ?: return ProviderActionResult.failure("未知供应商")
         val account = pool.account(providerId, uid) ?: return ProviderActionResult.failure("账号不存在")
+        val label =
+            "${provider.displayName}/${account.nickname.ifBlank { account.uid.take(8) }} · ${actionLabel(action)}"
+        taskRunLog.start(label)
         val result = try {
-            provider.performAction(account, action, payload)
+            // 采集口只在这一段生效：provider 内部的每次请求/响应都会进执行流水。
+            TaskTrace.collect({ kind, text -> taskRunLog.add(kind, text) }) {
+                provider.performAction(account, action, payload)
+            }
         } catch (e: Exception) {
             // 抛异常也要留一条，否则「一键完成成长任务」中途炸掉时日志里什么都没有。
-            logAction(provider, account, action, ProviderActionResult.failure(e.message ?: "执行异常"))
+            val failure = ProviderActionResult.failure(e.message ?: "执行异常")
+            logAction(provider, account, action, failure)
+            taskRunLog.finish(failure.message)
             throw e
         }
         logAction(provider, account, action, result)
+        taskRunLog.finish(result.message.ifBlank { if (result.ok) "完成" else "失败" })
         if (result.ok) refreshCredits(providerId, uid)
         return result
     }

@@ -1,20 +1,25 @@
 # 进度
 
 ## 当前状态
-任务中心运行日志（2026-10-13）：
-- 按钮动作此前一条日志都不写：`AppViewModel` 的四个批量入口只把结果写进 `notice`（提示条），
-  而整点排程是写日志的，于是「手动按按钮没日志、定时有日志」。现四个入口各记一条触发日志，
-  「刷新全部额度」另记一条汇总。
-- 动作结果改在 `GatewayEngine.performAction` 统一记日志（新增 `OperationLog.CATEGORY_TASK`，界面显示「任务」）：
-  手动按钮、供应商页按钮、整点排程都从这一个口过，不会再漏；`unsupported` 不记（国际版跳过属常态）；
+任务中心执行日志（2026-10-13）：
+- 面板要的是「成长任务跑起来时的请求与响应原文 + 当前跑到哪个账号」，操作日志（谁做了什么、结果如何）
+  不够用，故新增第三套日志：`usage/TaskRunLog.kt`（内存环形缓冲，400 条、单条 600 字、每轮清空、不落盘）
+  与 `usage/TaskTrace.kt`（ThreadLocal 采集口）。
+- 采集口只在 `GatewayEngine.performAction` 的 `TaskTrace.collect { ... }` 段内生效：动作在调用方线程同步跑完，
+  并发的代理请求不会混进来；不在执行动作时 provider 侧埋点是空操作，无需判断。
+- 埋点落在各 provider 的 HTTP 出口（一处覆盖全部动作请求）：`CodeBuddyProvider.open`（请求）+ `postJson` /
+  `getJson` / `sendChatOnce`（响应，SSE 不聚合正文只报状态码）、`LoomyHttp.httpJson`、`TraeHttp.post` / `readBody`；
+  进度埋在 `CodeBuddyProvider.autoTasks` 的逐项循环（形如「动作 3/17：chat_5 · 每日对话」）。
+- 进面板前一律过 `redactSecrets`：请求/响应原文里的 token / secret / api_key 字段值抹成 `***`，
+  截图分享不会带走凭证。
+- 任务中心面板改绑 `TaskRunSnapshot`：标题行显示「执行中／最近一次：供应商/账号 · 动作」，行首标记区分
+  进度/请求/响应/结果，报文用等宽字体、每行截断 3 行（结果 6 行）；固定 220dp 独立滚动、最新在上、
+  最多 200 条，停在本页每 2 秒轮询（`AppViewModel.refreshLogPanel` 一次取回操作日志与执行流水）。
+- 上一版的「运行日志面板」（绑 `OperationLog`）已被本面板取代；操作日志仍在「日志」页按类别筛选，
+  动作结果照旧记 `CATEGORY_TASK`（界面显示「任务」），`unsupported` 不记（国际版跳过属常态）；
   抛异常也补一条再原样抛出，避免「一键完成」中途失败时日志里什么都没有。
-  `GatewayService.runKind` 原来的逐账号日志随之删除（同一次执行只留一条）。
-- 新增 `AppViewModel.refreshOperations()`：只读操作日志，不枚举调用记录（供面板轮询）。
-- 任务中心批量操作下方新增「运行日志」面板：固定 220dp、内部独立滚动、最新在上、最多 200 条、
-  空态提示，停在本页每 2 秒轮询一次；`LogsScreen` 的 `categoryLabel` / `levelColor` / `KEY_CALL`
-  上移到 `Components.kt` 供两处共用。
 - 版本：versionCode 104→105，versionName 1.1.7→1.1.8。
-- 验证：本容器无 JDK/Gradle，仅做静态交叉核对；面板观感与实时刷新需装机确认。
+- 验证：本容器无 JDK/Gradle，仅做静态交叉核对；面板观感与流水实时刷新需装机确认。
 
 评审修复（2026-10-13，对 `d51ba75..HEAD` 的 code-review 结论）：
 - 国际版门控改标 `unsupported`：`CodeBuddyProvider.performAction` 对国际版账号的 5 个动作原返回 `failure`，

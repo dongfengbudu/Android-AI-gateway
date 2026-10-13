@@ -88,6 +88,8 @@
 | `provider/loomy/` | 讯飞 Loomy（HTTP 200 + 业务码陷阱）| |
 | `provider/custom/` | 任意 OpenAI 兼容中转站 | 一个 key = 一个账号 |
 | `usage/OperationLog.kt` | 统一操作日志：请求/登录/任务/未来功能的任意类别共用一个环形缓冲（节流落盘）；旧 `logs/requests.json`、`logs/login.json` 首次启动自动迁入并清孤儿键 | 新功能记日志直接 `operationLog.info(类别, 文案)`，界面自动出现新筛选；内置类别 `CATEGORY_REQUEST` / `CATEGORY_LOGIN` / `CATEGORY_TASK`（`Components.kt` 的 `categoryLabel` 给中文名） |
+| `usage/TaskRunLog.kt` | 任务执行流水：动作发出的请求、上游响应、跑到哪一步；内存环形缓冲（400 条、单条 600 字、每轮清空、不落盘），进面板前过 `redactSecrets` | 一次成长任务上百条请求原文，落盘既撑存储又会把 `OperationLog` 的环形缓冲挤爆；要的是「看着它跑」，重启即清 |
+| `usage/TaskTrace.kt` | 执行期间的采集口：`ThreadLocal` 传递 sink，`collect { ... }` 包住 `provider.performAction`；不在采集段内 `emit` 是空操作 | 动作在调用方线程同步跑完，故用线程局部变量隔离并发的代理请求 |
 | `usage/CallLogStore.kt` | 调用记录（含请求/响应原文）与用量聚合（累计/每日），容量淘汰 + 保留天数清理 | 单记录单独占一个存储键，避免大 JSON 整体重加密 |
 | `store/KeyValueStore.kt` | 存储抽象（App 侧用 EncryptedSharedPreferences 实现） | |
 

@@ -31,6 +31,7 @@ import dev.aigw.core.provider.ProviderTaskListView
 import dev.aigw.core.provider.QuotaPack
 import dev.aigw.core.provider.StreamingChatCall
 import dev.aigw.core.provider.UpstreamError
+import dev.aigw.core.usage.TaskTrace
 import dev.aigw.core.util.arrayOrNull
 import dev.aigw.core.util.objOrNull
 import dev.aigw.core.util.str
@@ -824,7 +825,10 @@ class CodeBuddyProvider(
                 chatHeaders(credential),
             )
             try {
-                if (conn.responseCode !in 200..299) return false
+                val status = conn.responseCode
+                // 对话是流式 SSE，正文不聚合，只报状态码（发出去什么已由 open 记下）。
+                TaskTrace.response("$status 流式对话")
+                if (status !in 200..299) return false
                 conn.inputStream?.use { input ->
                     val buffer = ByteArray(8192)
                     var total = 0L
@@ -1245,7 +1249,8 @@ class CodeBuddyProvider(
         val code = payload.firstString("task_code").trim()
         if (code.isEmpty()) {
             val lines = ArrayList<String>()
-            for (action in autoActions) {
+            for ((index, action) in autoActions.withIndex()) {
+                TaskTrace.progress("动作 ${index + 1}/${autoActions.size}：${action.code} · ${action.desc}")
                 lines.add("${action.code}：${runAutoAction(credential, action)}")
                 Thread.sleep(REPORT_GAP_MS)
             }
@@ -1253,6 +1258,7 @@ class CodeBuddyProvider(
         }
         val action = autoActions.firstOrNull { it.code == code }
             ?: return ProviderActionResult.failure("「$code」没有登记自动化动作，需要在客户端内完成")
+        TaskTrace.progress("动作：${action.code} · ${action.desc}")
         return ProviderActionResult.success("$code：${runAutoAction(credential, action)}")
     }
 
@@ -1998,6 +2004,8 @@ class CodeBuddyProvider(
         headers: Map<String, String>,
         method: String = if (body == null) "GET" else "POST",
     ): HttpURLConnection {
+        // 这是本供应商所有出站请求的唯一出口，请求流水记在这里才不会漏（动作执行之外是空操作）。
+        TaskTrace.request("$method ${url.removePrefix("https://")} ${body.orEmpty()}")
         val conn = (URL(url).openConnection() as HttpURLConnection).apply {
             requestMethod = method
             connectTimeout = CONNECT_TIMEOUT_MS
@@ -2025,6 +2033,7 @@ class CodeBuddyProvider(
         return try {
             val status = conn.responseCode
             val text = if (status in 200..299) readLimited(conn.inputStream) else readLimited(conn.errorStream)
+            TaskTrace.response("$status $text")
             status to text
         } finally {
             conn.disconnect()
@@ -2036,6 +2045,7 @@ class CodeBuddyProvider(
         return try {
             val status = conn.responseCode
             val text = if (status in 200..299) readLimited(conn.inputStream) else readLimited(conn.errorStream)
+            TaskTrace.response("$status $text")
             status to text
         } finally {
             conn.disconnect()

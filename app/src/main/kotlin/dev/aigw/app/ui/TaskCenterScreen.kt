@@ -2,29 +2,30 @@ package dev.aigw.app.ui
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import dev.aigw.app.data.AutoTaskKind
-import dev.aigw.core.usage.OperationEntry
+import dev.aigw.core.usage.TaskRunEntry
+import dev.aigw.core.usage.TaskRunKind
+import dev.aigw.core.usage.TaskRunSnapshot
 import kotlinx.coroutines.delay
 import top.yukonga.miuix.kmp.basic.Button
 import top.yukonga.miuix.kmp.basic.ButtonDefaults
@@ -94,10 +95,10 @@ fun TaskCenterScreen(state: AppUiState, viewModel: AppViewModel, onBack: () -> U
             }
         }
 
-        item { SmallTitle("运行日志") }
+        item { SmallTitle("执行日志") }
         item {
             SectionCard(enterIndex = 1) {
-                TaskLogPanel(state.operations, viewModel)
+                TaskRunPanel(state.taskRun, viewModel)
             }
         }
 
@@ -124,7 +125,7 @@ fun TaskCenterScreen(state: AppUiState, viewModel: AppViewModel, onBack: () -> U
                 )
                 Text(
                     text = "定时任务跟着网关前台服务跑：服务停掉或被系统回收后不再触发，重新打开网关即恢复。" +
-                        "执行记录见上方「运行日志」或「日志」页。",
+                        "执行记录见上方「执行日志」或「日志」页。",
                     style = MiuixTheme.textStyles.footnote1,
                     color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
                 )
@@ -194,49 +195,79 @@ private fun nextRunText(at: Long?): String {
 private fun sameDay(a: Calendar, b: Calendar): Boolean =
     a.get(Calendar.YEAR) == b.get(Calendar.YEAR) && a.get(Calendar.DAY_OF_YEAR) == b.get(Calendar.DAY_OF_YEAR)
 
-/** 面板最多展示的条数：日志池留 1000 条，面板只给最近一段，免得越滚越长。 */
+/** 面板最多展示的条数：一轮「一键完成成长任务」就有上百条请求，只给最近一段。 */
 private const val LOG_PANEL_LIMIT = 200
 
 /** 面板固定高度：高于一屏的一半就会把操作按钮顶出视野。 */
 private const val LOG_PANEL_HEIGHT_DP = 220
 
-/** 批量任务要跑几分钟，日志是边跑边写的，停在本页时按这个间隔轮询。 */
+/** 批量任务要跑几分钟，流水是边跑边写的，停在本页时按这个间隔轮询。 */
 private const val LOG_PANEL_REFRESH_MILLIS = 2_000L
 
 private val LOG_TIME_FORMAT = SimpleDateFormat("MM-dd HH:mm:ss", Locale.getDefault())
 
+/** 行首标记：区分「走到哪一步」「发出去的」「收回来的」「最后结果」。 */
+private fun kindMark(kind: TaskRunKind): String = when (kind) {
+    TaskRunKind.PROGRESS -> "▸"
+    TaskRunKind.REQUEST -> "→"
+    TaskRunKind.RESPONSE -> "←"
+    TaskRunKind.RESULT -> "="
+}
+
+private fun kindName(kind: TaskRunKind): String = when (kind) {
+    TaskRunKind.PROGRESS -> "进度"
+    TaskRunKind.REQUEST -> "请求"
+    TaskRunKind.RESPONSE -> "响应"
+    TaskRunKind.RESULT -> "结果"
+}
+
+@Composable
+private fun kindColor(kind: TaskRunKind): Color = when (kind) {
+    TaskRunKind.PROGRESS, TaskRunKind.RESULT -> MiuixTheme.colorScheme.primary
+    TaskRunKind.REQUEST -> MiuixTheme.colorScheme.onSurfaceVariantSummary
+    TaskRunKind.RESPONSE -> MiuixTheme.colorScheme.onSurface
+}
+
 /**
- * 运行日志面板：固定高度、内部独立滚动、最新在上。
+ * 执行日志面板：本次（或最近一次）动作执行的实时流水。
  *
- * 用 LazyColumn 而不是 Column：日志最多 200 条，普通 Column 会把它们全部组合出来，
- * 每 2 秒一次刷新就是一次全量重组。
+ * 展示的是 provider 内部真实发出的请求与上游响应，外加「正在跑哪个账号、哪一步」，
+ * 用固定高度的 LazyColumn 独立滚动：一轮跑几百条，跟整页一起滚就找不着北了。
  */
 @Composable
-private fun TaskLogPanel(operations: List<OperationEntry>, viewModel: AppViewModel) {
+private fun TaskRunPanel(run: TaskRunSnapshot, viewModel: AppViewModel) {
     LaunchedEffect(Unit) {
-        viewModel.refreshOperations()
+        viewModel.refreshLogPanel()
         while (true) {
             delay(LOG_PANEL_REFRESH_MILLIS)
-            viewModel.refreshOperations()
+            viewModel.refreshLogPanel()
         }
     }
-    val entries = operations.take(LOG_PANEL_LIMIT)
+    val entries = run.entries.take(LOG_PANEL_LIMIT)
     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
         Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
             Text(
-                text = "最近 ${entries.size} 条",
+                text = when {
+                    run.label.isEmpty() -> "还没有执行记录"
+                    run.running -> "执行中：${run.label}"
+                    else -> "最近一次：${run.label}"
+                },
                 style = MiuixTheme.textStyles.footnote1,
-                color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
+                color = if (run.running) {
+                    MiuixTheme.colorScheme.primary
+                } else {
+                    MiuixTheme.colorScheme.onSurfaceVariantSummary
+                },
                 modifier = Modifier.weight(1f),
             )
             Text(
-                text = "完整记录见「日志」页",
+                text = "${entries.size} 条",
                 style = MiuixTheme.textStyles.footnote2,
                 color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
             )
         }
         if (entries.isEmpty()) {
-            EmptyHint("暂无日志", "按上面的按钮或发起对话后，记录会出现在这里。")
+            EmptyHint("暂无执行记录", "点上面的按钮后，这里会实时显示发往上游的请求与响应。")
         } else {
             LazyColumn(
                 modifier = Modifier
@@ -249,16 +280,17 @@ private fun TaskLogPanel(operations: List<OperationEntry>, viewModel: AppViewMod
                     if (index > 0) {
                         HorizontalDivider(modifier = Modifier.fillMaxWidth().padding(horizontal = 10.dp))
                     }
-                    LogEntryLine(entry)
+                    TaskRunLine(entry)
                 }
             }
         }
     }
 }
 
-/** 一行日志：级别彩点 + 类别 + 时间在上，正文在下（正文放不下就截断，详情去「日志」页看）。 */
+/** 一行流水：标记 + 时间在上，正文在下；报文用等宽字体，长内容截断。 */
 @Composable
-private fun LogEntryLine(entry: OperationEntry) {
+private fun TaskRunLine(entry: TaskRunEntry) {
+    val payload = entry.kind == TaskRunKind.REQUEST || entry.kind == TaskRunKind.RESPONSE
     Column(
         modifier = Modifier
             .fillMaxWidth()
@@ -266,18 +298,17 @@ private fun LogEntryLine(entry: OperationEntry) {
         verticalArrangement = Arrangement.spacedBy(2.dp),
     ) {
         Row(verticalAlignment = Alignment.CenterVertically) {
-            Box(
-                Modifier
-                    .size(6.dp)
-                    .clip(CircleShape)
-                    .background(levelColor(entry.level)),
+            Text(
+                text = kindMark(entry.kind),
+                style = MiuixTheme.textStyles.footnote2,
+                fontWeight = FontWeight.SemiBold,
+                color = kindColor(entry.kind),
             )
             Spacer(Modifier.width(6.dp))
             Text(
-                text = categoryLabel(entry.category),
+                text = kindName(entry.kind),
                 style = MiuixTheme.textStyles.footnote2,
-                fontWeight = FontWeight.SemiBold,
-                color = levelColor(entry.level),
+                color = kindColor(entry.kind),
             )
             Spacer(Modifier.weight(1f))
             Text(
@@ -287,9 +318,13 @@ private fun LogEntryLine(entry: OperationEntry) {
             )
         }
         Text(
-            text = entry.message,
-            style = MiuixTheme.textStyles.footnote1,
-            maxLines = 2,
+            text = entry.text,
+            style = if (payload) {
+                MiuixTheme.textStyles.footnote2.copy(fontFamily = FontFamily.Monospace)
+            } else {
+                MiuixTheme.textStyles.footnote1
+            },
+            maxLines = if (entry.kind == TaskRunKind.RESULT) 6 else 3,
             overflow = TextOverflow.Ellipsis,
             modifier = Modifier.fillMaxWidth(),
         )

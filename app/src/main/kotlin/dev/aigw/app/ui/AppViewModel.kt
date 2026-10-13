@@ -51,6 +51,7 @@ import dev.aigw.core.usage.OperationLog
 import dev.aigw.core.usage.OperationEntry
 import dev.aigw.core.usage.StorageAudit
 import dev.aigw.core.usage.StorageReport
+import dev.aigw.core.usage.TaskRunSnapshot
 import dev.aigw.core.usage.UsageStats
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
@@ -227,6 +228,8 @@ data class AppUiState(
     val taskLists: Map<String, dev.aigw.core.provider.ProviderTaskListView> = emptyMap(),
     /** 统一操作日志（请求、登录、以及未来各功能自己的类别）。 */
     val operations: List<OperationEntry> = emptyList(),
+    /** 任务执行的实时流水（请求/响应/进度），只存在于内存。 */
+    val taskRun: TaskRunSnapshot = TaskRunSnapshot.EMPTY,
     val settings: GatewaySettings = GatewaySettings(),
     /**
      * 非空表示需要打开内嵌登录页（URL）。
@@ -446,14 +449,16 @@ class AppViewModel(
     }
 
     /**
-     * 只刷新操作日志。
+     * 只刷新日志面板要的数据：统一操作日志 + 任务执行流水。
      *
-     * 供任务中心的日志面板轮询用：那里每 2 秒刷一次，没必要顺带读调用记录（体量大）。
+     * 供任务中心的日志面板轮询：那里每 2 秒刷一次，没必要顺带读调用记录（体量大）。
      */
-    fun refreshOperations() {
+    fun refreshLogPanel() {
         viewModelScope.launch {
-            val operations = withContext(Dispatchers.IO) { engine.operationLog.entries() }
-            _state.value = _state.value.copy(operations = operations)
+            val (operations, taskRun) = withContext(Dispatchers.IO) {
+                engine.operationLog.entries() to engine.taskRunLog.snapshot()
+            }
+            _state.value = _state.value.copy(operations = operations, taskRun = taskRun)
         }
     }
 

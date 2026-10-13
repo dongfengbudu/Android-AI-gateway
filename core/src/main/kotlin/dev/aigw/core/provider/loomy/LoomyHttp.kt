@@ -1,5 +1,6 @@
 package dev.aigw.core.provider.loomy
 
+import dev.aigw.core.usage.TaskTrace
 import java.io.ByteArrayOutputStream
 import java.io.InputStream
 import java.net.HttpURLConnection
@@ -80,6 +81,7 @@ internal fun httpJson(
     connectTimeoutMs: Int = LoomyHttp.CONNECT_TIMEOUT_MS,
     readTimeoutMs: Int = LoomyHttp.READ_TIMEOUT_MS,
 ): Pair<Int, String> {
+    TaskTrace.request("$method ${url.removePrefix("https://")} ${body.orEmpty()}")
     val conn = try {
         LoomyHttp.open(url, method, headers, body, connectTimeoutMs, readTimeoutMs)
     } catch (e: Exception) {
@@ -87,7 +89,9 @@ internal fun httpJson(
     }
     return try {
         val status = conn.responseCode
-        status to LoomyHttp.readBody(conn)
+        val text = LoomyHttp.readBody(conn)
+        TaskTrace.response("$status $text")
+        status to text
     } catch (e: Exception) {
         throw LoomyApiException(0, LoomyErrorKind.NETWORK, e.message.orEmpty())
     } finally {
