@@ -34,8 +34,8 @@ android {
         applicationId = "dev.aigw.app"
         minSdk = 26
         targetSdk = 36
-        versionCode = 105
-        versionName = "1.1.8"
+        versionCode = 106
+        versionName = "1.1.9"
     }
 
     buildFeatures {
@@ -130,6 +130,13 @@ dependencies {
     // 单构件 miuix-android（basic/theme/utils/extra 组件），extended 图标在 miuix-icons。
     implementation("top.yukonga.miuix.kmp:miuix-android:0.8.8")
     implementation("top.yukonga.miuix.kmp:miuix-icons-android:0.8.8")
+
+    // 液态玻璃渲染原语（AGSL 边缘折射/色散 + RenderEffect 背景模糊 + 高光/内阴影），minSdk 21。
+    // 取 1.0.6 而不是 2.x：2.x 编译于 Compose 1.12 + Kotlin 2.4（元数据 2.4.0，本仓库 Kotlin 2.2.21
+    // 读不了）；1.0.6 编译于 Compose 1.10.3 + Kotlin 2.3.10，与 miuix 0.8.8 同一代工具链，依赖图不变。
+    implementation("io.github.kyant0:backdrop:1.0.6")
+    // 连续曲率形状（iOS 式 squircle 边）。backdrop 与 miuix 都只在 runtime 域带它，直接引用需显式声明。
+    implementation("io.github.kyant0:shapes:1.2.0")
     implementation("androidx.security:security-crypto:1.1.0-alpha06")
 
     debugImplementation("androidx.compose.ui:ui-tooling:1.10.5")

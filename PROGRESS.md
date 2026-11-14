@@ -1,6 +1,28 @@
 # 进度
 
 ## 当前状态
+UI 迁移至液态玻璃（2026-11-14）：
+- 渲染原语选 Kyant0 Backdrop 1.0.6（GitHub 4.6k star：AGSL 边缘折射/色散 + RenderEffect 背景模糊 +
+  高光/投影/内阴影，minSdk 21）。版本必须钉在 1.0.6：2.x 编译于 Compose 1.12 + Kotlin 2.4（元数据 2.4.0，
+  本仓库 Kotlin 2.2.21 读不了），而 1.0.6 编译于 Compose 1.10.3 + Kotlin 2.3.10，与 miuix 0.8.8 同代，
+  依赖图不变；连续曲率形状库 shapes 1.2.0 miuix 自己就在用（runtime 域），这里要显式声明成编译期依赖。
+- 新增 `ui/glass/`：`Glass.kt`（质感档位 + 玻璃上下文 + glassCard/glassBar/glassPill/glassWell 四类表面，
+  光学参数按表面类型集中在 `materialOf` 一处）、`GlassField.kt`（按强调色色相展开的极光氛围场，
+  实现库的 `Backdrop` 接口，让每块玻璃按屏幕坐标只采自己那一片）。
+- 接入点只有三处（其余全走已有共享容器）：MainActivity 根层铺氛围场 + Scaffold 底色转透明 +
+  底栏改悬浮玻璃胶囊（采样页面内容层）；PageScaffold 把 LazyColumn 录成内容层给顶栏采；
+  SectionCard/GroupCard 底色转透明、材质画在背面。另外 StatusChip / ChoiceChip / AddressTile /
+  外观页 PresetChip 换成玻璃凹槽与胶囊。
+- 外观主题页新增「玻璃质感」三档单选（平面 / 玻璃 / 清透，默认玻璃）+ 能力说明 + 自带玻璃上下文的实时样张；
+  偏好走 AppearanceStore（`settings/appearance.glassFinish`），「重置默认」一并恢复。
+- `AiGatewayTheme` 新增 `glassFinish` 参数：玻璃档下 surfaceContainer* / surfaceVariant / dividerLine
+  降不透明度（否则卡内 miuix 子控件会在透底玻璃上显出一块块实心面板）；文字类 token 不动。
+- 降级与边界：背景模糊需 Android 12+、边缘折射需 13+，低版本由库内部降级，调用侧不写版本分支；
+  弹窗在独立 Window 里采不到主界面内容层，保持 miuix 原样；选平面档时所有 `glass*` 直接返回原
+  Modifier，整页回到现在的 HyperOS 观感（给低端设备留着）。
+- 版本：versionCode 105→106，versionName 1.1.8→1.1.9。
+- 验证：本容器无 JDK/Gradle，仅做静态交叉核对（逐个 API 对照已下载的 backdrop 1.0.6 / miuix 0.8.8 源码），
+  编译结果以 CI 为准，玻璃观感需装机确认。
 任务中心执行日志（2026-10-13）：
 - 面板要的是「成长任务跑起来时的请求与响应原文 + 当前跑到哪个账号」，操作日志（谁做了什么、结果如何）
   不够用，故新增第三套日志：`usage/TaskRunLog.kt`（内存环形缓冲，400 条、单条 600 字、每轮清空、不落盘）

@@ -20,6 +20,7 @@ import androidx.compose.foundation.layout.consumeWindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
@@ -30,6 +31,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.ViewModel
@@ -51,7 +53,14 @@ import top.yukonga.miuix.kmp.icon.extended.Recent
 import top.yukonga.miuix.kmp.icon.extended.Settings
 import top.yukonga.miuix.kmp.theme.MiuixTheme
 import top.yukonga.miuix.kmp.extra.WindowDialog
+import com.kyant.backdrop.Backdrop
+import com.kyant.backdrop.backdrops.layerBackdrop
+import com.kyant.backdrop.backdrops.rememberLayerBackdrop
 import dev.aigw.app.service.GatewayTileService
+import dev.aigw.app.ui.glass.AmbientField
+import dev.aigw.app.ui.glass.LocalGlassContext
+import dev.aigw.app.ui.glass.glassBar
+import dev.aigw.app.ui.glass.glassEnabled
 import dev.aigw.app.ui.pushPopSpec
 import dev.aigw.app.ui.tabContentSpec
 import dev.aigw.app.ui.AppUiState
@@ -137,6 +146,7 @@ class MainActivity : ComponentActivity() {
                 accent = ThemeAccent(state.accentHue),
                 dynamicColor = state.dynamicColor,
                 backgroundTone = state.backgroundTone,
+                glassFinish = state.glassFinish,
             ) {
                 AppRoot(vm, state)
             }
@@ -200,34 +210,35 @@ private fun AppRoot(viewModel: AppViewModel, state: AppUiState) {
         }
     }
 
-    Scaffold(
-        containerColor = MiuixTheme.colorScheme.background,
-        snackbarHost = { SnackbarHost(snackbarHostState) },
-        bottomBar = {
-            NavigationBar {
-                Tab.entries.forEach { item ->
-                    NavigationBarItem(
-                        selected = subPage == null && tab == item,
-                        onClick = {
-                            subPage = null
-                            tab = item
-                        },
-                        icon = item.icon,
-                        label = item.label,
-                    )
-                }
-            }
-        },
-    ) { insets ->
-        // 外层 Scaffold 的 bottom padding 已含 bottomBar（含导航栏 inset）：把它用到内容上，
-        // 并 consumeWindowInsets 消费掉，否则内层页面自己只补了导航栏 inset，
-        // 差值（bottomBar 高度）正好把列表尾部挡在底栏下面（每页都拉不到底）。
-        Box(
-            Modifier
-                .fillMaxSize()
-                .padding(bottom = insets.calculateBottomPadding())
-                .consumeWindowInsets(PaddingValues(bottom = insets.calculateBottomPadding())),
-        ) {
+    val glass = glassEnabled()
+    // 底栏玻璃要采样页面内容：内容层录进 contentBackdrop，悬浮底栏取自己那一片
+    val contentBackdrop = rememberLayerBackdrop()
+
+    Box(Modifier.fillMaxSize()) {
+        // 玻璃档：氛围场铺到最底层，Scaffold 转透明，玻璃表面才有可折射的内容
+        if (glass) AmbientField(LocalGlassContext.current.field, Modifier.fillMaxSize())
+
+        Scaffold(
+            containerColor = if (glass) Color.Transparent else MiuixTheme.colorScheme.background,
+            snackbarHost = { SnackbarHost(snackbarHostState) },
+            bottomBar = {
+                TabBar(
+                    source = contentBackdrop,
+                    selected = { subPage == null && tab == it },
+                    onSelect = {
+                        subPage = null
+                        tab = it
+                    },
+                )
+            },
+        ) { insets ->
+            Box(
+                Modifier
+                    .fillMaxSize()
+                    .padding(bottom = insets.calculateBottomPadding())
+                    .consumeWindowInsets(PaddingValues(bottom = insets.calculateBottomPadding()))
+                    .then(if (glass) Modifier.layerBackdrop(contentBackdrop) else Modifier),
+            ) {
             // 二级页推拉过渡：推入从右滑入，返回向右滑出
             AnimatedContent(
                 targetState = subPage,
@@ -288,6 +299,7 @@ private fun AppRoot(viewModel: AppViewModel, state: AppUiState) {
                     onSubPage = { subPage = it },
                 )
                 }
+                }
             }
         }
     }
@@ -311,6 +323,46 @@ private fun AppRoot(viewModel: AppViewModel, state: AppUiState) {
                 viewModel.dismissUpdate()
             },
         )
+    }
+}
+
+/**
+ * 底部导航。平面档保持 miuix 通栏样式（自带导航栏 inset）；玻璃档改成悬浮胶囊，
+ * 采样页面内容层，inset 改由外层补，胶囊才能真的浮在系统导航条上方。
+ */
+@Composable
+private fun TabBar(
+    source: Backdrop,
+    selected: (Tab) -> Boolean,
+    onSelect: (Tab) -> Unit,
+) {
+    val glass = glassEnabled()
+    Box(
+        Modifier
+            .fillMaxWidth()
+            .then(
+                if (glass) {
+                    Modifier.navigationBarsPadding().padding(horizontal = 12.dp).padding(bottom = 10.dp)
+                } else {
+                    Modifier
+                },
+            ),
+    ) {
+        NavigationBar(
+            modifier = if (glass) Modifier.glassBar(source, pill = true) else Modifier,
+            color = if (glass) Color.Transparent else MiuixTheme.colorScheme.surface,
+            showDivider = !glass,
+            defaultWindowInsetsPadding = !glass,
+        ) {
+            Tab.entries.forEach { item ->
+                NavigationBarItem(
+                    selected = selected(item),
+                    onClick = { onSelect(item) },
+                    icon = item.icon,
+                    label = item.label,
+                )
+            }
+        }
     }
 }
 

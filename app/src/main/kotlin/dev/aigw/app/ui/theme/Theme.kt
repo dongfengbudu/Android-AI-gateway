@@ -6,6 +6,10 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.toArgb
+import dev.aigw.app.ui.glass.GlassFinish
+import dev.aigw.app.ui.glass.GlassScope
+import dev.aigw.app.ui.glass.defaultGlassFinish
+import dev.aigw.app.ui.glass.rememberGlassContext
 import top.yukonga.miuix.kmp.theme.ColorSchemeMode
 import top.yukonga.miuix.kmp.theme.Colors
 import top.yukonga.miuix.kmp.theme.MiuixTheme
@@ -129,12 +133,27 @@ fun themeBackgroundColor(accent: ThemeAccent, dark: Boolean, tone: BackgroundTon
 }
 
 /**
- * 应用主题（深模块：调用方只给「模式 + 强调色调」，色阶展开全在内部）。
+ * 玻璃档位下给控件层用的方案：把 surface 系列改成半透明。
+ *
+ * 卡片本身已经改画玻璃，但卡内的开关轨道、下拉栏、进位条这类 miuix 子控件仍拿 surfaceContainer*
+ * 做实心底；不降不透明度，它们会在一块透底的玻璃上显出一块块实心面板。文字类 token（on*）一律不动。
+ */
+private fun Colors.asGlassScheme(dark: Boolean): Colors = copy(
+    surfaceContainer = surfaceContainer.copy(alpha = if (dark) 0.52f else 0.62f),
+    surfaceContainerHigh = surfaceContainerHigh.copy(alpha = if (dark) 0.55f else 0.66f),
+    surfaceContainerHighest = surfaceContainerHighest.copy(alpha = if (dark) 0.60f else 0.72f),
+    surfaceVariant = surfaceVariant.copy(alpha = if (dark) 0.48f else 0.60f),
+    dividerLine = dividerLine.copy(alpha = if (dark) 0.45f else 0.55f),
+)
+
+/**
+ * 应用主题（深模块：调用方只给「模式 + 强调色调 + 质感」，色阶与材质展开全在内部）。
  *
  * @param themeMode 明暗模式（跟随系统 / 深色 / 浅色）。
  * @param accent 强调色调；换色相即整页换色，具体色值由内部调色板生成。
  * @param dynamicColor 动态取色（Android 12+）；开启时以 [accent] 为种子覆盖自定义调色板。
  * @param backgroundTone 页面底色档位（同色相下改染色浓度）。
+ * @param glassFinish 质感档位；非平面时提供玻璃上下文（氛围场 + 材质）并降 surface 不透明度。
  */
 @Composable
 fun AiGatewayTheme(
@@ -142,9 +161,11 @@ fun AiGatewayTheme(
     accent: ThemeAccent = defaultThemeAccent,
     dynamicColor: Boolean = false,
     backgroundTone: BackgroundTone = BackgroundTone.Theme,
+    glassFinish: GlassFinish = defaultGlassFinish,
     content: @Composable () -> Unit,
 ) {
     val dark = isDarkTheme(themeMode)
+    val glass = glassFinish != GlassFinish.Flat
     val colorSchemeMode = when (themeMode) {
         ThemeMode.System -> if (dynamicColor) ColorSchemeMode.MonetSystem else ColorSchemeMode.System
         ThemeMode.Light -> if (dynamicColor) ColorSchemeMode.MonetLight else ColorSchemeMode.Light
@@ -157,29 +178,42 @@ fun AiGatewayTheme(
             ThemeController(colorSchemeMode, keyColor = hueTone(accent.normalizedHue, accent.normalizedChroma, 0.5f))
         }
         MiuixTheme(controller = controller) {
-            if (backgroundTone != BackgroundTone.Theme) {
-                // 动态取色下只覆写页面底色：嵌套一层 MiuixTheme 做局部改色（theme.md 认可的用法）
-                MiuixTheme(
-                    colors = MiuixTheme.colorScheme.copy(
-                        background = toneBackground(MiuixTheme.colorScheme.background, dark, backgroundTone),
-                    ),
+            // 动态取色下需要覆写的只有两项：页面底色档位、玻璃要的半透 surface。
+            // 嵌套一层 MiuixTheme 做局部改色是 theme.md 认可的用法。
+            if (backgroundTone != BackgroundTone.Theme || glass) {
+                val colors = MiuixTheme.colorScheme
+                    .copy(background = toneBackground(MiuixTheme.colorScheme.background, dark, backgroundTone))
+                    .let { if (glass) it.asGlassScheme(dark) else it }
+                MiuixTheme(colors = colors) {
+                    GlassScope(
+                        rememberGlassContext(glassFinish, colors.background, accent.normalizedHue, dark),
+                        content = content,
+                    )
+                }
+            } else {
+                GlassScope(
+                    rememberGlassContext(glassFinish, MiuixTheme.colorScheme.background, accent.normalizedHue, dark),
                     content = content,
                 )
-            } else {
-                content()
             }
         }
     } else {
         // isSystemInDarkTheme() 是 @Composable，必须在 remember 外调用
         val systemDark = isSystemInDarkTheme()
-        val scheme = remember(colorSchemeMode, accent, backgroundTone, systemDark) {
+        val scheme = remember(colorSchemeMode, accent, backgroundTone, glassFinish, systemDark) {
             val base = when (colorSchemeMode) {
                 ColorSchemeMode.Light -> lightScheme(accent)
                 ColorSchemeMode.Dark -> darkScheme(accent)
                 else -> if (systemDark) darkScheme(accent) else lightScheme(accent)
             }
-            base.copy(background = toneBackground(base.background, dark, backgroundTone))
+            val toned = base.copy(background = toneBackground(base.background, dark, backgroundTone))
+            if (glass) toned.asGlassScheme(dark) else toned
         }
-        MiuixTheme(colors = scheme, content = content)
+        MiuixTheme(colors = scheme) {
+            GlassScope(
+                rememberGlassContext(glassFinish, scheme.background, accent.normalizedHue, dark),
+                content = content,
+            )
+        }
     }
 }

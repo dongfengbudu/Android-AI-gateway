@@ -15,6 +15,8 @@ import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.matchParentSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
@@ -35,6 +37,15 @@ import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import com.kyant.backdrop.backdrops.layerBackdrop
+import com.kyant.backdrop.backdrops.rememberLayerBackdrop
+import dev.aigw.app.ui.glass.AmbientField
+import dev.aigw.app.ui.glass.GlassFinish
+import dev.aigw.app.ui.glass.GlassScope
+import dev.aigw.app.ui.glass.glassCard
+import dev.aigw.app.ui.glass.glassEnabled
+import dev.aigw.app.ui.glass.glassPill
+import dev.aigw.app.ui.glass.rememberGlassContext
 import dev.aigw.app.ui.theme.BackgroundTone
 import dev.aigw.app.ui.theme.ThemeAccent
 import dev.aigw.app.ui.theme.ThemeMode
@@ -57,12 +68,12 @@ private val WheelSize = 120.dp
 private val WheelStroke = 12.dp
 private val WheelThumb = 10.dp
 
-/** 外观主题二级页：明暗模式、页面底色、强调色相、动态取色。 */
+/** 外观主题二级页：明暗模式、质感档位、页面底色、强调色相、动态取色。 */
 @Composable
 fun AppearanceThemeScreen(state: AppUiState, viewModel: AppViewModel, onBack: () -> Unit) {
     PageScaffold(
         title = "外观主题",
-        subtitle = "明暗模式 · 底色 · 强调色",
+        subtitle = "明暗模式 · 质感 · 底色 · 强调色",
         leading = { BackButton(onBack) },
     ) {
         item { SmallTitle("明暗模式") }
@@ -82,9 +93,28 @@ fun AppearanceThemeScreen(state: AppUiState, viewModel: AppViewModel, onBack: ()
             }
         }
 
-        item { SmallTitle("页面底色") }
+        item { SmallTitle("玻璃质感") }
         item {
             SectionCard(enterIndex = 1) {
+                GlassFinish.entries.forEachIndexed { index, finish ->
+                    if (index > 0) HorizontalDivider(modifier = Modifier.fillMaxWidth())
+                    ModeRow(finish.label, finish.summary, state.glassFinish == finish) {
+                        viewModel.setGlassFinish(finish)
+                    }
+                }
+                HorizontalDivider(modifier = Modifier.fillMaxWidth())
+                Text(
+                    text = "背景模糊需 Android 12+，边缘折射需 13+；低版本自动降级为半透明底，布局与字号不变。",
+                    style = MiuixTheme.textStyles.footnote2,
+                    color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
+                    modifier = Modifier.padding(top = 10.dp),
+                )
+            }
+        }
+
+        item { SmallTitle("页面底色") }
+        item {
+            SectionCard(enterIndex = 2) {
                 Text(
                     text = "底色与强调色同色相展开，四档只改染色浓度；深浅由明暗模式自动配对：",
                     style = MiuixTheme.textStyles.footnote1,
@@ -113,7 +143,7 @@ fun AppearanceThemeScreen(state: AppUiState, viewModel: AppViewModel, onBack: ()
 
         item { SmallTitle("强调色") }
         item {
-            SectionCard(enterIndex = 2) {
+            SectionCard(enterIndex = 3) {
                 Text(
                     text = "拖动色相环选择强调色，主色、按钮、点缀色都从同一色相按调性阶梯自动展开：",
                     style = MiuixTheme.textStyles.footnote1,
@@ -148,7 +178,7 @@ fun AppearanceThemeScreen(state: AppUiState, viewModel: AppViewModel, onBack: ()
 
         item { SmallTitle("动态取色") }
         item {
-            SectionCard(enterIndex = 3) {
+            SectionCard(enterIndex = 4) {
                 SuperSwitch(
                     title = "动态取色",
                     summary = "由系统按壁纸取色生成整套配色（Android 12+），强调色作为取色种子参与生成",
@@ -161,8 +191,8 @@ fun AppearanceThemeScreen(state: AppUiState, viewModel: AppViewModel, onBack: ()
 
         item { SmallTitle("效果预览") }
         item {
-            SectionCard(enterIndex = 4) {
-                PagePreview()
+            SectionCard(enterIndex = 5) {
+                PagePreview(state)
             }
         }
 
@@ -193,7 +223,13 @@ private fun PresetChip(label: String, dotColor: Color, selected: Boolean, onClic
         modifier = Modifier
             .pressScale()
             .clip(CircleShape)
-            .background(if (selected) primary.copy(alpha = 0.12f) else MiuixTheme.colorScheme.surfaceVariant)
+            .then(
+                when {
+                    selected -> Modifier.background(primary.copy(alpha = 0.12f))
+                    glassEnabled() -> Modifier.glassPill()
+                    else -> Modifier.background(MiuixTheme.colorScheme.surfaceVariant)
+                },
+            )
             .border(if (selected) 1.5.dp else 1.dp, if (selected) primary else MiuixTheme.colorScheme.outline, CircleShape)
             .clickable(onClick = onClick)
             .padding(horizontal = 14.dp, vertical = 10.dp),
@@ -262,52 +298,82 @@ private fun HueWheel(color: Color, onPick: (Color) -> Unit) {
     }
 }
 
-/** 整页样张：底色 + 卡片 + 强调色按钮的组合效果，用于直接判断好不好看。 */
+/**
+ * 整页样张：氛围底 + 内容行 + 压在内容之上的卡片，用于直接判断好不好看。
+ *
+ * 样张自带一套玻璃上下文（按当前档位、底色与色相生成），改任何一项设置都能立刻看到材质变化。
+ * 内层先单独装「氛围底 + 文字」并录成采样层，玻璃卡放在采样层之外：否则玻璃会采到自己。
+ */
 @Composable
-private fun PagePreview() {
+private fun PagePreview(state: AppUiState) {
     val cs = MiuixTheme.colorScheme
-    Box(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clip(RoundedCornerShape(16.dp))
-            .background(cs.background)
-            .border(1.dp, cs.outline, RoundedCornerShape(16.dp))
-            .padding(14.dp),
-    ) {
-        Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Text(
-                    text = "页面标题",
-                    style = MiuixTheme.textStyles.main,
-                    fontWeight = FontWeight.SemiBold,
-                    color = cs.onBackground,
-                )
-                Spacer(Modifier.weight(1f))
-                Box(
-                    modifier = Modifier
-                        .clip(CircleShape)
-                        .background(cs.primary)
-                        .padding(horizontal = 12.dp, vertical = 5.dp),
+    val dark = isDarkTheme(state.themeMode)
+    val accent = ThemeAccent(state.accentHue)
+    val base = themeBackgroundColor(accent, dark, state.backgroundTone)
+    val glass = state.glassFinish != GlassFinish.Flat
+    val sample = rememberLayerBackdrop()
+    val context = rememberGlassContext(state.glassFinish, base, accent.normalizedHue, dark)
+    GlassScope(context) {
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(172.dp)
+                .clip(RoundedCornerShape(16.dp))
+                .border(1.dp, cs.outline, RoundedCornerShape(16.dp)),
+        ) {
+            Box(
+                modifier = Modifier
+                    .matchParentSize()
+                    .background(base)
+                    .then(if (glass) Modifier.layerBackdrop(sample) else Modifier),
+            ) {
+                if (glass) AmbientField(context.field, Modifier.matchParentSize())
+                Column(
+                    modifier = Modifier.fillMaxWidth().padding(14.dp),
+                    verticalArrangement = Arrangement.spacedBy(6.dp),
                 ) {
-                    Text("操作", style = MiuixTheme.textStyles.footnote2, color = cs.onPrimary)
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Text(
+                            text = "页面标题",
+                            style = MiuixTheme.textStyles.main,
+                            fontWeight = FontWeight.SemiBold,
+                            color = cs.onBackground,
+                        )
+                        Spacer(Modifier.weight(1f))
+                        Box(
+                            modifier = Modifier
+                                .clip(CircleShape)
+                                .background(cs.primary)
+                                .padding(horizontal = 12.dp, vertical = 5.dp),
+                        ) {
+                            Text("操作", style = MiuixTheme.textStyles.footnote2, color = cs.onPrimary)
+                        }
+                    }
+                    Text("内容会滚到玻璃下面", style = MiuixTheme.textStyles.footnote1, color = cs.onSurfaceVariantSummary)
+                    Text("磨砂与高光都作用在这些字上", style = MiuixTheme.textStyles.footnote1, color = cs.onSurfaceVariantSummary)
+                    Text("再看这里：边缘折射会让字轻微错位", style = MiuixTheme.textStyles.footnote1, color = cs.onSurfaceVariantSummary)
                 }
             }
             Box(
                 modifier = Modifier
+                    .align(Alignment.BottomCenter)
                     .fillMaxWidth()
-                    .clip(RoundedCornerShape(12.dp))
-                    .background(cs.surfaceContainerHighest)
+                    .padding(12.dp)
+                    .then(
+                        if (glass) Modifier.glassCard(14.dp)
+                        else Modifier.clip(RoundedCornerShape(14.dp)).background(cs.surfaceContainerHighest)
+                    )
                     .padding(12.dp),
             ) {
                 Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
                     Text(
-                        text = "卡片标题",
+                        text = if (glass) "玻璃卡片" else "卡片标题",
                         style = MiuixTheme.textStyles.footnote1,
                         fontWeight = FontWeight.Medium,
-                        color = cs.onSurfaceContainerHighest,
+                        color = cs.onSurface,
                     )
                     Text(
-                        text = "卡片上的次要说明文字",
+                        text = "压在内容之上",
                         style = MiuixTheme.textStyles.footnote2,
                         color = cs.onSurfaceVariantSummary,
                     )

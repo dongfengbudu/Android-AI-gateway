@@ -17,6 +17,8 @@ import dev.aigw.app.data.AutoTaskKind
 import dev.aigw.app.data.TaskScheduleStore
 import dev.aigw.app.data.nextAutoTaskAt
 import dev.aigw.app.gatewayEngine
+import dev.aigw.app.ui.glass.GlassFinish
+import dev.aigw.app.ui.glass.defaultGlassFinish
 import dev.aigw.app.ui.theme.BackgroundTone
 import dev.aigw.app.ui.theme.ThemeAccent
 import dev.aigw.app.ui.theme.ThemeMode
@@ -125,6 +127,24 @@ class AppearanceStore(private val store: KeyValueStore) {
         )
     }
 
+    /** 质感档位（平面 / 玻璃 / 清透）；默认玻璃。 */
+    fun glassFinish(): GlassFinish = when (store.read(KEY_GLASS)) {
+        "flat" -> GlassFinish.Flat
+        "clear" -> GlassFinish.Clear
+        else -> defaultGlassFinish
+    }
+
+    fun setGlassFinish(finish: GlassFinish) {
+        store.write(
+            KEY_GLASS,
+            when (finish) {
+                GlassFinish.Flat -> "flat"
+                GlassFinish.Regular -> "regular"
+                GlassFinish.Clear -> "clear"
+            },
+        )
+    }
+
     /** 主题强调色相（0..360）；非法或缺失时回落默认。 */
     fun accentHue(): Float =
         store.read(KEY_ACCENT_HUE)?.toFloatOrNull()?.takeIf { it.isFinite() }
@@ -139,6 +159,7 @@ class AppearanceStore(private val store: KeyValueStore) {
         store.delete(KEY_MODE)
         store.delete(KEY_BG_TONE)
         store.delete(KEY_ACCENT_HUE)
+        store.delete(KEY_GLASS)
     }
 
     companion object {
@@ -146,6 +167,7 @@ class AppearanceStore(private val store: KeyValueStore) {
         private const val KEY_MODE = "settings/appearance.themeMode"
         private const val KEY_BG_TONE = "settings/appearance.backgroundTone"
         private const val KEY_ACCENT_HUE = "settings/appearance.accentHue"
+        private const val KEY_GLASS = "settings/appearance.glassFinish"
     }
 }
 
@@ -254,6 +276,8 @@ data class AppUiState(
     val backgroundTone: BackgroundTone = BackgroundTone.Theme,
     /** 主题强调色相（0..360）。 */
     val accentHue: Float = defaultThemeAccent.normalizedHue,
+    /** 质感档位：平面 / 玻璃 / 清透。 */
+    val glassFinish: GlassFinish = defaultGlassFinish,
     val keepAlive: KeepAliveStatus? = null,
     /** 存储占用明细（含各类记录与设置）。 */
     val storage: StorageReport? = null,
@@ -324,6 +348,7 @@ class AppViewModel(
             themeMode = appearance.themeMode(),
             backgroundTone = appearance.backgroundTone(),
             accentHue = appearance.accentHue(),
+            glassFinish = appearance.glassFinish(),
             taskSwitches = taskSwitches(),
             nextTaskAt = nextAutoTaskAt(taskSchedule.enabledKinds()),
         ),
@@ -692,13 +717,20 @@ class AppViewModel(
         _state.value = _state.value.copy(accentHue = normalized)
     }
 
-    /** 恢复默认外观（明暗模式、页面底色、强调色相）。 */
+    /** 设置质感档位（平面/玻璃/清透）。整页表面材质随之切换，无需重启。 */
+    fun setGlassFinish(finish: GlassFinish) {
+        appearance.setGlassFinish(finish)
+        _state.value = _state.value.copy(glassFinish = finish)
+    }
+
+    /** 恢复默认外观（明暗模式、页面底色、强调色相、质感档位）。 */
     fun resetAppearance() {
         appearance.reset()
         _state.value = _state.value.copy(
             themeMode = ThemeMode.System,
             backgroundTone = BackgroundTone.Theme,
             accentHue = defaultThemeAccent.normalizedHue,
+            glassFinish = defaultGlassFinish,
         )
         notice("外观主题已恢复默认")
     }

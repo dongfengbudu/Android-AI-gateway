@@ -108,6 +108,23 @@
 | `ui/KeepAliveScreen.kt` | 保活与权限页：逐项检测 + 一键跳转系统设置 |
 | `ui/SecurityProtectionScreen.kt` | 安全防护页：反审核脱敏、账号级限速等防护模块 |
 | `ui/Motion.kt` | 全局动效参数与Modifier |
+| `ui/glass/Glass.kt` | 液态玻璃材质层：质感档位（平面/玻璃/清透）+ 按表面类型（卡片/栏/胶囊/凹槽）展开的光学参数；渲染原语来自 Backdrop（AGSL 边缘折射 + RenderEffect 背景模糊） |
+| `ui/glass/GlassField.kt` | 氛围场：按强调色展开的极光底，同时作为 `Backdrop` 供每个玻璃表面按屏幕坐标采自己的那一片 |
+
+#### 液态玻璃质感（UI 交接要点）
+
+质感档位存在 `settings/appearance.glassFinish`（平面 / 玻璃 / 清透，默认玻璃）。`AiGatewayTheme` 把它
+展开成两件事：① surface 系列 token 降不透明度（否则卡内 miuix 子控件会在透底玻璃上显出实心块）；
+② 提供 `LocalGlassContext`（档位 + 氛围场）。页面侧只有三处需要配合，其余全走共享容器：
+
+- `MainActivity`：玻璃档时 Scaffold 底色转透明，极光氛围场铺到最底层；底栏改悬浮胶囊，采样页面内容层；
+- `Components.PageScaffold`：LazyColumn 用 `layerBackdrop` 录成内容层，顶栏转透明并 `glassBar(内容层)`；
+- `Components.SectionCard` / `GroupCard`：卡片底色转透明，材质由 `glassCard()` 画在背面。
+
+玻璃必须有东西可折射，所以极光氛围场是玻璃档的组成部分而不是可选装饰；选 `GlassFinish.Flat` 时
+所有 `glass*` 修饰符原样返回 `Modifier`，整页回到 HyperOS 平面观感（低端设备与低电耗时走这条）。
+背景模糊需 Android 12+、边缘折射需 13+，低版本由库内部降级，调用侧不写版本分支。
+弹窗（`WindowDialog` 等）跑在独立 Window 里，采不到主界面内容层，因此不做玻璃。
 
 #### 模型目录流式加载（UI 交接要点）
 

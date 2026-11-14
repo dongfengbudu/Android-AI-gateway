@@ -34,13 +34,21 @@ import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import dev.aigw.app.ui.glass.glassBar
+import dev.aigw.app.ui.glass.glassCard
+import dev.aigw.app.ui.glass.glassEnabled
+import dev.aigw.app.ui.glass.glassWell
 import dev.aigw.app.ui.theme.WarnAmber
 import dev.aigw.core.pool.AccountStatus
 import dev.aigw.core.usage.LogLevel
 import dev.aigw.core.usage.OperationLog
+import com.kyant.backdrop.backdrops.layerBackdrop
+import com.kyant.backdrop.backdrops.rememberLayerBackdrop
 import top.yukonga.miuix.kmp.basic.Button
 import top.yukonga.miuix.kmp.basic.ButtonDefaults
 import top.yukonga.miuix.kmp.basic.Card
+import top.yukonga.miuix.kmp.basic.CardColors
+import top.yukonga.miuix.kmp.basic.CardDefaults
 import top.yukonga.miuix.kmp.basic.HorizontalDivider
 import top.yukonga.miuix.kmp.basic.Icon
 import top.yukonga.miuix.kmp.basic.IconButton
@@ -77,12 +85,17 @@ fun PageScaffold(
     val scrollBehavior = MiuixScrollBehavior()
     // 配色方案覆盖页面底色时，骨架与顶栏必须同步跟随，否则覆盖只改了
     // background 却被 Scaffold/TopAppBar 的默认 surface 色整页盖住（视觉上「无效」）。
-    val scaffoldBg = MiuixTheme.colorScheme.background
+    // 玻璃档：页面底色转透明（底色由最外层氛围场提供），顶栏材质改由玻璃画。
+    val glass = glassEnabled()
+    // 玻璃顶栏要采样滚动内容：内容层录进 barBackdrop，顶栏再按自己的屏幕位置取对应切片。
+    val barBackdrop = rememberLayerBackdrop()
+    val scaffoldBg = if (glass) Color.Transparent else MiuixTheme.colorScheme.background
     Scaffold(
         containerColor = scaffoldBg,
         topBar = {
             TopAppBar(
                 title = title,
+                modifier = if (glass) Modifier.glassBar(barBackdrop) else Modifier,
                 color = scaffoldBg,
                 largeTitle = title,
                 navigationIcon = { leading?.invoke() },
@@ -94,6 +107,7 @@ fun PageScaffold(
         LazyColumn(
             modifier = Modifier
                 .fillMaxSize()
+                .then(if (glass) Modifier.layerBackdrop(barBackdrop) else Modifier)
                 .overScrollVertical()
                 .scrollEndHaptic()
                 .nestedScroll(scrollBehavior.nestedScrollConnection),
@@ -145,7 +159,9 @@ fun GroupCard(
             .fillMaxWidth()
             .padding(horizontal = 12.dp)
             .padding(bottom = 12.dp)
+            .then(if (glassEnabled()) Modifier.glassCard() else Modifier)
             .then(modifier),
+        colors = glassCardColors(),
         content = content,
     )
 }
@@ -169,11 +185,25 @@ fun SectionCard(
             .then(if (enterIndex != null) Modifier.staggeredAppear(enterIndex) else Modifier)
             .padding(horizontal = 12.dp)
             .padding(bottom = 12.dp)
+            .then(if (glassEnabled()) Modifier.glassCard() else Modifier)
             .then(modifier),
         insideMargin = PaddingValues(16.dp),
+        colors = glassCardColors(),
         content = content,
     )
 }
+
+/**
+ * 卡片底色：平面档走 miuix 默认实心底，玻璃档换成透底——材质由 [glassCard] 在卡片背面画，
+ * 实心底叠在下面会把玻璃糊住。contentColor 保持默认，卡内文字取色不变。
+ */
+@Composable
+private fun glassCardColors(): CardColors =
+    if (glassEnabled()) {
+        CardDefaults.defaultColors(color = Color.Transparent, contentColor = MiuixTheme.colorScheme.onSurfaceContainer)
+    } else {
+        CardDefaults.defaultColors()
+    }
 
 /**
  * 弹窗底部确认按钮行：左侧取消、右侧确认（主色）。供各 WindowDialog/WindowBottomSheet 复用。
@@ -234,7 +264,10 @@ fun StatusChip(running: Boolean) {
     Row(
         modifier = Modifier
             .clip(CircleShape)
-            .background(MiuixTheme.colorScheme.surfaceContainer)
+            .then(
+                if (glassEnabled()) Modifier.glassWell(999.dp) // 胶囊形，但取凹槽这一档的弱折射
+                else Modifier.background(MiuixTheme.colorScheme.surfaceContainer)
+            )
             .padding(start = 12.dp, end = 14.dp, top = 6.dp, bottom = 6.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(6.dp),
@@ -307,12 +340,14 @@ fun ChoiceChip(
         animationSpec = tween(200),
         label = "choiceContainer",
     )
+    val glass = glassEnabled()
     val content = if (selected) MiuixTheme.colorScheme.surface else MiuixTheme.colorScheme.onSurface
     Box(
         modifier = modifier
             .pressScale()
             .clip(CircleShape)
-            .background(container)
+            // 玻璃档只给未选中态上玻璃：选中态保持实心底，靠「实心 / 玻璃」区分选中
+            .then(if (!glass || selected) Modifier.background(container) else Modifier.glassWell(999.dp))
             .clickable(onClick = onClick)
             .padding(horizontal = 16.dp, vertical = 10.dp),
         contentAlignment = Alignment.Center,
@@ -331,7 +366,10 @@ fun AddressTile(value: String, onCopy: () -> Unit) {
         modifier = Modifier
             .fillMaxWidth()
             .clip(RoundedCornerShape(8.dp))
-            .background(MiuixTheme.colorScheme.surfaceVariant)
+            .then(
+                if (glassEnabled()) Modifier.glassWell(8.dp)
+                else Modifier.background(MiuixTheme.colorScheme.surfaceVariant)
+            )
             .clickable(onClick = onCopy)
             .padding(horizontal = 14.dp, vertical = 12.dp),
     )
