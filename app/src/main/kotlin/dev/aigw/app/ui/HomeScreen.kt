@@ -48,6 +48,9 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import dev.aigw.app.ui.glass.glassCard
+import dev.aigw.app.ui.glass.glassEnabled
+import dev.aigw.app.ui.glass.glassWell
 import dev.aigw.app.ui.theme.SuccessGreen
 import dev.aigw.core.usage.UsageStats
 import dev.aigw.core.util.startOfDay
@@ -262,8 +265,12 @@ private fun ConsoleCard(
                 modifier = Modifier
                     .weight(1f)
                     .clip(RoundedCornerShape(10.dp))
-                    .background(MiuixTheme.colorScheme.surface)
-                    .border(1.dp, MiuixTheme.colorScheme.onSurface, RoundedCornerShape(10.dp))
+                    .then(
+                        if (glassEnabled()) Modifier.glassWell(10.dp)
+                        else Modifier
+                            .background(MiuixTheme.colorScheme.surface)
+                            .border(1.dp, MiuixTheme.colorScheme.onSurface, RoundedCornerShape(10.dp))
+                    )
                     .clickable(onClick = onRefreshCredits)
                     .padding(vertical = 12.dp),
                 contentAlignment = Alignment.Center,
@@ -470,10 +477,14 @@ private fun Tile(modifier: Modifier, label: String, content: @Composable ColumnS
         modifier = modifier
             .heightIn(min = 112.dp)
             .clip(RoundedCornerShape(16.dp))
-            // border 必须在 background 之前：否则边框画在 padding 内缩的矩形上，
-            // 背景铺满整格、看起来内容溢出边框
-            .border(1.dp, MiuixTheme.colorScheme.outline, RoundedCornerShape(16.dp))
-            .background(MiuixTheme.colorScheme.surface)
+            // 平面档：border 必须在 background 之前，否则边框画在 padding 内缩的矩形上，
+            // 背景铺满整格、看起来内容溢出边框。玻璃档不画 border：玻璃自带高光边。
+            .then(
+                if (glassEnabled()) Modifier.glassCard()
+                else Modifier
+                    .border(1.dp, MiuixTheme.colorScheme.outline, RoundedCornerShape(16.dp))
+                    .background(MiuixTheme.colorScheme.surface)
+            )
             .padding(12.dp),
         verticalArrangement = Arrangement.spacedBy(6.dp),
     ) {

@@ -49,6 +49,8 @@ import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import dev.aigw.core.provider.RoutedModel
+import dev.aigw.app.ui.glass.glassCard
+import dev.aigw.app.ui.glass.glassEnabled
 import dev.aigw.app.ui.theme.SuccessGreen
 import dev.aigw.app.ui.theme.WarnAmber
 import top.yukonga.miuix.kmp.basic.Icon
@@ -569,7 +571,7 @@ private fun LazyListScope.modelGroupSection(
                 .fillMaxWidth()
                 .padding(horizontal = 12.dp)
                 .clip(RoundedCornerShape(16.dp))
-                .background(MiuixTheme.colorScheme.surface)
+                .then(if (glassEnabled()) Modifier.glassCard() else Modifier.background(MiuixTheme.colorScheme.surface))
                 // 标题栏不用 bouncyClick：那是给按钮用的超弹动画（spring damping 0.36），
                 // 放在会滚动的列表项上每帧都要跑插值，是折叠发卡的另一个原因。
                 .clickable {
