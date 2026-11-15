@@ -30,7 +30,6 @@ import kotlinx.coroutines.delay
 import top.yukonga.miuix.kmp.basic.Button
 import top.yukonga.miuix.kmp.basic.ButtonDefaults
 import top.yukonga.miuix.kmp.basic.HorizontalDivider
-import top.yukonga.miuix.kmp.basic.SmallTitle
 import top.yukonga.miuix.kmp.basic.Text
 import top.yukonga.miuix.kmp.basic.TextButton
 import top.yukonga.miuix.kmp.extra.SuperSwitch
@@ -53,7 +52,7 @@ fun TaskCenterScreen(state: AppUiState, viewModel: AppViewModel, onBack: () -> U
         subtitle = "签到、成长任务与定时执行",
         leading = { BackButton(onBack) },
     ) {
-        item { SmallTitle("批量操作") }
+        item { GroupTitle("批量操作") }
         item {
             SectionCard(enterIndex = 0) {
                 Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
@@ -95,14 +94,14 @@ fun TaskCenterScreen(state: AppUiState, viewModel: AppViewModel, onBack: () -> U
             }
         }
 
-        item { SmallTitle("执行日志") }
+        item { GroupTitle("执行日志") }
         item {
             SectionCard(enterIndex = 1) {
                 TaskRunPanel(state.taskRun, viewModel)
             }
         }
 
-        item { SmallTitle("定时任务") }
+        item { GroupTitle("定时任务") }
         item {
             GroupCard {
                 for ((index, kind) in AutoTaskKind.entries.withIndex()) {
@@ -143,7 +142,7 @@ fun TaskCenterScreen(state: AppUiState, viewModel: AppViewModel, onBack: () -> U
         for (info in state.providers) {
             val accounts = state.accountsOf(info.id)
             if (accounts.isEmpty()) continue
-            item(key = info.id) { SmallTitle(info.displayName) }
+            item(key = info.id) { GroupTitle(info.displayName) }
             // 每个账号一张独立卡片（与供应商页一致）：多账号同卡时账号之间没有边界，
             // 且额度/状态挤在一行左对齐，看不出哪项属于哪个账号。
             accounts.forEachIndexed { index, account ->

@@ -52,7 +52,6 @@ import dev.aigw.app.ui.theme.defaultThemeAccent
 import dev.aigw.app.ui.theme.isDarkTheme
 import dev.aigw.app.ui.theme.themeBackgroundColor
 import top.yukonga.miuix.kmp.basic.HorizontalDivider
-import top.yukonga.miuix.kmp.basic.SmallTitle
 import top.yukonga.miuix.kmp.basic.Text
 import top.yukonga.miuix.kmp.extra.SuperRadioButton
 import top.yukonga.miuix.kmp.extra.SuperSwitch
@@ -75,7 +74,7 @@ fun AppearanceThemeScreen(state: AppUiState, viewModel: AppViewModel, onBack: ()
         subtitle = "明暗模式 · 质感 · 底色 · 强调色",
         leading = { BackButton(onBack) },
     ) {
-        item { SmallTitle("明暗模式") }
+        item { GroupTitle("明暗模式") }
         item {
             SectionCard(enterIndex = 0) {
                 ModeRow("自动 · 跟随系统", "跟随 Android 系统的深浅色设置自适应切换", state.themeMode == ThemeMode.System) {
@@ -92,7 +91,7 @@ fun AppearanceThemeScreen(state: AppUiState, viewModel: AppViewModel, onBack: ()
             }
         }
 
-        item { SmallTitle("玻璃质感") }
+        item { GroupTitle("玻璃质感") }
         item {
             SectionCard(enterIndex = 1) {
                 GlassFinish.entries.forEachIndexed { index, finish ->
@@ -111,7 +110,7 @@ fun AppearanceThemeScreen(state: AppUiState, viewModel: AppViewModel, onBack: ()
             }
         }
 
-        item { SmallTitle("页面底色") }
+        item { GroupTitle("页面底色") }
         item {
             SectionCard(enterIndex = 2) {
                 Text(
@@ -140,7 +139,7 @@ fun AppearanceThemeScreen(state: AppUiState, viewModel: AppViewModel, onBack: ()
             }
         }
 
-        item { SmallTitle("强调色") }
+        item { GroupTitle("强调色") }
         item {
             SectionCard(enterIndex = 3) {
                 Text(
@@ -175,7 +174,7 @@ fun AppearanceThemeScreen(state: AppUiState, viewModel: AppViewModel, onBack: ()
             }
         }
 
-        item { SmallTitle("动态取色") }
+        item { GroupTitle("动态取色") }
         item {
             SectionCard(enterIndex = 4) {
                 SuperSwitch(
@@ -188,7 +187,7 @@ fun AppearanceThemeScreen(state: AppUiState, viewModel: AppViewModel, onBack: ()
             }
         }
 
-        item { SmallTitle("效果预览") }
+        item { GroupTitle("效果预览") }
         item {
             SectionCard(enterIndex = 5) {
                 PagePreview(state)

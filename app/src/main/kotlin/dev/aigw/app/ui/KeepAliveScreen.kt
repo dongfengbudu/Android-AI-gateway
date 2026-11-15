@@ -26,7 +26,6 @@ import dev.aigw.app.data.KeepAlive
 import dev.aigw.app.ui.theme.SuccessGreen
 import top.yukonga.miuix.kmp.basic.BasicComponentColors
 import top.yukonga.miuix.kmp.basic.HorizontalDivider
-import top.yukonga.miuix.kmp.basic.SmallTitle
 import top.yukonga.miuix.kmp.basic.Text
 import top.yukonga.miuix.kmp.extra.SuperArrow
 import top.yukonga.miuix.kmp.theme.MiuixTheme
@@ -80,7 +79,7 @@ fun KeepAliveScreen(state: AppUiState, viewModel: AppViewModel, onBack: () -> Un
             }
         }
 
-        item { SmallTitle("系统条件") }
+        item { GroupTitle("系统条件") }
         item {
             SectionCard(enterIndex = 1) {
                 StatusRow(
@@ -128,7 +127,7 @@ fun KeepAliveScreen(state: AppUiState, viewModel: AppViewModel, onBack: () -> Un
             }
         }
 
-        item { SmallTitle("厂商后台管理") }
+        item { GroupTitle("厂商后台管理") }
         item {
             SectionCard(enterIndex = 2) {
                 Text(

@@ -1,6 +1,36 @@
 # 进度
 
 ## 当前状态
+设计体系重建 第一步：色彩 / 空间 / 排版 token 与共享骨架（2026-11-15）：
+- **色彩**：旧的 HSL 调色板（单色相按固定明度展开、无对比度校验）换成 OKLCH tone + WCAG 校验。
+  新增 `theme/Tone.kt`（OKLCH→sRGB、`toneColor`、`toneMeeting`、`contrastWith`）；`Theme.kt` 重写成
+  「中性底 + 强调点缀」：中性阶（彩度 0.006~0.05）承担页面/卡片/描边/正文，强调色只上主按钮、
+  选中态、链接、状态强调；每个 `on*` 都调 `readableOn(真实背色, 目标对比度)` 取档（正文 7:1、
+  次要 4.5:1），因此换色相或换底色档位都不会把文字做糊。色相环的饱和度现在驱动中性阶染色
+  （`tintChroma`），主彩度固定 `AccentChroma`。
+- **修了两个旧缺陷**：`BackgroundTone.Plain` 下页面底与 `surfaceContainer` 同为纯白/纯黑，平面档卡片
+  边界直接消失（现在 `containerToneFor` 保证与底色差一档）；`ThemeAccent.chroma` 之前被当主色强度用，
+  会把圆心附近选的低饱和色推到 Tone 45 的深色上（现在只驱动染色）。
+- **空间**：`theme/Space.kt` 定 4dp 基准阶梯（4/8/12/16/24/32/40）+ 语义别名 `Edge`（screen 16 /
+  groupGap 12 / cardPad 16 / sectionGap 24），`Radius`（卡 20）与 `Size`（触控 48 / 轨道 6）。共享骨架
+  （PageScaffold / GroupCard / SectionCard / StatusChip / StatCell / ChoiceChip / AddressTile /
+  OutlineActionButton / EmptyHint / AccountInfoRow / DialogButtonRow / SectionHeader / QuotaPackBar）
+  已全部换成 token，骨架内除图形尺寸（状态圆点 6dp、光环 14dp）与一处有注释的基线微调外无字面量。
+- **排版**：`theme/AppType.kt` 按信息角色重建八档（Display 32 / Number 24 / Title 20 / SectionTitle 17 /
+  Body 16 / Label 14 / Meta 13 / Micro 11）。此前 180 处引用里 129 处落在 13/11sp、全应用最大字号只有
+  20sp 一处，而 miuix `headline1` 实际只有 17sp（与 `main` 同号），所以首页「大号数字」并不比正文大；
+  现在 `StatCell` 的数字走 `AppType.Number`（24sp），层级真正拉开。
+- **语义叠加色**：`theme/Overlays.kt` + `LocalOverlays` 收编弱底/光环/轨道/描边这类带 alpha 的角色（骨架
+  内的手调值已清零；各页面剩余的 `copy(alpha=…)` 在第二步一并收）。
+- **分组标题体系**：新增 `GroupTitle`（卡片外、17sp 半粗、`onBackground`、上 24dp），`SectionHeader` 降为
+  卡内小标签（13sp 灰 + 字距）——两者原本 14/13sp 都是灰字、几乎分不开。miuix `SmallTitle` 的全部
+  35 处调用（12 个文件）已迁到 `GroupTitle`并清掉 import；providers 子包跨包引用补了显式 import。
+- 版本：versionCode 106→107，versionName 1.1.9→1.1.10。
+- **下一步（第二步）**：首页按信息层级重排（控制台 → 关键指标 → 趋势 → 操作）、各页面字号与间距
+  从旧 `textStyles` 迁到 `AppType`、页面内 `copy(alpha=…)` 收进 `LocalOverlays`。
+- 验证：本容器无 JDK/Gradle，只能静态核对（token 成员引用、函数元数、miuix 命名实参、括号平衡已逐项
+  脚本比对）；编译结果以 CI 为准，尺度观感需装机确认。
+
 UI 迁移至液态玻璃（2026-11-14）：
 - 渲染原语选 Kyant0 Backdrop 1.0.6（GitHub 4.6k star：AGSL 边缘折射/色散 + RenderEffect 背景模糊 +
   高光/投影/内阴影，minSdk 21）。版本必须钉在 1.0.6：2.x 编译于 Compose 1.12 + Kotlin 2.4（元数据 2.4.0，

@@ -11,7 +11,6 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import dev.aigw.core.gateway.CustomProviderConfig
-import top.yukonga.miuix.kmp.basic.SmallTitle
 import top.yukonga.miuix.kmp.basic.TextField
 import top.yukonga.miuix.kmp.extra.SuperSwitch
 
@@ -39,7 +38,7 @@ fun CustomProviderScreen(
             BackButton(onBack)
         },
     ) {
-        item { SmallTitle("基本信息") }
+        item { GroupTitle("基本信息") }
         item {
             SectionCard {
                 TextField(

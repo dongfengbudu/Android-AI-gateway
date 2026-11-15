@@ -18,7 +18,6 @@ import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.unit.dp
-import top.yukonga.miuix.kmp.basic.SmallTitle
 import top.yukonga.miuix.kmp.basic.TextField
 import top.yukonga.miuix.kmp.extra.SuperSwitch
 
@@ -37,7 +36,7 @@ fun ApiSettingsScreen(state: AppUiState, viewModel: AppViewModel, onBack: () -> 
         subtitle = "端口与 API Key",
         leading = { BackButton(onBack) },
     ) {
-        item { SmallTitle("接入地址") }
+        item { GroupTitle("接入地址") }
         item {
             SectionCard(enterIndex = 0) {
                 Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -55,7 +54,7 @@ fun ApiSettingsScreen(state: AppUiState, viewModel: AppViewModel, onBack: () -> 
             }
         }
 
-        item { SmallTitle("端口") }
+        item { GroupTitle("端口") }
         item {
             SectionCard(enterIndex = 1) {
                 Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
@@ -77,7 +76,7 @@ fun ApiSettingsScreen(state: AppUiState, viewModel: AppViewModel, onBack: () -> 
             }
         }
 
-        item { SmallTitle("API Key") }
+        item { GroupTitle("API Key") }
         item {
             SectionCard(enterIndex = 2) {
                 Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
@@ -104,7 +103,7 @@ fun ApiSettingsScreen(state: AppUiState, viewModel: AppViewModel, onBack: () -> 
             }
         }
 
-        item { SmallTitle("默认供应商") }
+        item { GroupTitle("默认供应商") }
         item {
             SectionCard(enterIndex = 3) {
                 FlowRow(

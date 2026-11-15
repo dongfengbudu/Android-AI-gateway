@@ -35,7 +35,6 @@ import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
 import top.yukonga.miuix.kmp.basic.HorizontalDivider
-import top.yukonga.miuix.kmp.basic.SmallTitle
 import top.yukonga.miuix.kmp.basic.Text
 import top.yukonga.miuix.kmp.basic.TextButton
 import top.yukonga.miuix.kmp.basic.TextField
@@ -120,7 +119,7 @@ fun DesensitizationComponent(
     onReloadPipeline: () -> Unit,
     onViewEvidence: () -> Unit,
 ) {
-    SmallTitle("反审核脱敏")
+    GroupTitle("反审核脱敏")
     SectionCard(enterIndex = 0) {
         SuperSwitch(
             title = "开启脱敏",
@@ -151,7 +150,7 @@ fun RateLimitComponent(
     state: AppUiState,
     onOpenEdit: () -> Unit,
 ) {
-    SmallTitle("账号级限速")
+    GroupTitle("账号级限速")
     SectionCard(enterIndex = 1) {
         SuperArrow(
             title = "最小间隔",

@@ -1,11 +1,11 @@
 package dev.aigw.app.ui.theme
 
-import android.graphics.Color as AndroidColor
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.remember
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.toArgb
+import androidx.compose.ui.graphics.luminance
 import dev.aigw.app.ui.glass.GlassFinish
 import dev.aigw.app.ui.glass.GlassScope
 import dev.aigw.app.ui.glass.defaultGlassFinish
@@ -18,86 +18,259 @@ import top.yukonga.miuix.kmp.theme.darkColorScheme
 import top.yukonga.miuix.kmp.theme.lightColorScheme
 
 /**
- * 高保真调性配色生成器。
+ * 调色板：中性底 + 强调点缀。
  *
- * 输入一个色相（[ThemeAccent]），输出整套明/暗色阶：主色、容器色、表面色、描边色
- * 都从同一色相按固定明度阶梯展开，因此换色相时整页色彩关系保持一致（调性统一）。
- * 具体色值属于实现细节，调用方只接触 [ThemeAccent] 这一个概念。
+ * 三层结构：
+ * 1. **中性阶**（[tintChroma] 级低彩度）承担页面底色、卡片、描边、正文——大面积永远不花；
+ * 2. **强调色**（[ThemeAccent] 色相 + 彩度）只出现在主色按钮、选中态、链接、状态强调；
+ * 3. **语义叠加**（[Overlays]）承接弱底、光环、轨道这类带 alpha 的角色。
+ *
+ * 每个前景色都不写死明度，而是由 [readableOn] 在它真实的背景上做 WCAG 校验后取档：
+ * 换任何强调色、切任何底色档位，正文对比度都不会掉到不可读。
  */
-private fun hueTone(hue: Float, saturation: Float, lightness: Float): Color =
-    Color.hsl(hue, saturation.coerceIn(0f, 1f), lightness.coerceIn(0f, 1f))
+/**
+ * 强调色的固定 OKLCH 彩度。实际显示彩度仍由 [toneColor] 按色相收敛到 sRGB 色域内
+ * （黄绿区会自动降彩度，否则会出现不可能存在的艳色）。
+ */
+private const val AccentChroma = 0.14f
 
-/** 浅色方案：主色落在 42 明度，表面近白但带一点同色相染色，避免纯灰的廉价感。 */
-private fun lightScheme(accent: ThemeAccent): Colors {
+/**
+ * 强调色的 OKLCH 彩度。
+ *
+ * 不取 [ThemeAccent.chroma]：那个字段是色相环拖动时同时写入的**饱和度**（圆心→边缘 0→1），
+ * 当强度用会把圆心附近选到的低饱和色推到 Tone 45 的深色上去、变得过艳且不和谐；
+ * 饱和度在手选颜色里的体现是中性阶的染色（[tintChroma]），而不是主色本身。
+ */
+val ThemeAccent.oklchChroma: Float
+    get() = AccentChroma
+
+/**
+ * 在 [bg] 上取一个至少 [min] 对比度的文字色。
+ *
+ * 先判断底色亮暗，再朝远离底色的方向逐档挪明度——这是「不靠人眼调色」的关键：
+ * 强调色换了、底色档位换了，文字自己会找到能读的那一档。
+ */
+private fun readableOn(bg: Color, hue: Float, min: Float, chroma: Float = 0.02f): Color {
+    val bgIsLight = bg.luminance() > 0.45f
+    return toneMeeting(
+        coord = Oklch(hue, chroma, 0f),
+        background = bg,
+        minContrast = min,
+        startTone = if (bgIsLight) 22f else 98f,
+        direction = if (bgIsLight) -1 else 1,
+    )
+}
+
+/**
+ * 中性阶的强调色染色浓度 = 档位基线 × 饱和度系数。
+ *
+ * [chroma] 来自色相环的径向位置（圆心 0 → 边缘 1）：拖得越靠外，整页底色/卡片/描边的
+ * 同色相染色越重——这才是「饱和度」在 neutral-base 方案里的正确作用点。
+ * 「纯净」档恒为 0（用户明确要无色偏），主色本身不受此影响（见 AccentChroma）。
+ */
+private fun tintChroma(tone: BackgroundTone, dark: Boolean, chroma: Float): Float {
+    if (tone == BackgroundTone.Plain) return 0f
+    val base = when (tone) {
+        BackgroundTone.Theme -> if (dark) 0.014f else 0.006f
+        BackgroundTone.Soft -> if (dark) 0.024f else 0.020f
+        BackgroundTone.Rich -> if (dark) 0.052f else 0.050f
+    }
+    return base * (0.35f + chroma.coerceIn(0f, 1f) * 1.15f)
+}
+
+/** 页面底色档位 → 实际颜色。四档只在「中性明度 + 染色浓度」上浮动，不改变明暗极性。 */
+private fun backgroundFor(hue: Float, dark: Boolean, tone: BackgroundTone, chroma: Float): Color {
+    val toneValue = when (tone) {
+        BackgroundTone.Theme -> if (dark) 15f else 98.5f
+        BackgroundTone.Plain -> if (dark) 0f else 100f
+        BackgroundTone.Soft -> if (dark) 14f else 98f
+        BackgroundTone.Rich -> if (dark) 12.5f else 96.5f
+    }
+    return toneColor(hue, tintChroma(tone, dark, chroma), toneValue)
+}
+
+/** 某档位实际生效的页面底色（设置页色点预览用；按强调色调性推导）。 */
+fun themeBackgroundColor(accent: ThemeAccent, dark: Boolean, tone: BackgroundTone): Color =
+    backgroundFor(accent.normalizedHue, dark, tone, accent.normalizedChroma)
+
+/**
+ * 卡片容器明度：必须与页面底色拉开一档，否则「纯净」底色（纯白/纯黑）下卡片边界直接消失。
+ * 浅色底太亮时改为略暗于底色，深色底则一律提亮。
+ */
+private fun containerToneFor(bgTone: Float, dark: Boolean): Float = if (dark) {
+    bgTone + 6f
+} else {
+    if (bgTone >= 99f) bgTone - 2.4f else bgTone + 1.4f
+}
+
+private fun backgroundToneValue(dark: Boolean, tone: BackgroundTone): Float = when (tone) {
+    BackgroundTone.Theme -> if (dark) 15f else 98.5f
+    BackgroundTone.Plain -> if (dark) 0f else 100f
+    BackgroundTone.Soft -> if (dark) 14f else 98f
+    BackgroundTone.Rich -> if (dark) 12.5f else 96.5f
+}
+
+/** 浅色方案：中性近白底 + 强调色点缀；所有前景色由 readableOn 校验。 */
+private fun lightScheme(accent: ThemeAccent, tone: BackgroundTone): Colors {
     val h = accent.normalizedHue
-    val s = accent.normalizedChroma
+    val c = accent.oklchChroma
+    val nc = tintChroma(tone, dark = false, accent.normalizedChroma)
+    val bgTone = backgroundToneValue(false, tone)
+    val bg = backgroundFor(h, false, tone, accent.normalizedChroma)
+    val containerTone = containerToneFor(bgTone, dark = false)
+
+    val surface = toneColor(h, nc, 100f)
+    val container = toneColor(h, nc, containerTone)
+    val variant = toneColor(h, nc, bgTone - 2f)
+    val containerHigh = toneColor(h, nc, containerTone - 3f)
+    val containerHighest = toneColor(h, nc, containerTone - 6.5f)
+    val outline = toneColor(h, 0.012f, 84f)
+    val divider = toneColor(h, 0.010f, 91f)
+
+    val primary = toneColor(h, c, 45f)
+    val primaryVariant = toneColor(h, c, 38f)
+    val primaryContainer = toneColor(h, c * 0.30f, 92f)
+    val tertiaryContainer = toneColor(h, c * 0.20f, 94f)
+    val secondary = toneColor(h, 0.014f, 93f)
+    val secondaryContainer = toneColor(h, 0.012f, 95f)
+    val error = toneColor(ErrorHue, 0.16f, 48f)
+    val errorContainer = toneColor(ErrorHue, 0.04f, 95f)
+
     return lightColorScheme(
-        primary = hueTone(h, s, 0.42f),
-        onPrimary = hueTone(h, s * 0.3f, 0.99f),
-        primaryVariant = hueTone(h, s, 0.34f),
-        onPrimaryVariant = hueTone(h, s * 0.5f, 0.94f),
-        primaryContainer = hueTone(h, s * 0.35f, 0.92f),
-        onPrimaryContainer = hueTone(h, s * 0.8f, 0.22f),
-        secondary = hueTone(wrapHue(h + 32f), s * 0.55f, 0.44f),
-        onSecondary = hueTone(h, s * 0.3f, 0.99f),
-        secondaryContainer = hueTone(wrapHue(h + 32f), s * 0.35f, 0.93f),
-        onSecondaryContainer = hueTone(wrapHue(h + 32f), s * 0.7f, 0.24f),
-        tertiaryContainer = hueTone(wrapHue(h - 46f), s * 0.35f, 0.93f),
-        onTertiaryContainer = hueTone(wrapHue(h - 46f), s * 0.7f, 0.24f),
-        background = hueTone(h, s * 0.08f, 0.985f),
-        onBackground = hueTone(h, s * 0.18f, 0.12f),
-        onBackgroundVariant = hueTone(h, s * 0.12f, 0.44f),
-        surface = hueTone(h, s * 0.06f, 1f),
-        onSurface = hueTone(h, s * 0.18f, 0.12f),
-        surfaceVariant = hueTone(h, s * 0.12f, 0.965f),
-        onSurfaceSecondary = hueTone(h, s * 0.12f, 0.44f),
-        onSurfaceVariantSummary = hueTone(h, s * 0.12f, 0.44f),
-        onSurfaceVariantActions = hueTone(h, s * 0.12f, 0.44f),
-        surfaceContainerHighest = hueTone(h, s * 0.14f, 0.93f),
-        onSurfaceContainerHighest = hueTone(h, s * 0.18f, 0.14f),
-        surfaceContainer = hueTone(h, s * 0.06f, 1f),
-        onSurfaceContainer = hueTone(h, s * 0.18f, 0.12f),
-        outline = hueTone(h, s * 0.14f, 0.87f),
-        dividerLine = hueTone(h, s * 0.12f, 0.90f),
+        primary = primary,
+        onPrimary = readableOn(primary, h, ContrastBody),
+        primaryVariant = primaryVariant,
+        onPrimaryVariant = readableOn(primaryVariant, h, ContrastBody),
+        primaryContainer = primaryContainer,
+        onPrimaryContainer = readableOn(primaryContainer, h, ContrastBody, chroma = c * 0.5f),
+        secondary = secondary,
+        onSecondary = readableOn(secondary, h, ContrastBody),
+        secondaryContainer = secondaryContainer,
+        onSecondaryContainer = readableOn(secondaryContainer, h, ContrastBody),
+        secondaryContainerVariant = toneColor(h, 0.012f, 96f),
+        onSecondaryContainerVariant = readableOn(toneColor(h, 0.012f, 96f), h, ContrastBody),
+        tertiaryContainer = tertiaryContainer,
+        onTertiaryContainer = readableOn(tertiaryContainer, h, ContrastBody, chroma = c * 0.5f),
+        tertiaryContainerVariant = toneColor(h, c * 0.14f, 96f),
+        background = bg,
+        onBackground = readableOn(bg, h, 7f),
+        onBackgroundVariant = readableOn(bg, h, ContrastBody),
+        surface = surface,
+        onSurface = readableOn(container, h, 7f),
+        surfaceVariant = variant,
+        onSurfaceSecondary = readableOn(container, h, 7f),
+        onSurfaceVariantSummary = readableOn(container, h, ContrastBody),
+        onSurfaceVariantActions = readableOn(container, h, ContrastBody),
+        surfaceContainer = container,
+        onSurfaceContainer = readableOn(container, h, 7f),
+        onSurfaceContainerVariant = readableOn(container, h, ContrastBody),
+        surfaceContainerHigh = containerHigh,
+        onSurfaceContainerHigh = readableOn(containerHigh, h, ContrastBody),
+        surfaceContainerHighest = containerHighest,
+        onSurfaceContainerHighest = readableOn(containerHighest, h, 7f),
+        outline = outline,
+        dividerLine = divider,
+        error = error,
+        onError = readableOn(error, ErrorHue, ContrastBody),
+        errorContainer = errorContainer,
+        onErrorContainer = readableOn(errorContainer, ErrorHue, ContrastBody),
+        disabledPrimary = toneColor(h, c * 0.30f, 86f),
+        disabledOnPrimary = toneColor(h, 0.02f, 99f),
+        disabledPrimaryButton = toneColor(h, c * 0.30f, 86f),
+        disabledOnPrimaryButton = toneColor(h, 0.02f, 99f),
+        disabledPrimarySlider = toneColor(h, c * 0.26f, 89f),
+        disabledSecondary = toneColor(h, 0.008f, 96f),
+        disabledOnSecondary = toneColor(h, 0.01f, 99f),
+        disabledSecondaryVariant = toneColor(h, 0.008f, 97f),
+        disabledOnSecondaryVariant = readableOn(toneColor(h, 0.008f, 97f), h, ContrastLarge),
+        disabledOnSurface = readableOn(container, h, ContrastLarge),
+        sliderKeyPoint = primary.copy(alpha = 0.30f),
+        sliderKeyPointForeground = primary,
+        sliderBackground = toneColor(h, 0.010f, 90f),
+        windowDimming = Color.Black.copy(alpha = 0.32f),
     )
 }
 
-/** 深色方案：主色抬到 78 明度保证暗底可读，表面用同色相深灰拉开层次。 */
-private fun darkScheme(accent: ThemeAccent): Colors {
+/** 深色方案：同一套结构在深色极性的镜像；容器比底色亮，正文比容器亮。 */
+private fun darkScheme(accent: ThemeAccent, tone: BackgroundTone): Colors {
     val h = accent.normalizedHue
-    val s = accent.normalizedChroma
+    val c = accent.oklchChroma
+    val nc = tintChroma(tone, dark = true, accent.normalizedChroma)
+    val bgTone = backgroundToneValue(true, tone)
+    val bg = backgroundFor(h, true, tone, accent.normalizedChroma)
+    val containerTone = containerToneFor(bgTone, dark = true)
+
+    val surface = toneColor(h, nc + 0.004f, bgTone + 4f)
+    val container = toneColor(h, nc + 0.004f, containerTone)
+    val variant = toneColor(h, nc + 0.004f, bgTone + 8f)
+    val containerHigh = toneColor(h, nc + 0.004f, containerTone + 4f)
+    val containerHighest = toneColor(h, nc + 0.004f, containerTone + 8f)
+    val outline = toneColor(h, 0.014f, 40f)
+    val divider = toneColor(h, 0.014f, 28f)
+
+    val primary = toneColor(h, c * 0.92f, 74f)
+    val primaryVariant = toneColor(h, c * 0.85f, 82f)
+    val primaryContainer = toneColor(h, c * 0.45f, 30f)
+    val tertiaryContainer = toneColor(h, c * 0.35f, 26f)
+    val secondary = toneColor(h, 0.016f, 30f)
+    val secondaryContainer = toneColor(h, 0.016f, 26f)
+    val error = toneColor(ErrorHue, 0.14f, 68f)
+    val errorContainer = toneColor(ErrorHue, 0.08f, 26f)
+
     return darkColorScheme(
-        primary = hueTone(h, s * 0.85f, 0.78f),
-        onPrimary = hueTone(h, s, 0.20f),
-        primaryVariant = hueTone(h, s * 0.9f, 0.86f),
-        onPrimaryVariant = hueTone(h, s, 0.18f),
-        primaryContainer = hueTone(h, s * 0.6f, 0.26f),
-        onPrimaryContainer = hueTone(h, s * 0.6f, 0.90f),
-        secondary = hueTone(wrapHue(h + 32f), s * 0.5f, 0.78f),
-        onSecondary = hueTone(wrapHue(h + 32f), s * 0.6f, 0.20f),
-        secondaryContainer = hueTone(wrapHue(h + 32f), s * 0.5f, 0.28f),
-        onSecondaryContainer = hueTone(wrapHue(h + 32f), s * 0.5f, 0.90f),
-        tertiaryContainer = hueTone(wrapHue(h - 46f), s * 0.5f, 0.28f),
-        onTertiaryContainer = hueTone(wrapHue(h - 46f), s * 0.5f, 0.90f),
-        background = hueTone(h, s * 0.25f, 0.055f),
-        onBackground = hueTone(h, s * 0.10f, 0.95f),
-        onBackgroundVariant = hueTone(h, s * 0.12f, 0.64f),
-        surface = hueTone(h, s * 0.22f, 0.09f),
-        onSurface = hueTone(h, s * 0.10f, 0.95f),
-        surfaceVariant = hueTone(h, s * 0.20f, 0.14f),
-        onSurfaceSecondary = hueTone(h, s * 0.12f, 0.64f),
-        onSurfaceVariantSummary = hueTone(h, s * 0.12f, 0.64f),
-        onSurfaceVariantActions = hueTone(h, s * 0.12f, 0.64f),
-        surfaceContainerHighest = hueTone(h, s * 0.22f, 0.19f),
-        onSurfaceContainerHighest = hueTone(h, s * 0.10f, 0.95f),
-        surfaceContainer = hueTone(h, s * 0.22f, 0.09f),
-        onSurfaceContainer = hueTone(h, s * 0.10f, 0.95f),
-        outline = hueTone(h, s * 0.20f, 0.28f),
-        dividerLine = hueTone(h, s * 0.20f, 0.24f),
+        primary = primary,
+        onPrimary = readableOn(primary, h, ContrastBody),
+        primaryVariant = primaryVariant,
+        onPrimaryVariant = readableOn(primaryVariant, h, ContrastBody),
+        primaryContainer = primaryContainer,
+        onPrimaryContainer = readableOn(primaryContainer, h, ContrastBody, chroma = c * 0.5f),
+        secondary = secondary,
+        onSecondary = readableOn(secondary, h, ContrastBody),
+        secondaryContainer = secondaryContainer,
+        onSecondaryContainer = readableOn(secondaryContainer, h, ContrastBody),
+        secondaryContainerVariant = toneColor(h, 0.016f, 29f),
+        onSecondaryContainerVariant = readableOn(toneColor(h, 0.016f, 29f), h, ContrastBody),
+        tertiaryContainer = tertiaryContainer,
+        onTertiaryContainer = readableOn(tertiaryContainer, h, ContrastBody, chroma = c * 0.5f),
+        tertiaryContainerVariant = toneColor(h, c * 0.28f, 24f),
+        background = bg,
+        onBackground = readableOn(bg, h, 7f),
+        onBackgroundVariant = readableOn(bg, h, ContrastBody),
+        surface = surface,
+        onSurface = readableOn(container, h, 7f),
+        surfaceVariant = variant,
+        onSurfaceSecondary = readableOn(container, h, 7f),
+        onSurfaceVariantSummary = readableOn(container, h, ContrastBody),
+        onSurfaceVariantActions = readableOn(container, h, ContrastBody),
+        surfaceContainer = container,
+        onSurfaceContainer = readableOn(container, h, 7f),
+        onSurfaceContainerVariant = readableOn(container, h, ContrastBody),
+        surfaceContainerHigh = containerHigh,
+        onSurfaceContainerHigh = readableOn(containerHigh, h, ContrastBody),
+        surfaceContainerHighest = containerHighest,
+        onSurfaceContainerHighest = readableOn(containerHighest, h, 7f),
+        outline = outline,
+        dividerLine = divider,
+        error = error,
+        onError = readableOn(error, ErrorHue, ContrastBody),
+        errorContainer = errorContainer,
+        onErrorContainer = readableOn(errorContainer, ErrorHue, ContrastBody),
+        disabledPrimary = toneColor(h, c * 0.22f, 34f),
+        disabledOnPrimary = toneColor(h, 0.02f, 62f),
+        disabledPrimaryButton = toneColor(h, c * 0.22f, 34f),
+        disabledOnPrimaryButton = toneColor(h, 0.02f, 62f),
+        disabledPrimarySlider = toneColor(h, c * 0.20f, 32f),
+        disabledSecondary = toneColor(h, 0.012f, 22f),
+        disabledOnSecondary = toneColor(h, 0.012f, 55f),
+        disabledSecondaryVariant = toneColor(h, 0.012f, 24f),
+        disabledOnSecondaryVariant = readableOn(toneColor(h, 0.012f, 24f), h, ContrastLarge),
+        disabledOnSurface = readableOn(container, h, ContrastLarge),
+        sliderKeyPoint = primary.copy(alpha = 0.34f),
+        sliderKeyPointForeground = primary,
+        sliderBackground = toneColor(h, 0.016f, 32f),
+        windowDimming = Color.Black.copy(alpha = 0.55f),
     )
 }
-
-private fun wrapHue(hue: Float): Float = ((hue % 360f) + 360f) % 360f
 
 /** 当前模式下是否为深色（主题内部与设置页预览共用同一判据）。 */
 @Composable
@@ -108,52 +281,13 @@ fun isDarkTheme(themeMode: ThemeMode): Boolean = when (themeMode) {
 }
 
 /**
- * 页面底色档位：在 [base]（当前调色板自带的页面底色）上调整染色浓度与明度。
- *
- * 档位只在当前明暗模式的极性内浮动（浅色档仍是浅底、深色档仍是深底），
- * 所以 onBackground 无需重算，文字始终落在可读对比上。
- */
-private fun toneBackground(base: Color, dark: Boolean, tone: BackgroundTone): Color {
-    if (tone == BackgroundTone.Theme) return base
-    val hsv = FloatArray(3)
-    AndroidColor.colorToHSV(base.toArgb(), hsv)
-    val (saturation, value) = when (tone) {
-        BackgroundTone.Theme -> hsv[1] to hsv[2]
-        BackgroundTone.Plain -> 0f to if (dark) 0f else 1f
-        BackgroundTone.Soft -> (hsv[1] + 0.10f) to (hsv[2] + if (dark) 0.02f else -0.015f)
-        BackgroundTone.Rich -> (hsv[1] + 0.22f) to (hsv[2] + if (dark) 0.05f else -0.035f)
-    }
-    return Color.hsv(hsv[0], saturation.coerceIn(0f, 1f), value.coerceIn(0f, 1f))
-}
-
-/** 某档位实际生效的页面底色（设置页色点预览用；按强调色调性推导）。 */
-fun themeBackgroundColor(accent: ThemeAccent, dark: Boolean, tone: BackgroundTone): Color {
-    val base = if (dark) darkScheme(accent).background else lightScheme(accent).background
-    return toneBackground(base, dark, tone)
-}
-
-/**
- * 玻璃档位下给控件层用的方案：把 surface 系列改成半透明。
- *
- * 卡片本身已经改画玻璃，但卡内的开关轨道、下拉栏、进位条这类 miuix 子控件仍拿 surfaceContainer*
- * 做实心底；不降不透明度，它们会在一块透底的玻璃上显出一块块实心面板。文字类 token（on*）一律不动。
- */
-private fun Colors.asGlassScheme(dark: Boolean): Colors = copy(
-    surfaceContainer = surfaceContainer.copy(alpha = if (dark) 0.52f else 0.62f),
-    surfaceContainerHigh = surfaceContainerHigh.copy(alpha = if (dark) 0.55f else 0.66f),
-    surfaceContainerHighest = surfaceContainerHighest.copy(alpha = if (dark) 0.60f else 0.72f),
-    surfaceVariant = surfaceVariant.copy(alpha = if (dark) 0.48f else 0.60f),
-    dividerLine = dividerLine.copy(alpha = if (dark) 0.45f else 0.55f),
-)
-
-/**
- * 应用主题（深模块：调用方只给「模式 + 强调色调 + 质感」，色阶与材质展开全在内部）。
+ * 应用主题（深模块：调用方只给「模式 + 强调色调 + 质感」，色阶、材质与对比度校验全在内部）。
  *
  * @param themeMode 明暗模式（跟随系统 / 深色 / 浅色）。
  * @param accent 强调色调；换色相即整页换色，具体色值由内部调色板生成。
  * @param dynamicColor 动态取色（Android 12+）；开启时以 [accent] 为种子覆盖自定义调色板。
- * @param backgroundTone 页面底色档位（同色相下改染色浓度）。
- * @param glassFinish 质感档位；非平面时提供玻璃上下文（氛围场 + 材质）并降 surface 不透明度。
+ * @param backgroundTone 页面底色档位（中性轴上的染色浓度）。
+ * @param glassFinish 质感档位；非平面时提供玻璃上下文（氛围场 + 材质）。
  */
 @Composable
 fun AiGatewayTheme(
@@ -175,45 +309,75 @@ fun AiGatewayTheme(
     if (dynamicColor) {
         // Monet 动态取色：仅 Monet* 模式读取 keyColor，以强调色为种子
         val controller = remember(colorSchemeMode, accent) {
-            ThemeController(colorSchemeMode, keyColor = hueTone(accent.normalizedHue, accent.normalizedChroma, 0.5f))
+            ThemeController(
+                colorSchemeMode,
+                keyColor = toneColor(accent.normalizedHue, accent.oklchChroma, 55f),
+            )
         }
         MiuixTheme(controller = controller) {
-            // 动态取色下需要覆写的只有两项：页面底色档位、玻璃要的半透 surface。
-            // 嵌套一层 MiuixTheme 做局部改色是 theme.md 认可的用法。
-            if (backgroundTone != BackgroundTone.Theme || glass) {
-                val colors = MiuixTheme.colorScheme
-                    .copy(background = toneBackground(MiuixTheme.colorScheme.background, dark, backgroundTone))
-                    .let { if (glass) it.asGlassScheme(dark) else it }
-                MiuixTheme(colors = colors) {
-                    GlassScope(
-                        rememberGlassContext(glassFinish, colors.background, accent.normalizedHue, dark),
-                        content = content,
+            val colors = MiuixTheme.colorScheme.let { monet ->
+                if (backgroundTone != BackgroundTone.Theme) {
+                    monet.copy(
+                        background = backgroundFor(
+                            accent.normalizedHue, dark, backgroundTone, accent.normalizedChroma,
+                        ),
                     )
+                } else {
+                    monet
                 }
-            } else {
-                GlassScope(
-                    rememberGlassContext(glassFinish, MiuixTheme.colorScheme.background, accent.normalizedHue, dark),
-                    content = content,
-                )
             }
+            ThemeLayer(colors = colors, accent = accent, dark = dark, finish = glassFinish, content = content)
         }
     } else {
         // isSystemInDarkTheme() 是 @Composable，必须在 remember 外调用
         val systemDark = isSystemInDarkTheme()
-        val scheme = remember(colorSchemeMode, accent, backgroundTone, glassFinish, systemDark) {
-            val base = when (colorSchemeMode) {
-                ColorSchemeMode.Light -> lightScheme(accent)
-                ColorSchemeMode.Dark -> darkScheme(accent)
-                else -> if (systemDark) darkScheme(accent) else lightScheme(accent)
+        val scheme = remember(colorSchemeMode, accent, backgroundTone, systemDark) {
+            when (colorSchemeMode) {
+                ColorSchemeMode.Light -> lightScheme(accent, backgroundTone)
+                ColorSchemeMode.Dark -> darkScheme(accent, backgroundTone)
+                else -> if (systemDark) darkScheme(accent, backgroundTone) else lightScheme(accent, backgroundTone)
             }
-            val toned = base.copy(background = toneBackground(base.background, dark, backgroundTone))
-            if (glass) toned.asGlassScheme(dark) else toned
         }
-        MiuixTheme(colors = scheme) {
+        ThemeLayer(colors = scheme, accent = accent, dark = dark, finish = glassFinish, content = content)
+    }
+}
+
+/** 把色板、语义叠加色与玻璃上下文一次性提供下去；调用方只需要 [content]。 */
+@Composable
+private fun ThemeLayer(
+    colors: Colors,
+    accent: ThemeAccent,
+    dark: Boolean,
+    finish: GlassFinish,
+    content: @Composable () -> Unit,
+) {
+    val effective = remember(colors, finish, dark) {
+        if (finish == GlassFinish.Flat) colors else colors.forGlass(dark)
+    }
+    val overlays = remember(effective, accent, dark) {
+        overlaysFor(primary = effective.primary, background = effective.background, dark = dark, tintHue = accent.normalizedHue)
+    }
+    MiuixTheme(colors = effective) {
+        CompositionLocalProvider(LocalOverlays provides overlays) {
             GlassScope(
-                rememberGlassContext(glassFinish, scheme.background, accent.normalizedHue, dark),
+                rememberGlassContext(finish, effective.background, accent.normalizedHue, dark),
                 content = content,
             )
         }
     }
 }
+
+/**
+ * 玻璃档下把控件层的 surface 系列降不透明度。
+ *
+ * 卡片本身改画玻璃后底色是透的，但卡内的开关轨道、下拉栏、进位条这些 miuix 子控件仍拿
+ * surfaceContainer* 当实心底；不降不透明度，它们会在一块透底玻璃上显出一块块实心面板。
+ * 文字类 token（on*）一律不动，对比度不受影响。
+ */
+private fun Colors.forGlass(dark: Boolean): Colors = copy(
+    surfaceContainer = surfaceContainer.copy(alpha = if (dark) 0.52f else 0.62f),
+    surfaceContainerHigh = surfaceContainerHigh.copy(alpha = if (dark) 0.55f else 0.66f),
+    surfaceContainerHighest = surfaceContainerHighest.copy(alpha = if (dark) 0.60f else 0.72f),
+    surfaceVariant = surfaceVariant.copy(alpha = if (dark) 0.48f else 0.60f),
+    dividerLine = dividerLine.copy(alpha = if (dark) 0.45f else 0.55f),
+)

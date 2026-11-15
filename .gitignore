@@ -13,6 +13,7 @@ keystore.properties
 
 # AiCode 本地配置（记忆、MCP 等），属于工具状态，不进仓库
 .aicode/
+.muse/
 
 # 只用于本地构建/诊断，不进仓库
 scripts/

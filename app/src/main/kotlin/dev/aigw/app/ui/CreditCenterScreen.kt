@@ -6,7 +6,6 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
-import top.yukonga.miuix.kmp.basic.SmallTitle
 import top.yukonga.miuix.kmp.basic.Text
 import top.yukonga.miuix.kmp.extra.SuperArrow
 import top.yukonga.miuix.kmp.theme.MiuixTheme
@@ -29,7 +28,7 @@ fun CreditCenterScreen(state: AppUiState, onOpen: (String) -> Unit, onBack: () -
                 }
             }
         } else {
-            item { SmallTitle("供应商") }
+            item { GroupTitle("供应商") }
             item {
                 GroupCard(modifier = Modifier.staggeredAppear(0)) {
                     providers.forEachIndexed { index, info ->
@@ -79,7 +78,7 @@ fun ProviderCreditsScreen(
         } else {
             for ((i, account) in accounts.withIndex()) {
                 val packs = state.creditPacks["$providerId/${account.uid}"].orEmpty()
-                item(key = account.uid) { SmallTitle(account.nickname.ifEmpty { account.uid }) }
+                item(key = account.uid) { GroupTitle(account.nickname.ifEmpty { account.uid }) }
                 item(key = "${account.uid}/card") {
                     SectionCard(enterIndex = 2) {
                         Text(

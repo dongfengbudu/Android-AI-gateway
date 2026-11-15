@@ -24,7 +24,6 @@ import androidx.compose.ui.unit.dp
 import dev.aigw.app.ui.providers.ProviderUiActions
 import dev.aigw.app.ui.providers.ProviderUiRegistry
 import top.yukonga.miuix.kmp.basic.Icon
-import top.yukonga.miuix.kmp.basic.SmallTitle
 import top.yukonga.miuix.kmp.basic.Text
 import top.yukonga.miuix.kmp.extra.SuperSwitch
 import top.yukonga.miuix.kmp.icon.MiuixIcons
@@ -144,7 +143,7 @@ fun ProviderDetailScreen(
 
         // 账号列表由供应商组件自管（如 WorkBuddy 按国内外分区）时，不再重复渲染通用账号卡
         if (accounts.isNotEmpty() && !ui.managesOwnAccounts) {
-            item { SmallTitle("账号") }
+            item { GroupTitle("账号") }
             item {
             SectionCard(enterIndex = 0) {
                 Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {

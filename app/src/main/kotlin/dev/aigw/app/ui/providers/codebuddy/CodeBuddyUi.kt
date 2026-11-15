@@ -29,12 +29,12 @@ import androidx.compose.ui.unit.sp
 import com.google.gson.JsonObject
 import dev.aigw.app.ui.AccountInfoRow
 import dev.aigw.app.ui.ChoiceChip
+import dev.aigw.app.ui.GroupTitle
 import dev.aigw.app.ui.OutlineActionButton
 import dev.aigw.app.ui.SectionCard
 import dev.aigw.app.ui.SectionHeader
 import dev.aigw.app.ui.accountStatusText
 import top.yukonga.miuix.kmp.basic.HorizontalDivider
-import top.yukonga.miuix.kmp.basic.SmallTitle
 import dev.aigw.app.ui.providers.ProviderUi
 import dev.aigw.app.ui.providers.ProviderUiActions
 import dev.aigw.core.pool.AccountStatus
@@ -155,7 +155,7 @@ object CodeBuddyUi : ProviderUi {
             }
             return
         }
-        SmallTitle("账号 · ${scoped.size} 个")
+        GroupTitle("账号 · ${scoped.size} 个")
         // 每个账号一张独立卡片，避免多个账号混在一张卡里分不清边界（与 CustomUi 一致）
         scoped.forEachIndexed { index, account ->
             SectionCard(enterIndex = 2 + index) {

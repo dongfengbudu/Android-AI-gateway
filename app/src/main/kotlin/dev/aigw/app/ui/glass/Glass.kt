@@ -88,9 +88,9 @@ fun rememberGlassContext(finish: GlassFinish, background: Color, hue: Float, dar
 @Composable
 fun glassEnabled(): Boolean = LocalGlassContext.current.finish != GlassFinish.Flat
 
-/** 卡片玻璃。圆角与 miuix Card 对齐（16dp），但改用连续曲率边——iOS 的玻璃边不是圆弧。 */
+/** 卡片玻璃。圆角与 Radius.card 对齐（20dp），改用连续曲率边——iOS 的玻璃边不是圆弧。 */
 @Composable
-fun Modifier.glassCard(cornerRadius: Dp = 16.dp): Modifier {
+fun Modifier.glassCard(cornerRadius: Dp = 20.dp): Modifier {
     val shape = remember(cornerRadius) { RoundedRectangle(cornerRadius, RoundedCornerStyle.Continuous) }
     return glassSurface(GlassSurface.Card, shape)
 }

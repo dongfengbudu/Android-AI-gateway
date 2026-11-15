@@ -18,7 +18,6 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import dev.aigw.core.gateway.ProxyType
 import top.yukonga.miuix.kmp.basic.HorizontalDivider
-import top.yukonga.miuix.kmp.basic.SmallTitle
 import top.yukonga.miuix.kmp.basic.Text
 import top.yukonga.miuix.kmp.basic.TextButton
 import top.yukonga.miuix.kmp.basic.TextField
@@ -49,7 +48,7 @@ fun ProxyScreen(state: AppUiState, viewModel: AppViewModel, onBack: () -> Unit) 
         subtitle = if (settings.usable) "已启用 ${settings.host}:${settings.port}" else "未启用",
         leading = { BackButton(onBack) },
     ) {
-        item { SmallTitle("代理") }
+        item { GroupTitle("代理") }
         item {
         SectionCard(enterIndex = 0) {
             Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
@@ -139,7 +138,7 @@ fun ProxyScreen(state: AppUiState, viewModel: AppViewModel, onBack: () -> Unit) 
         }
         }
 
-        item { SmallTitle("走代理的供应商") }
+        item { GroupTitle("走代理的供应商") }
         item {
         SectionCard(enterIndex = 1) {
             if (state.providers.isEmpty()) {

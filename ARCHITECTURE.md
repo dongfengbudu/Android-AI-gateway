@@ -110,6 +110,26 @@
 | `ui/Motion.kt` | 全局动效参数与Modifier |
 | `ui/glass/Glass.kt` | 液态玻璃材质层：质感档位（平面/玻璃/清透）+ 按表面类型（卡片/栏/胶囊/凹槽）展开的光学参数；渲染原语来自 Backdrop（AGSL 边缘折射 + RenderEffect 背景模糊） |
 | `ui/glass/GlassField.kt` | 氛围场：按强调色展开的极光底，同时作为 `Backdrop` 供每个玻璃表面按屏幕坐标采自己的那一片 |
+| `ui/theme/Tone.kt` | 色阶数学底座：OKLCH→sRGB（感知均匀）与 WCAG 对比度校验，只暴露 `toneColor` / `toneMeeting` |
+| `ui/theme/Space.kt` | 间距/圆角/尺寸阶梯：`Space`（4dp 基准七档）+ `Edge`（页边距/组间距/卡内边距等语义别名）、`Radius`、`Size` |
+| `ui/theme/AppType.kt` | 排版阶梯，按信息角色命名（Display/Number/Title/SectionTitle/Body/Label/Meta/Micro），不带颜色 |
+| `ui/theme/Overlays.kt` | 语义叠加色（弱底/光环/轨道/描边等带 alpha 的角色），走 `LocalOverlays`；页面不准再手写 `copy(alpha=…)` |
+
+#### 设计 token（UI 交接要点，写页面前先看这段）
+
+所有页面只允许引用 token，不写字面量：间距用 `Edge.*`（卡内 `Edge.cardPad`、卡片间距 `Edge.groupGap`、
+页边距 `Edge.screen`），字号用 `AppType.*`（按角而不是按字号选：关键数字 `Number`、区块标题 `Title`、
+正文 `Body`、说明 `Meta`、徽标 `Micro`），带透明度的底色用 `LocalOverlays.current.*`。
+
+- **为什么换掉 HSL**：HSL 的明度与人眼亮度不相关（同一 L 下黄色比蓝色亮很多），按固定明度阶梯
+  展开的色板一换色相对比度就漂。`Tone.kt` 改用 OKLCH tone（0..100 感知均匀），且每个前景色都经过
+  `readableOn` 在它**真实背色**上做 WCAG 校验（正文 7:1、次要 4.5:1），所以换任何强调色、切任何底色
+  档位，正文都不会调到不可读。
+- **中性底 + 强调点缀**：大面积（页面/卡片/描边/正文）全是中性阶，强调色只上主按钮、选中态、链接、
+  状态强调。色相环的饱和度（`ThemeAccent.chroma`）现在驱动的是**中性阶染色浓度**（`tintChroma`），
+  主彩度固定取 `AccentChroma`（手选低饱和色时主色不会变脏，饱和度靠染色体现）。
+- **分组标题只有一个**：卡片外页面级分组用 `GroupTitle`（17sp 半粗、`onBackground`、上 24dp），
+  卡内小节标签用 `SectionHeader`（13sp 灰 + 字距）。miuix 自带的 `SmallTitle` 已全部替换，不要再引入。
 
 #### 液态玻璃质感（UI 交接要点）
 

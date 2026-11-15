@@ -38,6 +38,12 @@ import dev.aigw.app.ui.glass.glassBar
 import dev.aigw.app.ui.glass.glassCard
 import dev.aigw.app.ui.glass.glassEnabled
 import dev.aigw.app.ui.glass.glassWell
+import dev.aigw.app.ui.theme.AppType
+import dev.aigw.app.ui.theme.Edge
+import dev.aigw.app.ui.theme.LocalOverlays
+import dev.aigw.app.ui.theme.Radius
+import dev.aigw.app.ui.theme.Size
+import dev.aigw.app.ui.theme.Space
 import dev.aigw.app.ui.theme.WarnAmber
 import dev.aigw.core.pool.AccountStatus
 import dev.aigw.core.usage.LogLevel
@@ -116,19 +122,19 @@ fun PageScaffold(
         ) {
             item {
                 Column {
-                    Spacer(Modifier.height(12.dp))
+                    Spacer(Modifier.height(Space.xs))
                     // miuix 0.8.8 的 TopAppBar 没有 subtitle 参数，副标题由页面内容区首行展示
                     if (subtitle.isNotEmpty()) {
                         Text(
                             text = subtitle,
-                            style = MiuixTheme.textStyles.footnote1,
+                            style = AppType.Meta,
                             color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
                             maxLines = 1,
                             overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .padding(horizontal = 26.dp)
-                                .padding(bottom = 4.dp),
+                                .padding(horizontal = Edge.screen)
+                                .padding(bottom = Space.xxs),
                         )
                     }
                 }
@@ -147,7 +153,7 @@ fun BackButton(onBack: () -> Unit) {
     }
 }
 
-/** miuix 标准分组容器：横向 12dp + 底部 12dp 外边距，内部 0 边距（Super* 行自带 16dp 内边距）。
+/** 分组容器：横向 Edge.screen + 底部 Edge.groupGap 外边距，内部 0 边距（Super* 行自带自己的内边距）。
  *  仅用于装 Super* 设置行；普通内容卡用 [SectionCard]。 */
 @Composable
 fun GroupCard(
@@ -157,23 +163,23 @@ fun GroupCard(
     Card(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(horizontal = 12.dp)
-            .padding(bottom = 12.dp)
-            .then(if (glassEnabled()) Modifier.glassCard() else Modifier)
+            .padding(horizontal = Edge.screen)
+            .padding(bottom = Edge.groupGap)
+            .then(if (glassEnabled()) Modifier.glassCard(Radius.card) else Modifier)
             .then(modifier),
         colors = glassCardColors(),
         content = content,
     )
 }
 
-/** 组内行间分割线：与卡片内文字左对齐（16dp 缩进）。每行之间加，最后一行后不加。 */
+/** 组内行间分割线：与卡片内文字左对齐（Edge.cardPad 缩进）。每行之间加，最后一行后不加。 */
 @Composable
 fun GroupDivider() {
-    HorizontalDivider(modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp))
+    HorizontalDivider(modifier = Modifier.fillMaxWidth().padding(horizontal = Edge.cardPad))
 }
 
-/** 内容卡：Miuix 卡片 + 16dp 内边距 + 横向 12dp 外边距；[enterIndex] 非空时带错峰入场动效。
- *  自带底部间距，列表项无需再包 Box。 */
+/** 内容卡：Edge.cardPad 内边距 + Edge.screen 横向外边距 + Edge.groupGap 底部间距；
+ *  [enterIndex] 非空时带错峰入场动效。自带底部间距，列表项无需再包 Box。 */
 @Composable
 fun SectionCard(
     modifier: Modifier = Modifier,
@@ -183,11 +189,11 @@ fun SectionCard(
     Card(
         modifier = Modifier
             .then(if (enterIndex != null) Modifier.staggeredAppear(enterIndex) else Modifier)
-            .padding(horizontal = 12.dp)
-            .padding(bottom = 12.dp)
-            .then(if (glassEnabled()) Modifier.glassCard() else Modifier)
+            .padding(horizontal = Edge.screen)
+            .padding(bottom = Edge.groupGap)
+            .then(if (glassEnabled()) Modifier.glassCard(Radius.card) else Modifier)
             .then(modifier),
-        insideMargin = PaddingValues(16.dp),
+        insideMargin = PaddingValues(Edge.cardPad),
         colors = glassCardColors(),
         content = content,
     )
@@ -217,7 +223,7 @@ fun DialogButtonRow(
 ) {
     Row(
         modifier = Modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.spacedBy(12.dp),
+        horizontalArrangement = Arrangement.spacedBy(Space.sm),
     ) {
         TextButton(text = cancelText, onClick = onCancel, modifier = Modifier.weight(1f))
         TextButton(
@@ -240,10 +246,10 @@ fun AccountInfoRow(
     valueColor: Color = MiuixTheme.colorScheme.primary,
 ) {
     Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-        Text(label, style = MiuixTheme.textStyles.body2, color = MiuixTheme.colorScheme.onSurfaceVariantSummary)
+        Text(label, style = AppType.Label, color = MiuixTheme.colorScheme.onSurfaceVariantSummary)
         Text(
             text = value,
-            style = MiuixTheme.textStyles.body2,
+            style = AppType.Label,
             fontWeight = FontWeight.SemiBold,
             color = valueColor,
             modifier = Modifier.weight(1f),
@@ -256,6 +262,7 @@ fun AccountInfoRow(
 @Composable
 fun StatusChip(running: Boolean) {
     val accent = MiuixTheme.colorScheme.primary
+    val overlays = LocalOverlays.current
     val content by animateColorAsState(
         targetValue = MiuixTheme.colorScheme.onSurface,
         animationSpec = tween(200),
@@ -265,19 +272,19 @@ fun StatusChip(running: Boolean) {
         modifier = Modifier
             .clip(CircleShape)
             .then(
-                if (glassEnabled()) Modifier.glassWell(999.dp) // 胶囊形，但取凹槽这一档的弱折射
-                else Modifier.background(MiuixTheme.colorScheme.surfaceContainer)
+                if (glassEnabled()) Modifier.glassWell(Radius.chip) // 胶囊形，但取凹槽这一档的弱折射
+                else Modifier.background(overlays.track)
             )
-            .padding(start = 12.dp, end = 14.dp, top = 6.dp, bottom = 6.dp),
+            .padding(start = Space.sm, end = Space.md, top = Space.xs, bottom = Space.xs),
         verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(6.dp),
+        horizontalArrangement = Arrangement.spacedBy(Space.xs),
     ) {
         Box(
             modifier = Modifier.size(6.dp), // 固定占位尺寸，光环不参与对齐计算，圆点与文字始终垂直居中
             contentAlignment = Alignment.Center,
         ) {
             if (running) {
-                Box(Modifier.size(14.dp).clip(CircleShape).background(accent.copy(alpha = 0.18f)))
+                Box(Modifier.size(14.dp).clip(CircleShape).background(overlays.accentGlow))
             }
             Box(
                 Modifier
@@ -288,7 +295,7 @@ fun StatusChip(running: Boolean) {
         }
         Text(
             text = if (running) "运行中" else "已停止",
-            style = MiuixTheme.textStyles.footnote1,
+            style = AppType.Label,
             color = content,
         )
     }
@@ -306,15 +313,13 @@ fun StatCell(
     Column(modifier = modifier, horizontalAlignment = Alignment.Start) {
         Text(
             text = label,
-            style = MiuixTheme.textStyles.footnote2,
-            letterSpacing = 0.8.sp,
+            style = AppType.Meta.copy(letterSpacing = 0.8.sp),
             color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
             maxLines = 1,
         )
         Text(
             text = value,
-            style = MiuixTheme.textStyles.headline1,
-            fontWeight = FontWeight.Light,
+            style = AppType.Number,
             color = if (indicatorColor != Color.Unspecified) indicatorColor else MiuixTheme.colorScheme.onSurface,
             maxLines = 1,
             softWrap = false,
@@ -336,7 +341,7 @@ fun ChoiceChip(
     onClick: () -> Unit,
 ) {
     val container by animateColorAsState(
-        targetValue = if (selected) MiuixTheme.colorScheme.onSurface else MiuixTheme.colorScheme.surfaceContainer,
+        targetValue = if (selected) MiuixTheme.colorScheme.onSurface else LocalOverlays.current.track,
         animationSpec = tween(200),
         label = "choiceContainer",
     )
@@ -347,12 +352,12 @@ fun ChoiceChip(
             .pressScale()
             .clip(CircleShape)
             // 玻璃档只给未选中态上玻璃：选中态保持实心底，靠「实心 / 玻璃」区分选中
-            .then(if (!glass || selected) Modifier.background(container) else Modifier.glassWell(999.dp))
+            .then(if (!glass || selected) Modifier.background(container) else Modifier.glassWell(Radius.chip))
             .clickable(onClick = onClick)
-            .padding(horizontal = 16.dp, vertical = 10.dp),
+            .padding(horizontal = Space.md, vertical = Space.sm),
         contentAlignment = Alignment.Center,
     ) {
-        Text(text, style = MiuixTheme.textStyles.footnote1, color = content)
+        Text(text, style = AppType.Label, color = content)
     }
 }
 
@@ -361,17 +366,17 @@ fun ChoiceChip(
 fun AddressTile(value: String, onCopy: () -> Unit) {
     Text(
         text = value,
-        style = MiuixTheme.textStyles.body2.copy(fontFamily = FontFamily.Monospace),
+        style = AppType.Label.copy(fontFamily = FontFamily.Monospace),
         color = MiuixTheme.colorScheme.onSurface,
         modifier = Modifier
             .fillMaxWidth()
-            .clip(RoundedCornerShape(8.dp))
+            .clip(RoundedCornerShape(Radius.inner))
             .then(
-                if (glassEnabled()) Modifier.glassWell(8.dp)
+                if (glassEnabled()) Modifier.glassWell(Radius.inner)
                 else Modifier.background(MiuixTheme.colorScheme.surfaceVariant)
             )
             .clickable(onClick = onCopy)
-            .padding(horizontal = 14.dp, vertical = 12.dp),
+            .padding(horizontal = Space.md, vertical = Space.sm),
     )
 }
 
@@ -385,23 +390,23 @@ fun OutlineActionButton(
 ) {
     Button(
         onClick = onClick,
-        modifier = modifier.fillMaxWidth(),
+        modifier = modifier.fillMaxWidth().height(Size.button),
         enabled = enabled,
         colors = ButtonDefaults.buttonColorsPrimary(),
     ) {
-        Text(text, style = MiuixTheme.textStyles.main)
+        Text(text, style = AppType.Label)
     }
 }
 
 @Composable
 fun EmptyHint(title: String, message: String) {
-    Column(Modifier.fillMaxWidth().padding(vertical = 28.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-        Text(title, style = MiuixTheme.textStyles.headline2, color = MiuixTheme.colorScheme.onSurface)
-        Text(message, style = MiuixTheme.textStyles.body2, color = MiuixTheme.colorScheme.onSurfaceVariantSummary)
+    Column(Modifier.fillMaxWidth().padding(vertical = Space.lg), verticalArrangement = Arrangement.spacedBy(Space.xs)) {
+        Text(title, style = AppType.Title, color = MiuixTheme.colorScheme.onSurface)
+        Text(message, style = AppType.Body, color = MiuixTheme.colorScheme.onSurfaceVariantSummary)
     }
 }
 
-/** 小节头：左小灰大写标题 + 右侧可选主色小链接（仅用于内容卡内部，分组标题一律用 SmallTitle）。 */
+/** 小节头：左小灰大写标题 + 右侧可选主色小链接（仅用于内容卡内部，页面级分组标题用 GroupTitle）。 */
 @Composable
 fun SectionHeader(title: String, action: String? = null, onAction: (() -> Unit)? = null) {
     val accentVariant = MiuixTheme.colorScheme.primaryVariant
@@ -411,20 +416,19 @@ fun SectionHeader(title: String, action: String? = null, onAction: (() -> Unit)?
             // 与卡内正文基线对齐：小节头文字偏小，底部补 2dp 视觉对齐
             .padding(bottom = 2.dp),
         verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(8.dp),
+        horizontalArrangement = Arrangement.spacedBy(Space.xs),
     ) {
         Text(
             text = title,
-            style = MiuixTheme.textStyles.footnote1,
+            style = AppType.Meta.copy(letterSpacing = 1.0.sp),
             fontWeight = FontWeight.SemiBold,
-            letterSpacing = 1.2.sp,
             color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
             modifier = Modifier.weight(1f),
         )
         if (action != null) {
             Text(
                 text = action,
-                style = MiuixTheme.textStyles.footnote1,
+                style = AppType.Meta,
                 color = accentVariant,
                 modifier = if (onAction != null) Modifier.clickable(onClick = onAction) else Modifier,
             )
@@ -433,16 +437,35 @@ fun SectionHeader(title: String, action: String? = null, onAction: (() -> Unit)?
 }
 
 /**
+ * 分组标题：卡片之外的页面级分组名。
+ *
+ * 与卡内的 [SectionHeader] 是两个角色，视觉上必须一眼分开：这里是 17sp 半粗、高对比、上下留白更大；
+ * 卡内小节是 13sp 灰字带字距。此前两者都是 13/14sp 灰字，页面层级因此糊成一片。
+ */
+@Composable
+fun GroupTitle(text: String, modifier: Modifier = Modifier) {
+    Text(
+        text = text,
+        style = AppType.SectionTitle,
+        color = MiuixTheme.colorScheme.onBackground,
+        modifier = modifier
+            .fillMaxWidth()
+            .padding(horizontal = Edge.screen)
+            .padding(top = Edge.sectionGap, bottom = Space.xs),
+    )
+}
+
+/**
  * 额度包进度条：一行「名称（分组）+ 过期时间」，下方细进度条 + 右侧百分比。
  */
 @Composable
 fun QuotaPackBar(pack: dev.aigw.core.provider.QuotaPack) {
     val accent = MiuixTheme.colorScheme.primary
-    Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+    Column(verticalArrangement = Arrangement.spacedBy(Space.xxs)) {
         Row(Modifier.fillMaxWidth()) {
             Text(
                 text = if (pack.group.isEmpty()) pack.name else "${pack.name}（${pack.group}）",
-                style = MiuixTheme.textStyles.footnote1,
+                style = AppType.Label,
                 modifier = Modifier.weight(1f),
             )
             Text(
@@ -450,14 +473,14 @@ fun QuotaPackBar(pack: dev.aigw.core.provider.QuotaPack) {
                     java.text.DateFormat.SHORT,
                     java.text.DateFormat.SHORT,
                 ).format(java.util.Date(pack.expireAt * 1000)) else "",
-                style = MiuixTheme.textStyles.footnote1,
+                style = AppType.Micro,
                 color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
             )
         }
         Row(
             modifier = Modifier.fillMaxWidth(),
             verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            horizontalArrangement = Arrangement.spacedBy(Space.xs),
         ) {
             val fraction = if (pack.limit > 0) {
                 (pack.remain.toFloat() / pack.limit).coerceIn(0f, 1f)
@@ -467,9 +490,9 @@ fun QuotaPackBar(pack: dev.aigw.core.provider.QuotaPack) {
             Box(
                 Modifier
                     .weight(1f)
-                    .height(6.dp)
+                    .height(Size.barTrack)
                     .clip(CircleShape)
-                    .background(MiuixTheme.colorScheme.surfaceContainerHighest),
+                    .background(LocalOverlays.current.track),
             ) {
                 val barFraction by animateFloatAsState(
                     targetValue = fraction,
@@ -479,7 +502,7 @@ fun QuotaPackBar(pack: dev.aigw.core.provider.QuotaPack) {
                 Box(
                     Modifier
                         .fillMaxWidth(barFraction)
-                        .height(6.dp)
+                        .height(Size.barTrack)
                         .clip(CircleShape)
                         .background(
                             when {
@@ -496,7 +519,7 @@ fun QuotaPackBar(pack: dev.aigw.core.provider.QuotaPack) {
                 } else {
                     "—"
                 },
-                style = MiuixTheme.textStyles.footnote2,
+                style = AppType.Micro,
                 color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
             )
         }

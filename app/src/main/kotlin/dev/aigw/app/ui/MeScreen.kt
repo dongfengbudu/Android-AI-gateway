@@ -28,7 +28,6 @@ import dev.aigw.core.usage.StorageAudit
 import top.yukonga.miuix.kmp.basic.HorizontalDivider
 import top.yukonga.miuix.kmp.basic.Icon
 import top.yukonga.miuix.kmp.basic.IconButton
-import top.yukonga.miuix.kmp.basic.SmallTitle
 import top.yukonga.miuix.kmp.basic.Text
 import top.yukonga.miuix.kmp.basic.TextButton
 import top.yukonga.miuix.kmp.icon.MiuixIcons
@@ -83,7 +82,7 @@ fun MeScreen(state: AppUiState, viewModel: AppViewModel, open: (SubPage) -> Unit
             }
         }
 
-        item { SmallTitle("外观") }
+        item { GroupTitle("外观") }
         item {
             GroupCard {
                 SuperSwitch(
@@ -104,7 +103,7 @@ fun MeScreen(state: AppUiState, viewModel: AppViewModel, open: (SubPage) -> Unit
             }
         }
 
-        item { SmallTitle("核心功能") }
+        item { GroupTitle("核心功能") }
         item {
             GroupCard {
                 SuperArrow(
@@ -163,7 +162,7 @@ fun MeScreen(state: AppUiState, viewModel: AppViewModel, open: (SubPage) -> Unit
             }
         }
 
-        item { SmallTitle("日志与更新") }
+        item { GroupTitle("日志与更新") }
         item {
             GroupCard {
                 SuperSwitch(
@@ -198,7 +197,7 @@ fun MeScreen(state: AppUiState, viewModel: AppViewModel, open: (SubPage) -> Unit
             }
         }
 
-        item { SmallTitle("关于") }
+        item { GroupTitle("关于") }
         item {
             SectionCard {
                 Text(
@@ -296,7 +295,7 @@ fun UsageScreen(state: AppUiState, viewModel: AppViewModel, onBack: () -> Unit) 
         subtitle = "累计与今日",
         leading = { BackButton(onBack) },
     ) {
-        item { SmallTitle("今日") }
+        item { GroupTitle("今日") }
         item {
             SectionCard(enterIndex = 3) {
                 Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceEvenly) {
@@ -311,7 +310,7 @@ fun UsageScreen(state: AppUiState, viewModel: AppViewModel, onBack: () -> Unit) 
             }
         }
 
-        item { SmallTitle("累计") }
+        item { GroupTitle("累计") }
         item {
             SectionCard(enterIndex = 4) {
                 Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceEvenly) {
@@ -326,7 +325,7 @@ fun UsageScreen(state: AppUiState, viewModel: AppViewModel, onBack: () -> Unit) 
             }
         }
 
-        item { SmallTitle("最近调用") }
+        item { GroupTitle("最近调用") }
         item {
             SectionCard(enterIndex = 5) {
                 if (state.calls.isEmpty()) {
@@ -351,7 +350,7 @@ fun UsageScreen(state: AppUiState, viewModel: AppViewModel, onBack: () -> Unit) 
             }
         }
 
-        item { SmallTitle("存储") }
+        item { GroupTitle("存储") }
         item {
             SectionCard(enterIndex = 6) {
                 Text(

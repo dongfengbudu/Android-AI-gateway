@@ -19,7 +19,6 @@ import androidx.compose.ui.unit.dp
 import dev.aigw.core.gateway.GatewaySettings
 import dev.aigw.core.usage.StorageAudit
 import top.yukonga.miuix.kmp.basic.HorizontalDivider
-import top.yukonga.miuix.kmp.basic.SmallTitle
 import top.yukonga.miuix.kmp.basic.Text
 import top.yukonga.miuix.kmp.basic.TextField
 import top.yukonga.miuix.kmp.theme.MiuixTheme
@@ -67,7 +66,7 @@ fun DataManagementScreen(state: AppUiState, viewModel: AppViewModel, onBack: () 
             }
         }
 
-        item { SmallTitle("清理") }
+        item { GroupTitle("清理") }
         item {
             SectionCard(enterIndex = 1) {
                 Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
