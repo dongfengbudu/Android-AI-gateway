@@ -366,15 +366,31 @@ private fun ThemeLayer(
     finish: GlassFinish,
     content: @Composable () -> Unit,
 ) {
-    // 活动实例，不能一次性 copy：动态取色下 miuix 就地更新同一个 Colors 对象，快照会把换壁纸前的色钉住。
-    // 只从 colors 读、往 effective 写；反过来会在本作用域形成读后写自激重组。
-    val effective = remember(colors) { colors.copy() }.apply {
-        updateColorsFrom(colors)
-        if (finish != GlassFinish.Flat) applyGlassSurfaceAlpha(colors, dark)
+    // 先把当前色值读出来。Colors 的字段是 mutableStateOf，读取即订阅：系统换壁纸调色后这里会重组。
+    // 必须拿色值当 remember key——miuix 动态模式是就地更新同一个 Colors 实例（引用不变），
+    // 只记引用的话换色后拿到的仍是旧快照（实测就是这个把动态取色卡住）。
+    val primary = colors.primary
+    val background = colors.background
+    val container = colors.surfaceContainer
+    val containerHighest = colors.surfaceContainerHighest
+    val variant = colors.surfaceVariant
+
+    // 只读不写：Colors 的字段在库外不能直接赋值（只有 copy 公开），所以玻璃覆写只能派生新对象。
+    val effective = remember(colors, primary, background, container, containerHighest, variant, dark, finish) {
+        if (finish == GlassFinish.Flat) {
+            colors
+        } else {
+            // 玻璃档：卡内 miuix 子控件（开关轨道、下拉栏、进度条）仍拿 surface* 当实心底，
+            // 不降不透明度会在一块透底玻璃上显出实心面板；文字类 token（on*）一律不动。
+            colors.copy(
+                surfaceContainer = container.copy(alpha = if (dark) 0.52f else 0.62f),
+                surfaceContainerHigh = colors.surfaceContainerHigh.copy(alpha = if (dark) 0.55f else 0.66f),
+                surfaceContainerHighest = containerHighest.copy(alpha = if (dark) 0.60f else 0.72f),
+                surfaceVariant = variant.copy(alpha = if (dark) 0.48f else 0.60f),
+                dividerLine = colors.dividerLine.copy(alpha = if (dark) 0.45f else 0.55f),
+            )
+        }
     }
-    // 取实际参与计算的两个色值当 key（Colors 字段是 mutableStateOf，整对象当 key 不会随内容变化重组）
-    val primary = effective.primary
-    val background = effective.background
     val overlays = remember(primary, background, dark, accent.normalizedHue) {
         overlaysFor(primary = primary, background = background, dark = dark, tintHue = accent.normalizedHue)
     }
@@ -388,17 +404,3 @@ private fun ThemeLayer(
     }
 }
 
-/**
- * 玻璃档下把控件层的 surface 系列降不透明度，结果写入接收者。
- *
- * 卡片本身改画玻璃后底色是透的，但卡内的开关轨道、下拉栏、进位条这些 miuix 子控件仍拿
- * surfaceContainer* 当实心底；不降不透明度，它们会在一块透底玻璃上显出一块块实心面板。
- * 文字类 token（on*）一律不动，对比度不受影响。色值一律从 [source] 取，保证可反复调用不累加 alpha。
- */
-private fun Colors.applyGlassSurfaceAlpha(source: Colors, dark: Boolean) {
-    surfaceContainer = source.surfaceContainer.copy(alpha = if (dark) 0.52f else 0.62f)
-    surfaceContainerHigh = source.surfaceContainerHigh.copy(alpha = if (dark) 0.55f else 0.66f)
-    surfaceContainerHighest = source.surfaceContainerHighest.copy(alpha = if (dark) 0.60f else 0.72f)
-    surfaceVariant = source.surfaceVariant.copy(alpha = if (dark) 0.48f else 0.60f)
-    dividerLine = source.dividerLine.copy(alpha = if (dark) 0.45f else 0.55f)
-}
