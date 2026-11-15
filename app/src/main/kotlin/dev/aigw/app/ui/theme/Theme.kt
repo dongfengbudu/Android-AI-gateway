@@ -302,7 +302,8 @@ fun isDarkTheme(themeMode: ThemeMode): Boolean = when (themeMode) {
  *
  * @param themeMode 明暗模式（跟随系统 / 深色 / 浅色）。
  * @param accent 强调色调；换色相即整页换色，具体色值由内部调色板生成。
- * @param dynamicColor 动态取色（Android 12+）；开启时以 [accent] 为种子覆盖自定义调色板。
+ * @param dynamicColor 动态取色（Android 12+）；开启时整盘色由系统调色板接管，[accent] 与
+ *   [backgroundTone] 暂不参与（否则会出现两个来源互相覆写）。
  * @param backgroundTone 页面底色档位（中性轴上的染色浓度）。
  * @param glassFinish 质感档位；非平面时提供玻璃上下文（氛围场 + 材质）。
  */
@@ -324,26 +325,23 @@ fun AiGatewayTheme(
     }
 
     if (dynamicColor) {
-        // Monet 动态取色：仅 Monet* 模式读取 keyColor，以强调色为种子
-        val controller = remember(colorSchemeMode, accent) {
-            ThemeController(
-                colorSchemeMode,
-                keyColor = toneColor(accent.normalizedHue, accent.oklchChroma, 55f),
-            )
+        // 动态取色必须传 keyColor = null：ThemeController.currentColors() 是
+        // `keyColor?.let { colorsFromSeed(它) } ?: platformDynamicColors(dark)`，只要 keyColor 非空
+        // 就只会用这个种子自己拼一套 MD3 方案，永远不读系统调色板（settings 里的
+        // theme_customization_overlay_packages / system_palette）。之前恒传强调色种子，
+        // 出来的色相跟用户自己选的差不多，开关看着就像没生效。
+        val controller = remember(colorSchemeMode) {
+            ThemeController(colorSchemeMode, keyColor = null)
         }
         MiuixTheme(controller = controller) {
-            val colors = MiuixTheme.colorScheme.let { monet ->
-                if (backgroundTone != BackgroundTone.Theme) {
-                    monet.copy(
-                        background = backgroundFor(
-                            accent.normalizedHue, dark, backgroundTone, accent.normalizedChroma,
-                        ),
-                    )
-                } else {
-                    monet
-                }
-            }
-            ThemeLayer(colors = colors, accent = accent, dark = dark, finish = glassFinish, content = content)
+            // 动态模式下不覆写 background：整盘色由系统接管，再用强调色算一个底色只会与系统打架
+            ThemeLayer(
+                colors = MiuixTheme.colorScheme,
+                accent = accent,
+                dark = dark,
+                finish = glassFinish,
+                content = content,
+            )
         }
     } else {
         // isSystemInDarkTheme() 是 @Composable，必须在 remember 外调用
@@ -368,16 +366,22 @@ private fun ThemeLayer(
     finish: GlassFinish,
     content: @Composable () -> Unit,
 ) {
-    val effective = remember(colors, finish, dark) {
-        if (finish == GlassFinish.Flat) colors else colors.forGlass(dark)
+    // 活动实例，不能一次性 copy：动态取色下 miuix 就地更新同一个 Colors 对象，快照会把换壁纸前的色钉住。
+    // 只从 colors 读、往 effective 写；反过来会在本作用域形成读后写自激重组。
+    val effective = remember(colors) { colors.copy() }.apply {
+        updateColorsFrom(colors)
+        if (finish != GlassFinish.Flat) applyGlassSurfaceAlpha(colors, dark)
     }
-    val overlays = remember(effective, accent, dark) {
-        overlaysFor(primary = effective.primary, background = effective.background, dark = dark, tintHue = accent.normalizedHue)
+    // 取实际参与计算的两个色值当 key（Colors 字段是 mutableStateOf，整对象当 key 不会随内容变化重组）
+    val primary = effective.primary
+    val background = effective.background
+    val overlays = remember(primary, background, dark, accent.normalizedHue) {
+        overlaysFor(primary = primary, background = background, dark = dark, tintHue = accent.normalizedHue)
     }
     MiuixTheme(colors = effective) {
         CompositionLocalProvider(LocalOverlays provides overlays) {
             GlassScope(
-                rememberGlassContext(finish, effective.background, accent.normalizedHue, dark),
+                rememberGlassContext(finish, background, accent.normalizedHue, dark),
                 content = content,
             )
         }
@@ -385,16 +389,16 @@ private fun ThemeLayer(
 }
 
 /**
- * 玻璃档下把控件层的 surface 系列降不透明度。
+ * 玻璃档下把控件层的 surface 系列降不透明度，结果写入接收者。
  *
  * 卡片本身改画玻璃后底色是透的，但卡内的开关轨道、下拉栏、进位条这些 miuix 子控件仍拿
  * surfaceContainer* 当实心底；不降不透明度，它们会在一块透底玻璃上显出一块块实心面板。
- * 文字类 token（on*）一律不动，对比度不受影响。
+ * 文字类 token（on*）一律不动，对比度不受影响。色值一律从 [source] 取，保证可反复调用不累加 alpha。
  */
-private fun Colors.forGlass(dark: Boolean): Colors = copy(
-    surfaceContainer = surfaceContainer.copy(alpha = if (dark) 0.52f else 0.62f),
-    surfaceContainerHigh = surfaceContainerHigh.copy(alpha = if (dark) 0.55f else 0.66f),
-    surfaceContainerHighest = surfaceContainerHighest.copy(alpha = if (dark) 0.60f else 0.72f),
-    surfaceVariant = surfaceVariant.copy(alpha = if (dark) 0.48f else 0.60f),
-    dividerLine = dividerLine.copy(alpha = if (dark) 0.45f else 0.55f),
-)
+private fun Colors.applyGlassSurfaceAlpha(source: Colors, dark: Boolean) {
+    surfaceContainer = source.surfaceContainer.copy(alpha = if (dark) 0.52f else 0.62f)
+    surfaceContainerHigh = source.surfaceContainerHigh.copy(alpha = if (dark) 0.55f else 0.66f)
+    surfaceContainerHighest = source.surfaceContainerHighest.copy(alpha = if (dark) 0.60f else 0.72f)
+    surfaceVariant = source.surfaceVariant.copy(alpha = if (dark) 0.48f else 0.60f)
+    dividerLine = source.dividerLine.copy(alpha = if (dark) 0.45f else 0.55f)
+}

@@ -179,11 +179,21 @@ fun AppearanceThemeScreen(state: AppUiState, viewModel: AppViewModel, onBack: ()
             SectionCard(enterIndex = 4) {
                 SuperSwitch(
                     title = "动态取色",
-                    summary = "由系统按壁纸取色生成整套配色（Android 12+），强调色作为取色种子参与生成",
+                    summary = "整盘配色改由系统调色板生成（Android 12+；壁纸取色需 13+）",
                     checked = state.dynamicColor,
                     onCheckedChange = { viewModel.setDynamicColor(it) },
                     insideMargin = PaddingValues(0.dp),
                 )
+                if (state.dynamicColor) {
+                    HorizontalDivider(modifier = Modifier.fillMaxWidth())
+                    // 不这么写就是一个说谎的开关：开了之后上面两个设置看起来坏了
+                    Text(
+                        text = "开启后整盘色由系统接管：上面的强调色与页面底色暂不参与生成，关掉开关即恢复。",
+                        style = MiuixTheme.textStyles.footnote2,
+                        color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
+                        modifier = Modifier.padding(top = 10.dp),
+                    )
+                }
             }
         }
 
