@@ -43,8 +43,9 @@ fun ProviderDetailScreen(
     onBack: () -> Unit,
     onEditCustom: (String) -> Unit,
 ) {
-    val ui = ProviderUiRegistry.require(providerId)
     val info = state.providerOf(providerId)
+    // 未适配界面的供应商走兜底组件，不能让它 error（上游新供应商只有 core 实现）
+    val ui = ProviderUiRegistry.require(providerId, info?.displayName ?: providerId)
     val accounts = state.accountsOf(providerId)
     val context = LocalContext.current
 

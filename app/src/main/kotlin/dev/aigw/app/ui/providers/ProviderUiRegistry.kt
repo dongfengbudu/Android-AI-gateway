@@ -30,8 +30,14 @@ object ProviderUiRegistry {
         else -> null
     }
 
-    fun require(providerId: String): ProviderUi =
-        of(providerId) ?: error("没有为供应商 $providerId 注册 UI 组件")
+    /**
+     * 取组件，未适配界面的供应商回退到 [GenericProviderUi]。
+     *
+     * 不这么做就会闪退：上游合进来的六个供应商只有 core 实现、没 Miuix 界面，
+     * 供应商列表照旧会列出它们，点进详情页直接 error。
+     */
+    fun require(providerId: String, displayName: String = providerId): ProviderUi =
+        of(providerId) ?: GenericProviderUi(providerId, displayName)
 
     const val CUSTOM_PREFIX = "custom:"
 }

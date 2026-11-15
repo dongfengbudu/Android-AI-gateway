@@ -24,6 +24,7 @@ import dev.aigw.core.provider.ProviderCapability
 import dev.aigw.core.provider.ProviderHooks
 import dev.aigw.core.provider.ProviderModelCatalogView
 import dev.aigw.core.provider.ProviderRegistry
+import dev.aigw.core.provider.actionLabel
 import dev.aigw.core.provider.QuotaPack
 import dev.aigw.core.provider.RoutedModel
 import dev.aigw.core.provider.SmsLoginSupport
@@ -39,6 +40,7 @@ import dev.aigw.core.usage.CallLogStore
 import dev.aigw.core.usage.OperationLog
 import dev.aigw.core.usage.RequestLog
 import dev.aigw.core.usage.TaskRunLog
+import dev.aigw.core.usage.TaskTrace
 import dev.aigw.core.usage.StorageAudit
 import dev.aigw.core.usage.StorageReport
 import dev.aigw.core.usage.UsageStats
@@ -1026,11 +1028,47 @@ class GatewayEngine(
         action: String,
         payload: JsonObject = JsonObject(),
     ): ProviderActionResult {
-        val result = performActionRaw(providerId, uid, action, payload)
+        val provider = registry.get(providerId)
+        val account = pool.account(providerId, uid)
+        val label = "${provider?.displayName ?: providerId}/" +
+            "${account?.nickname?.ifBlank { account.uid.take(8) } ?: uid} · ${actionLabel(action)}"
+        taskRunLog.start(label)
+        val result = try {
+            // 采集口只在这一段生效：provider 内部每次上游请求/响应都进执行流水（任务中心面板读它）
+            TaskTrace.collect({ kind, text -> taskRunLog.add(kind, text) }) {
+                performActionRaw(providerId, uid, action, payload)
+            }
+        } catch (e: Exception) {
+            // 抛异常也留一条，否则「一键完成成长任务」中途炸掉时面板里什么都没有
+            taskRunLog.finish(e.message ?: "执行异常")
+            throw e
+        }
+        logAction(providerId, uid, action, result)
+        taskRunLog.finish(result.message.ifBlank { if (result.ok) "完成" else "失败" })
         // 单账号动作：成功后立刻刷一次该账号额度，用户点一下就能看到最新数字。
         // 批量路径不走这里（见 performActionAll），否则 N 个账号会多打 N 次额度接口。
         if (result.ok) refreshCredits(providerId, uid)
         return result
+    }
+
+    /**
+     * 动作结果统一记到 task 类别。
+     *
+     * 记在引擎这一层：任务中心按钮、供应商页按钮、整点排程都从这里过，各写各的必漏；
+     * [ProviderActionResult.unsupported] 属常态（如国际版没有签到），记了只会刷屏。
+     */
+    private fun logAction(providerId: String, uid: String, action: String, result: ProviderActionResult) {
+        if (result.unsupported) return
+        val provider = registry.get(providerId)
+        val account = pool.account(providerId, uid)
+        val who = "${provider?.displayName ?: providerId}/" +
+            "${account?.nickname?.ifBlank { account.uid.take(8) } ?: uid}"
+        val text = "$who·${actionLabel(action)}：${result.message.ifBlank { if (result.ok) "完成" else "失败" }}"
+        if (result.ok) {
+            operationLog.info(OperationLog.CATEGORY_TASK, text)
+        } else {
+            operationLog.warn(OperationLog.CATEGORY_TASK, text)
+        }
     }
 
     /** 无参数动作的便捷重载（调用方不必依赖 JsonObject）。 */

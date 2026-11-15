@@ -24,6 +24,7 @@ import dev.aigw.core.provider.Provider
 import dev.aigw.core.provider.ProviderAccount
 import dev.aigw.core.provider.ProviderActionResult
 import dev.aigw.core.provider.ProviderCapability
+import dev.aigw.core.provider.ProviderHooks
 import dev.aigw.core.provider.ProviderModel
 import dev.aigw.core.provider.ProviderModelCatalogView
 import dev.aigw.core.provider.ProviderTask
@@ -55,9 +56,16 @@ import java.util.Locale
 class CodeBuddyProvider(
     private val region: () -> String = { REGION_CN },
     private val nowMillis: () -> Long = System::currentTimeMillis,
-    /** 登录过程上报（请求/轮询的 URL、状态与响应摘录），由网关接住写进登录日志。 */
-    private val onLoginLog: (String) -> Unit = {},
+    hooks: ProviderHooks = ProviderHooks(),
 ) : Provider, DeviceCodeSupport, dev.aigw.core.provider.RegionAwareSupport {
+
+    /**
+     * 登录过程上报（请求/轮询的 URL、状态与响应摘录）。
+     *
+     * 走网关统一的 [ProviderHooks.onLoginLog]，不另开一条上报通道：上游也已用同一个 hooks，
+     * 两套并行会让登录日志分裂到两个地方。
+     */
+    private val onLoginLog: (String) -> Unit = hooks.onLoginLog
 
     override val id: String = ID
     override val displayName: String = "WorkBuddy"
