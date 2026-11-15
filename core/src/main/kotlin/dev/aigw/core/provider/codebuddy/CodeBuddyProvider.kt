@@ -34,6 +34,7 @@ import dev.aigw.core.provider.StreamingChatCall
 import dev.aigw.core.provider.UpstreamError
 import dev.aigw.core.usage.TaskTrace
 import dev.aigw.core.util.arrayOrNull
+import dev.aigw.core.util.longOrNull
 import dev.aigw.core.util.objOrNull
 import dev.aigw.core.util.str
 import java.io.ByteArrayOutputStream
@@ -178,18 +179,47 @@ class CodeBuddyProvider(
 
     override fun classify(status: Int, body: String): UpstreamError {
         val message = extractMessage(body)
+        val code = businessCode(body)
+        // 6020（queue.waiting）带 data.retry_after：上游队列按 client_user_type 全局共享，
+        // 换号必然撞同一堵墙，交给网关直接 429 + Retry-After，别再轮转。
+        // 6021（queue.full，无 retry_after）是间歇空窗，仍按限流轮转。
+        val queueWait = code == CODE_QUEUE_WAITING
         val kind = when {
             status == 402 -> ErrorKind.QUOTA
+            // 429 分两种：业务码 6004 是**该模型**超限（换号无用，换模型立刻可用），
+            // 其余 429（无业务码/账号级限流）才按可退避的限流处理。
+            status == 429 && code == CODE_MODEL_LIMITED -> ErrorKind.MODEL_LIMIT
             status == 429 -> ErrorKind.SOFT_RATE
+            queueWait -> ErrorKind.QUEUE_WAIT
             status == 404 -> ErrorKind.NOT_FOUND
             status in 500..599 -> ErrorKind.SERVER
+            code == CODE_MODEL_LIMITED -> ErrorKind.MODEL_LIMIT
             matchesQuota(body) -> ErrorKind.QUOTA
             matchesSessionDead(body) -> ErrorKind.SESSION_DEAD
             status in 400..499 -> ErrorKind.CLIENT
             else -> ErrorKind.CLIENT
         }
-        return UpstreamError(kind, message.ifEmpty { "上游 HTTP $status" })
+        return UpstreamError(
+            kind = kind,
+            message = message.ifEmpty { "上游 HTTP $status" },
+            code = code ?: 0L,
+            retryAfterSeconds = if (kind == ErrorKind.QUEUE_WAIT) queueRetryAfter(body) else 0,
+        )
     }
+
+    /** 取响应体里的业务码；取不到/非数字返回 null。 */
+    private fun businessCode(body: String): Long? =
+        runCatching { JsonParser.parseString(body).asJsonObject.get("code")?.asLong }.getOrNull()
+
+    /**
+     * 6020 的等待口径：`data.retry_after`（秒）。
+     *
+     * 取不到就给一个保守值 2 秒——比让客户端立刻重试又撞墙好。
+     */
+    private fun queueRetryAfter(body: String): Long = runCatching {
+        val data = JsonParser.parseString(body).asJsonObject.objOrNull("data")
+        data?.longOrNull("retry_after")?.takeIf { it > 0 }
+    }.getOrNull() ?: 2L
 
     override fun creditInfo(account: ProviderAccount): CreditInfo? {
         val credential = parse(account) ?: return null
@@ -2293,6 +2323,12 @@ class CodeBuddyProvider(
         const val GLOBAL_WEB_BASE = "https://www.workbuddy.ai"
 
         const val CLIENT_UA = "CLI/2.63.2 CodeBuddy/2.63.2"
+
+        /** 业务码：该模型已超限（换号无用，换模型立刻可用）。 */
+        const val CODE_MODEL_LIMITED = 6004L
+
+        /** 上游队列排队中（queue.waiting）：带 `data.retry_after`，换号无意义。 */
+        const val CODE_QUEUE_WAITING = 6020L
 
         const val PATH_AUTH_STATE = "/v2/plugin/auth/state"
         const val PATH_AUTH_TOKEN = "/v2/plugin/auth/token"
