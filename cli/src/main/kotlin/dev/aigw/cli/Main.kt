@@ -31,6 +31,8 @@ fun main(args: Array<String>) {
     if (!dataDir.exists()) dataDir.mkdirs()
 
     val engine = GatewayEngine(FileKeyValueStore(dataDir), onLog = { println("[log] $it") })
+    // uid 口径变更后的自愈（如小浣熊早期把 JWT 的 iss 当 uid）：一次性命令同步跑，拿到的就是修好的账号
+    engine.migrateAccounts()
 
     when (command) {
         "serve" -> serve(engine, rest)
@@ -187,7 +189,11 @@ private fun models(engine: GatewayEngine) {
 
 private fun usage(engine: GatewayEngine) {
     val stats = engine.callLogStore.totalStats()
-    println("累计请求 ${stats.requests}，成功 ${stats.success}，失败 ${stats.failed}，tokens ${stats.totalTokens}")
+    println("累计请求 ${stats.requests}，成功 ${stats.success}，失败 ${stats.failed}，中断 ${stats.aborted}，tokens ${stats.totalTokens}")
+    if (stats.cachedTokens > 0 && stats.promptTokens > 0) {
+        val hitPercent = String.format(java.util.Locale.US, "%.0f", stats.cachedTokens * 100.0 / stats.promptTokens)
+        println("提示词命中 ${stats.cachedTokens} / 输入 ${stats.promptTokens}（$hitPercent%）")
+    }
     for (record in engine.callLogStore.list().take(20)) {
         println(
             "${java.util.Date(record.startedAtMillis)}  ${record.providerId}/${record.model}  " +

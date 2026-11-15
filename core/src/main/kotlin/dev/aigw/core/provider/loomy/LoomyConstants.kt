@@ -39,6 +39,16 @@ object LoomyConstants {
     const val PATH_CHAT_COMPLETIONS = "/api/v1/chat/completions"
     const val PATH_POINTS_RECORDS = "/api/v1/points/records"
     const val PATH_POINTS_ACTIVATION = "/api/v1/points/activation"
+
+    /**
+     * 每日「签到」的真身：官方客户端**每次启动**都会调，幂等（本周期已领回 `alreadyProcessed`）。
+     * 响应 data 自带全套额度口径（currentBalance/permanentBalance/dailyBalance/dailyQuota/
+     * dailyConsumed/dailyCycleDate），dailyQuota/dailyConsumed 只有这个端点给。
+     *
+     * 每日 5000 赠送在「每日登录后自动刷新」——漏调不报错，只是当日赠送拿不到/看不到，
+     * 是静默型陷阱（rsfree/loomy2api 实证）。
+     */
+    const val PATH_POINTS_FIRST_LOGIN = "/api/v1/points/first-login"
     const val PATH_REDEMPTION_REDEEM = "/api/v1/points/redemption-codes/redeem"
 
     /** 团队积分余额（账号加入团队时，消耗走的是这里）。 */
@@ -59,7 +69,6 @@ object LoomyConstants {
     /** token 缺失或失效（积分/模型服务）。 */
     const val CODE_TOKEN_INVALID = "100002"
 
-    /** 短信验证码有效期（秒），与官方客户端一致。 */
     /**
      * 默认国家码（中国大陆）。
      *
@@ -67,6 +76,7 @@ object LoomyConstants {
      */
     const val DEFAULT_CCODE = "86"
 
+    /** 短信验证码有效期（秒），与官方客户端一致。 */
     const val SMS_CODE_EXPIRE_SECONDS = 300
 
     /** 登录 session 有效期（秒）：14 天。 */
@@ -81,4 +91,13 @@ object LoomyConstants {
     /** session 认证头（非标准，官方客户端用裸 `token`）。
      *  注意：只有积分/模型类接口用它；对话接口要 `Authorization: Bearer`（已实测）。 */
     const val TOKEN_HEADER = "token"
+
+    /** 调用来源：`user` = 用户主动发起，`system` = 后台子调用。 */
+    const val INVOKE_ORIGIN_HEADER = "invokeorigin"
+
+    /** 会话 id（`chat-<uuid>`），官方客户端每个对话一个。 */
+    const val CHAT_ID_HEADER = "chatid"
+
+    /** 消息 id（`msg-<uuid>`），官方客户端每条消息一个。 */
+    const val MESSAGE_ID_HEADER = "msgid"
 }

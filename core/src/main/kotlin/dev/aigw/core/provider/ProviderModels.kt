@@ -22,7 +22,24 @@ data class CreditInfo(
     /** false 表示上游未返回可解析的额度字段，界面显示「—」而不是 0。 */
     val known: Boolean = true,
     val detail: String = "",
+    /**
+     * 余额的计量单位；空串等同 [CreditUnit.CREDITS]。
+     *
+     * 各家口径不一样：Trae / 小浣熊 / Loomy 是积分，Antigravity 没有积分条目时只能拿到
+     * 配额剩余百分比（0~100）。不带单位就会把 87% 和 9 万积分加成「90087」，
+     * 对客报余额时必须按单位分组，不能跨单位直接相加。
+     */
+    val unit: String = "",
 )
+
+/** 余额单位取值（[CreditInfo.unit]）。 */
+object CreditUnit {
+    /** 积分 / 权益包份数，各家可相加做总量。 */
+    const val CREDITS = "credits"
+
+    /** 配额剩余百分比（0~100），只能按账号展示，不能与积分类相加。 */
+    const val PERCENT = "percent"
+}
 
 /** provider 专属动作的结果。 */
 data class ProviderActionResult(
@@ -80,12 +97,46 @@ data class ProviderTask(
 
 /**
  * 一个账号的成长任务列表快照。
- *
- * [inPeriod] 表示活动是否在期（对齐上游 `in_period`）：不在期时任务可能为空。
  */
 data class ProviderTaskListView(
     val tasks: List<ProviderTask>,
-    val inPeriod: Boolean = false,
+    /**
+     * 活动是否在期（对齐上游 `in_period`）：true 在期、false 不在期、**null 表示上游没给这个字段**。
+     *
+     * 用三态而不是默认 false：不是每个任务接口都返回 in_period，默认 false 会让界面把
+     * 「上游没说」当成「活动已结束」展示。
+     */
+    val inPeriod: Boolean? = null,
     /** 非空表示拉取失败（凭证失效、上游报错等），界面据此提示。 */
+    val error: String = "",
+)
+
+/**
+ * 一笔积分/额度流水。
+ *
+ * 字段命名对齐小浣熊的 `/api/web/points/v1/bills`：`bill_id` / `event_name` /
+ * `biz_type` / `points` / `created_at`。
+ *
+ * 与 [QuotaPack] 的分工：额度包回答「还剩多少」，流水回答「每一笔怎么来的」。
+ */
+data class PointsBill(
+    val id: String,
+    /** 展示名（上游 `event_name`，缺失时回退业务类型）。 */
+    val title: String,
+    /** 正数入账、负数支出，符号与上游一致。 */
+    val points: Long,
+    /** 上游业务类型（如 `daily_grant` 发放 / `daily_expire` 过期）。 */
+    val bizType: String = "",
+    /** 发生时间（毫秒；0 表示上游没给或无法解析）。 */
+    val createdAtMillis: Long = 0,
+)
+
+/**
+ * 一个账号的积分流水快照。
+ *
+ * [error] 非空表示拉取失败，[bills] 为空不代表没有流水。
+ */
+data class PointsBillListView(
+    val bills: List<PointsBill>,
     val error: String = "",
 )

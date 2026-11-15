@@ -10,8 +10,16 @@ data class FailoverCandidate(
     val providerId: String,          // 供应商 id（如 "trae"、"codebuddy"、"custom:zhipu"）
     val upstreamModel: String,        // 该供应商处实际对应的模型名（如 "glm-5.3-flash-20250101"）
     val priority: Int = 100,          // 优先级（数值越大越优先）
-    val weight: Int = 1,              // 同优先级下的权重
-    val timeoutMs: Long = 30_000L,    // 该候选专用超时设置
+    /**
+     * 同优先级下的权重（越大越容易被选中）。
+     *
+     * 消费方式见 [dev.aigw.core.failover.weightedOrder]：**只在同 priority 内生效**，
+     * 不同 priority 之间仍然优先级说了算——否则「优先级」就失去意义。
+     * 权重 <= 0 的候选排到同优先级末尾（保留可选，不会被静默丢弃）。
+     */
+    val weight: Int = 1,
+    /** 该候选专用超时。⚠️ 仍未生效：上游超时由各 Provider 自己的 READ_TIMEOUT 决定。 */
+    val timeoutMs: Long = 30_000L,
 ) {
     fun toJson(): JsonObject = JsonObject().apply {
         addProperty("providerId", providerId)
@@ -101,11 +109,52 @@ data class CircuitBreakerConfig(
     }
 }
 
+/**
+ * 模型级冷却参数。
+ *
+ * 上游对「该模型已超限」类错误只给一句重置文案，格式未验证，所以先给固定时长；
+ * 冷却期内该模型直接跳过，不再换号、不计熔断。
+ */
+data class ModelCooldownConfig(
+    /** 一次模型级限流后的冷却毫秒数（默认 10 分钟）。 */
+    val cooldownMs: Long = 600_000L,
+    /** 冷却时长上限（默认 2 小时），避免误判出超长冷却。 */
+    val maxCooldownMs: Long = 7_200_000L,
+) {
+    fun toJson(): JsonObject = JsonObject().apply {
+        addProperty("cooldownMs", cooldownMs)
+        addProperty("maxCooldownMs", maxCooldownMs)
+    }
+
+    companion object {
+        fun fromJson(obj: JsonObject?): ModelCooldownConfig {
+            if (obj == null) return ModelCooldownConfig()
+            return ModelCooldownConfig(
+                cooldownMs = obj.get("cooldownMs")?.asLong?.coerceIn(1_000L, 7_200_000L) ?: 600_000L,
+                maxCooldownMs = obj.get("maxCooldownMs")?.asLong?.coerceIn(1_000L, 7_200_000L) ?: 7_200_000L,
+            )
+        }
+    }
+}
+
 /** 模型故障转移总配置 */
 data class ModelFailoverSettings(
     val enabled: Boolean = true,
     val retry: RetryConfig = RetryConfig(),
     val circuitBreaker: CircuitBreakerConfig = CircuitBreakerConfig(),
+    /** 上游请求并发闸门：全局与单账号在途上限。 */
+    val concurrency: ConcurrencyConfig = ConcurrencyConfig(),
+    /** 模型级冷却（针对该模型不可用类错误）。 */
+    val modelCooldown: ModelCooldownConfig = ModelCooldownConfig(),
+    /**
+     * 上游刚报错的账号在本地的冷却时长（毫秒）。0 表示不冷却。
+     *
+     * 只防「上一个请求刚失败、下一个请求又选中同一个号」这种连续撞墙；
+     * 不影响禁用/启用语义，到期自动恢复。
+     */
+    val accountCooldownMs: Long = DEFAULT_ACCOUNT_COOLDOWN_MS,
+    /** 账号选择策略（默认 SMART = 优先级优先、同级比余额）。 */
+    val accountStrategy: AccountStrategy = AccountStrategy.SMART,
     // 逻辑模型名 -> 候选供应商列表
     val routes: Map<String, List<FailoverCandidate>> = emptyMap(),
 ) {
@@ -113,6 +162,10 @@ data class ModelFailoverSettings(
         addProperty("enabled", enabled)
         add("retry", retry.toJson())
         add("circuitBreaker", circuitBreaker.toJson())
+        add("concurrency", concurrency.toJson())
+        add("modelCooldown", modelCooldown.toJson())
+        addProperty("accountCooldownMs", accountCooldownMs)
+        addProperty("accountStrategy", accountStrategy.name)
         val routesObj = JsonObject()
         for ((model, candidates) in routes) {
             val arr = JsonArray()
@@ -124,6 +177,9 @@ data class ModelFailoverSettings(
 
     companion object {
         const val STORE_KEY = "settings/failover.json"
+
+        /** 账号本地冷却默认时长：短到不影响正常轮换，长到能跳过「刚被限流」的那一轮。 */
+        const val DEFAULT_ACCOUNT_COOLDOWN_MS = 15_000L
 
         fun fromJson(raw: String?): ModelFailoverSettings {
             if (raw.isNullOrBlank()) return ModelFailoverSettings()
@@ -142,6 +198,14 @@ data class ModelFailoverSettings(
                 enabled = obj.get("enabled")?.asBoolean ?: true,
                 retry = RetryConfig.fromJson(obj.getAsJsonObject("retry")),
                 circuitBreaker = CircuitBreakerConfig.fromJson(obj.getAsJsonObject("circuitBreaker")),
+                concurrency = ConcurrencyConfig.fromJson(obj.getAsJsonObject("concurrency")),
+                modelCooldown = ModelCooldownConfig.fromJson(obj.getAsJsonObject("modelCooldown")),
+                accountCooldownMs = obj.get("accountCooldownMs")?.asLong
+                    ?.coerceIn(0L, 600_000L) ?: DEFAULT_ACCOUNT_COOLDOWN_MS,
+                // 未知策略名落回 SMART：旧版写进来的配置（没有该字段）也是这个默认值
+                accountStrategy = runCatching {
+                    AccountStrategy.valueOf(obj.get("accountStrategy")?.asString.orEmpty())
+                }.getOrDefault(AccountStrategy.SMART),
                 routes = routes,
             )
         }

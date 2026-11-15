@@ -26,7 +26,8 @@ import dev.aigw.core.provider.isStreamingBody
 import dev.aigw.core.provider.queryParam
 import dev.aigw.core.provider.requestedModelOf
 import dev.aigw.core.store.KeyValueStore
-import java.util.UUID
+import dev.aigw.core.util.newCompletionId
+import java.util.concurrent.ConcurrentHashMap
 
 /**
  * Trae 国内版 SOLO 通道。
@@ -50,25 +51,36 @@ class TraeProvider(
         setOf(ProviderCapability.CREDIT_REFRESH, ProviderCapability.CHECKIN)
 
     // 国内 / 国际两套客户端：上游 host 不同（trae.cn vs trae.ai），按账号区域取用。
-    private val chatClients = HashMap<TraeRegion, TraeChatClient>()
-    private val authClients = HashMap<TraeRegion, TraeAuthClient>()
-    private val checkinClients = HashMap<TraeRegion, TraeCheckinClient>()
-    private val catalogs = HashMap<TraeRegion, TraeModelCatalog>()
+    // 网关多线程并发调用 openChat/listModels，reconfigure() 也会并发 clear()，
+    // 故必须用 ConcurrentHashMap（普通 HashMap 并发读写会死循环/丢数据）。
+    // 缓存键一律用 **host** 而不是区域枚举：国际版还分新加坡/美区两套域名，
+    // 用区域当键会让两套账号共用一个 client（后建的那个覆盖先建的 host）。
+    private val chatClients = ConcurrentHashMap<String, TraeChatClient>()
+    private val authClients = ConcurrentHashMap<TraeRegion, TraeAuthClient>()
+    private val checkinClients = ConcurrentHashMap<String, TraeCheckinClient>()
+    private val catalogs = ConcurrentHashMap<String, TraeModelCatalog>()
 
-    private fun chatClient(region: TraeRegion): TraeChatClient =
-        chatClients.getOrPut(region) { TraeChatClient(version(), region.agentHost) }
+    private fun chatClient(region: TraeRegion, userRegion: String = ""): TraeChatClient {
+        val host = TraeUpstream.of(region, userRegion).chatHost
+        return chatClients.computeIfAbsent(host) { TraeChatClient(version(), host) }
+    }
+
 
     // TraeAuthClient 读取账号自身的 apiHost，不按区域分实例
-    private val authClientSingleton: TraeAuthClient get() = authClients.getOrPut(TraeRegion.CN) { TraeAuthClient(version()) }
+    private val authClientSingleton: TraeAuthClient get() = authClients.computeIfAbsent(TraeRegion.CN) { TraeAuthClient(version()) }
 
     @Suppress("UNUSED_PARAMETER")
     private fun authClient(region: TraeRegion): TraeAuthClient = authClientSingleton
 
-    private fun checkinClient(region: TraeRegion): TraeCheckinClient =
-        checkinClients.getOrPut(region) { TraeCheckinClient(version(), region.ugHost) }
+    private fun checkinClient(region: TraeRegion, userRegion: String = ""): TraeCheckinClient {
+        val host = TraeUpstream.of(region, userRegion).ugHost
+        return checkinClients.computeIfAbsent(host) { TraeCheckinClient(version(), host, region) }
+    }
 
-    private fun catalog(region: TraeRegion): TraeModelCatalog =
-        catalogs.getOrPut(region) { TraeModelCatalog(chatClient(region), nowMillis) }
+    private fun catalog(region: TraeRegion, userRegion: String = ""): TraeModelCatalog {
+        val host = TraeUpstream.of(region, userRegion).chatHost
+        return catalogs.computeIfAbsent(host) { TraeModelCatalog(chatClient(region, userRegion), nowMillis) }
+    }
 
     /** 客户端版本号变更后重建各客户端，并让模型目录缓存失效。 */
     fun reconfigure() {
@@ -102,7 +114,7 @@ class TraeProvider(
     override fun listModels(account: ProviderAccount?): ProviderModelCatalogView {
         val trae = account?.let { parseOrNull(it) }
         val region = regionOfAccount(account)
-        val catalog = catalog(region)
+        val catalog = catalog(region, trae?.userRegion.orEmpty())
         val models = catalog.models(trae)
         return ProviderModelCatalogView(
             models = models.map { model ->
@@ -129,6 +141,10 @@ class TraeProvider(
         )
     }
 
+    override fun invalidateModelCache() {
+        for (catalog in catalogs.values) catalog.invalidate()
+    }
+
     override fun resolveModel(requested: String): String {
         val model = requested.trim()
         if (model.isEmpty() || model == "auto") return defaultModel()
@@ -138,15 +154,43 @@ class TraeProvider(
 
     override fun isInternalModel(id: String): Boolean = TraeModelCatalog.isInternal(id)
 
-    override fun hosts(): List<String> = listOf("trae-api-cn.mchost.guru", "api.trae.com.cn", "api.trae.cn")
+    /**
+     * 上游域名后缀（代理分流的判定依据），从区域定义推导，避免手写清单与区域脱节。
+     *
+     * 只列网关自己会出站访问的 host（agent / 额度 / 鉴权）：登录页由系统浏览器打开，不走这里。
+     */
+    override fun hosts(): List<String> =
+        TraeRegion.entries
+            .flatMap { region ->
+                // 国际版有新加坡/美区两套 host，两个都要列（代理分流漏掉一个就会绕过开关）
+                listOf("", "US-East").flatMap { userRegion ->
+                    val up = TraeUpstream.of(region, userRegion)
+                    listOf(up.chatHost, up.ugHost, up.authHost)
+                }
+            }
+            .map { it.removePrefix("https://") }
+            .distinct()
 
     // ------------------------------------------------------------------ 对话
 
     override fun openChat(account: ProviderAccount, openAiBody: String): ChatCall {
-        val trae = parseOrNull(account) ?: return FailedChatCall(401, "账号凭证无法解析")
+        var trae = parseOrNull(account) ?: return FailedChatCall(401, "账号凭证无法解析")
+        // 只有 refreshToken 的账号（国际版回调常见）：先用 ExchangeToken 换出 accessToken，
+        // 并通知账号池持久化——refreshToken 每次交换都会轮换，不回写下次就失效。
+        // 之前这里直接拿空 accessToken 去请求，用户看到的就是「上游接口不存在/401」。
+        if (trae.accessToken.isEmpty() && trae.refreshToken.isNotEmpty()) {
+            val renewed = try {
+                authClient(regionOfAccount(account)).exchangeToken(trae)
+            } catch (e: TraeHttpException) {
+                return FailedChatCall(e.status, "国际版凭证换取 token 失败：${e.body.ifEmpty { e.message.orEmpty() }}")
+            }
+            trae = renewed
+            hooks.onAccountUpdated(toProviderAccount(renewed))
+        }
         val model = resolveModel(requestedModelOf(openAiBody))
+        val region = regionOfAccount(account)
         val call = try {
-            chatClient(regionOfAccount(account)).openStream(trae, openAiBody)
+            chatClient(region, trae.userRegion).openStream(trae, openAiBody)
         } catch (e: TraeHttpException) {
             return FailedChatCall(e.status, e.body)
         }
@@ -197,17 +241,134 @@ class TraeProvider(
 
     override fun refreshAccount(account: ProviderAccount, skewSeconds: Long): ProviderAccount? {
         val trae = parseOrNull(account) ?: return null
-        val refreshed = authClient(regionOfAccount(account)).refreshIfNeeded(trae, skewSeconds) ?: return null
+        val refreshed = authClientSingleton.refreshIfNeeded(trae, skewSeconds) ?: return null
         return toProviderAccount(refreshed)
     }
 
     /** 粘贴 JSON 凭证导入：补齐设备指纹后换 token 并拉取用户信息。 */
     override fun importCredentials(raw: String): ProviderAccount {
+        // 网页「桌面模式登录」回传的是 {"cookie":"..."}，不是凭证 JSON。
+        // 走 Cookie → GetUserToken 换会话 token；两个国际区各试一次（凭证里没有区域信息）。
+        val cookieOnly = runCatching {
+            JsonParser.parseString(raw).asJsonObject.get("cookie")?.takeIf { it.isJsonPrimitive }?.asString
+        }.getOrNull()
+        if (!cookieOnly.isNullOrEmpty()) {
+            var lastError: Exception? = null
+            for (userRegion in listOf("US-East", "SG")) {
+                val seed = TraeAccount(
+                    uid = "",
+                    accessToken = "",
+                    refreshToken = "",
+                    expiresAt = 0L,
+                    nickname = "",
+                    enterpriseId = "",
+                    machineId = TraeLogin.newMachineId(),
+                    deviceId = TraeLogin.randomDeviceId(),
+                    domain = TraeRegion.INTL.id,
+                    apiHost = "",
+                    userRegion = userRegion,
+                )
+                val renewed = try {
+                    authClient(TraeRegion.INTL).fetchTokenByCookie(seed, cookieOnly)
+                        .copy(userRegion = userRegion)
+                } catch (e: Exception) {
+                    lastError = e
+                    continue
+                }
+                var filled = renewed
+                if (filled.uid.isEmpty() && filled.accessToken.isNotEmpty()) {
+                    filled = filled.withIdentity(
+                        dev.aigw.core.util.jwtClaim(filled.accessToken, "user_id", "userId", "uid", "sub"),
+                        "",
+                        "",
+                    )
+                }
+                val withInfo = authClient(TraeRegion.INTL).getUserInfo(filled)
+                if (withInfo.uid.isEmpty()) {
+                    lastError = IllegalStateException("Cookie 有效但拿不到 uid")
+                    continue
+                }
+                return toProviderAccount(withInfo)
+            }
+            // 只报关键键的存在性：完整键列表有三十多个，糊满一屏反而看不清
+            val keys = TraeLogin.parseCookie(cookieOnly).keys
+            val important = listOf("sessionid", "sid_tt", "sid_guard", "uid_tt")
+                .joinToString(", ") { key -> "$key=" + if (keys.any { it.equals(key, true) }) "有" else "无" }
+            throw IllegalStateException(
+                "Cookie 登录失败：${lastError?.message ?: "上游未返回 token"}（关键 Cookie：$important）",
+            )
+        }
+        // 直接粘贴 IDE 的 JWT（DevTools 里 Authorization: Cloud-IDE-JWT eyJ... 或裸串）：
+        // 其他反代（autumnsentiment/Trae2api-cn）的 manual 模式就是这条路，也是手机上最能拿到的凭证。
+        val bareJwt = raw.trim()
+            .removePrefix("Cloud-IDE-JWT").removePrefix("cloud-ide-jwt")
+            .removePrefix("Authorization:").removePrefix("Bearer").trim()
+            .takeIf { it.startsWith("eyJ") && it.count { c -> c == '.' } == 2 }
+        if (bareJwt != null) {
+            var lastError: Exception? = null
+            for (userRegion in listOf("US-East", "SG")) {
+                val seed = TraeAccount(
+                    uid = "",
+                    accessToken = bareJwt,
+                    refreshToken = "",
+                    expiresAt = 0L,
+                    nickname = "",
+                    enterpriseId = "",
+                    machineId = TraeLogin.newMachineId(),
+                    deviceId = TraeLogin.randomDeviceId(),
+                    domain = TraeRegion.INTL.id,
+                    apiHost = "",
+                    userRegion = userRegion,
+                )
+                try {
+                    var info = authClient(TraeRegion.INTL).getUserInfo(seed)
+                    if (info.uid.isEmpty()) {
+                        info = info.withIdentity(
+                            dev.aigw.core.util.jwtClaim(bareJwt, "user_id", "userId", "uid", "sub"),
+                            "",
+                            "",
+                        )
+                    }
+                    if (info.uid.isEmpty()) throw IllegalStateException("JWT 里没有 user_id")
+                    // 真正验证能不能调模型：这一步过了才算可用
+                    chatClient(TraeRegion.INTL, userRegion).fetchModels(info)
+                    return toProviderAccount(info)
+                } catch (e: Exception) {
+                    lastError = e
+                }
+            }
+            throw IllegalStateException("这个 JWT 用不了：${lastError?.message ?: "未知错误"}")
+        }
         var account = ensureDeviceIds(TraeAccount.parse(raw))
         val region = TraeRegion.infer(account.domain, account.apiHost)
         if (account.refreshToken.isNotEmpty()) account = authClient(region).exchangeToken(account)
+        // getUserInfo 可能因区域/host 不通而拿不到 uid；accessToken 本身是 JWT，claim 里有 sub。
+        // 不补这条，导入会失败在「无法确定 uid」，明明 token 是好的。
+        if (account.uid.isEmpty() && account.accessToken.isNotEmpty()) {
+            account = account.withIdentity(
+                dev.aigw.core.util.jwtClaim(account.accessToken, "user_id", "userId", "uid", "sub"),
+                "",
+                "",
+            )
+        }
         account = authClient(region).getUserInfo(account)
-        if (account.uid.isEmpty()) throw IllegalStateException("无法确定账号 uid，请确认凭证完整")
+        if (account.uid.isEmpty()) {
+            throw IllegalStateException(
+                "无法确定账号 uid（GetUserInfo 未返回，token 里也没有 user_id）。请确认凭证完整。",
+            )
+        }
+        // 导入前先探一次模型目录：网页会话 token（浏览器 UserScript 抓的那种）能过
+        // GetUserInfo，但没有 IDE 权限——打 get_detail_param 一律 401 code 1001。
+        // 这种号塞进池子只会在模型页顶一个红错误，不如当场说清楚。
+        val probeError = runCatching { chatClient(region, account.userRegion).fetchModels(account) }
+            .exceptionOrNull()
+        if (probeError is TraeHttpException && probeError.status == 401) {
+            throw IllegalStateException(
+                "这份凭证没有模型调用权限（上游 401 code ${probeError.upstreamCode}）。" +
+                    "浏览器插件抓的是网页会话 token，只能读账号信息，不能对话。" +
+                    "请改用桌面客户端登录（需要 refreshToken），或在「粘贴凭证」里导入带 refreshToken 的 JSON。",
+            )
+        }
         return toProviderAccount(account)
     }
 
@@ -257,11 +418,13 @@ class TraeProvider(
     override fun creditInfo(account: ProviderAccount): CreditInfo? {
         val trae = parseOrNull(account) ?: return null
         return try {
-            val usage = checkinClient(regionOfAccount(account)).entUsage(trae)
-            if (usage.parsed) {
+            val usage = checkinClient(regionOfAccount(account), trae.userRegion).entUsage(trae)
+            // 命中权益包列表还不够：包内字段缺失时 limit/remain 都是 0，报 known=true 就成了「额度真是 0」
+            if (usage.parsed && usage.limit > 0) {
                 CreditInfo(usage.remain, known = true, detail = "权益包剩余 ${usage.remain} / ${usage.limit}")
             } else {
-                CreditInfo(0, known = false, detail = "上游未返回可解析的额度")
+                val reason = if (usage.parsed) "上游返回的权益包没有可解析的额度" else "上游未返回可解析的额度"
+                CreditInfo(0, known = false, detail = reason)
             }
         } catch (e: TraeHttpException) {
             CreditInfo(0, known = false, detail = e.message ?: "刷新额度失败")
@@ -270,13 +433,17 @@ class TraeProvider(
         }
     }
 
+    /** 签到只对国内版存在：国际版没有签到制度（前端 JS 里 checkin 零命中），选目标时先排掉。 */
+    override fun supportsAction(account: ProviderAccount, action: String): Boolean =
+        action != ACTION_CHECKIN || regionOfAccount(account) != TraeRegion.INTL
+
     override fun performAction(
         account: ProviderAccount,
         action: String,
         payload: JsonObject,
     ): ProviderActionResult = when (action) {
         ACTION_CHECKIN -> {
-            // 国际版没有签到制度（前端 JS 里 checkin 零命中）
+            // 国际版没有签到制度（前端 JS 里 checkin 零命中）；正常由 supportsAction 拦下
             if (regionOfAccount(account) == TraeRegion.INTL) {
                 ProviderActionResult.failure("国际版没有签到制度")
             } else {
@@ -290,7 +457,7 @@ class TraeProvider(
     override fun creditPacks(account: ProviderAccount): List<QuotaPack> {
         val trae = parseOrNull(account) ?: return emptyList()
         return try {
-            checkinClient(regionOfAccount(account)).entUsage(trae).details.map {
+            checkinClient(regionOfAccount(account), trae.userRegion).entUsage(trae).details.map {
                 QuotaPack(
                     name = it.name,
                     group = it.group,
@@ -312,8 +479,10 @@ class TraeProvider(
     private fun checkin(account: ProviderAccount): ProviderActionResult {
         val trae = parseOrNull(account) ?: return ProviderActionResult.failure("账号凭证无法解析")
         return try {
-            val status = checkinClient(regionOfAccount(account)).status(trae)
+            val status = checkinClient(regionOfAccount(account), trae.userRegion).status(trae)
             if (status.checkedIn) return ProviderActionResult.success("今日已签到")
+            // 上游明确说活动未开启就别发 claim：拿了也是「活动暂不可用」(9090)，用户看不出所以然
+            if (status.enabled == false) return ProviderActionResult.failure("签到活动未开启")
             val outcome = claimWithRetry(trae)
             if (outcome == ClaimOutcome.ALREADY_CHECKED_IN) {
                 ProviderActionResult.success("今日已签到")
@@ -328,11 +497,11 @@ class TraeProvider(
     }
 
     private fun claimWithRetry(account: TraeAccount): ClaimOutcome = try {
-        checkinClient(regionOfAccount(account)).claim(account)
+        checkinClient(regionOfAccount(account), account.userRegion).claim(account)
     } catch (e: TraeHttpException) {
         if (e.upstreamCode != CHECKIN_BUSY_CODE) throw e
         Thread.sleep(CHECKIN_RETRY_DELAY_MS)
-        checkinClient(regionOfAccount(account)).claim(account)
+        checkinClient(regionOfAccount(account), account.userRegion).claim(account)
     }
 
     // ------------------------------------------------------------------ 登录
@@ -368,9 +537,7 @@ class TraeProvider(
             traceId,
             TraeLogin.buildLoginUrl(machineId, deviceId, callbackUrl, region = target),
             callbackUrl,
-        ).also {
-            hooks.onLoginLog("[Trae] 已生成登录链接（region=${target.id}），等待用户在登录页完成授权")
-        }
+        )
     }
 
     override fun completeWebLogin(callbackUrl: String): ProviderAccount {
@@ -382,7 +549,6 @@ class TraeProvider(
             queryParam(callbackUrl, "loginHost"),
             callback.enterpriseId.ifEmpty { queryParam(callbackUrl, "host") },
         )
-        hooks.onLoginLog("[Trae] 收到登录回调（region=${region.id}，uid=${callback.uid.ifEmpty { "未带" }}）")
         var account = TraeAccount(
             uid = callback.uid,
             accessToken = callback.accessToken,
@@ -395,11 +561,25 @@ class TraeProvider(
             domain = region.id,
             apiHost = region.oauthHost,
         )
-        if (account.refreshToken.isNotEmpty()) {
-            hooks.onLoginLog("[Trae] 用 refreshToken 换取 accessToken（${region.oauthHost}）")
-            account = authClient(region).exchangeToken(account)
+        if (account.refreshToken.isNotEmpty()) account = authClient(region).exchangeToken(account)
+        // 网页「桌面模式登录」只给 Cookie：拿它换会话 token（官方网页就是这么做的）
+        if (account.accessToken.isEmpty() && account.refreshToken.isEmpty() && callback.cookie.isNotEmpty()) {
+            account = try {
+                authClient(region).fetchTokenByCookie(account, callback.cookie)
+            } catch (e: TraeHttpException) {
+                throw IllegalStateException(
+                    "Cookie 换 token 失败（HTTP ${e.status}）：${e.body.take(160).ifEmpty { e.message.orEmpty() }}。" +
+                        "Cookie 键：${TraeLogin.cookieKeys(callback.cookie).joinToString(",")}",
+                )
+            }
         }
-        hooks.onLoginLog("[Trae] 拉取用户信息（${region.oauthHost}）")
+        if (account.uid.isEmpty() && account.accessToken.isNotEmpty()) {
+            account = account.withIdentity(
+                dev.aigw.core.util.jwtClaim(account.accessToken, "user_id", "userId", "uid", "sub"),
+                "",
+                "",
+            )
+        }
         account = authClient(region).getUserInfo(account)
         if (account.uid.isEmpty()) throw IllegalStateException("无法确定账号 uid，请确认登录已完成")
         return toProviderAccount(account)
@@ -443,8 +623,6 @@ class TraeProvider(
     private fun parseOrNull(account: ProviderAccount): TraeAccount? =
         runCatching { TraeAccount.parse(account.secret) }.getOrNull()
 
-    private fun newCompletionId(): String = "chatcmpl-" + UUID.randomUUID().toString().replace("-", "").take(24)
-
     companion object {
         const val ID = "trae"
 
@@ -469,10 +647,17 @@ internal fun ensureDeviceIds(account: TraeAccount): TraeAccount {
 internal fun traeErrorMessage(e: TraeHttpException): String = when (e.upstreamCode) {
     9074L -> "签到被拒：设备指纹未通过校验，去账号详情点「重新生成」后重试"
     4001L -> "模型或客户端版本不被上游接受（可在供应商设置里上调版本号）"
-    else -> e.message ?: "上游错误"
+    // 9090 是上游活动发放链路的「活动暂不可用」码（另一条链路对应 9069）：不是请求错，是活动侧当下领不到
+    9090L -> "签到活动暂不可用（活动侧原因），稍后再试"
+    else -> {
+        // 上游 message 往往很含糊（如「活动暂不可用」），把它对应的业务码一并给出才能定性
+        val base = e.message ?: "上游错误"
+        if (e.upstreamCode != 0L) "$base（code=${e.upstreamCode}）" else base
+    }
 }
 
 internal fun TraeErrorKind.toErrorKind(): ErrorKind = when (this) {
+    TraeErrorKind.MODEL_LIMIT -> ErrorKind.MODEL_LIMIT
     TraeErrorKind.PLAN_LIMIT -> ErrorKind.QUOTA
     TraeErrorKind.SOFT_RATE -> ErrorKind.SOFT_RATE
     TraeErrorKind.NOT_FOUND -> ErrorKind.NOT_FOUND

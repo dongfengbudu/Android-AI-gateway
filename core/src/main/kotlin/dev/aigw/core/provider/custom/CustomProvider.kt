@@ -4,11 +4,14 @@ import com.google.gson.JsonObject
 import com.google.gson.JsonParser
 import dev.aigw.core.gateway.CustomProviderConfig
 import dev.aigw.core.provider.AggregatedChatCall
+import dev.aigw.core.provider.AudioTranscriptionRequest
+import dev.aigw.core.provider.AudioTranscriptionResult
 import dev.aigw.core.provider.AuthKind
 import dev.aigw.core.provider.ChatCall
 import dev.aigw.core.provider.CreditInfo
 import dev.aigw.core.provider.ErrorKind
 import dev.aigw.core.provider.FailedChatCall
+import dev.aigw.core.provider.MediaCall
 import dev.aigw.core.provider.OpenAiSseAggregator
 import dev.aigw.core.provider.Provider
 import dev.aigw.core.provider.ProviderAccount
@@ -18,12 +21,12 @@ import dev.aigw.core.provider.ProviderModelCatalogView
 import dev.aigw.core.provider.StreamFailureChatCall
 import dev.aigw.core.provider.StreamingChatCall
 import dev.aigw.core.provider.UpstreamError
+import dev.aigw.core.util.HttpSupport
 import dev.aigw.core.util.arrayOrNull
+import dev.aigw.core.util.bodySnippet
 import dev.aigw.core.util.objOrNull
-import java.io.ByteArrayOutputStream
-import java.io.InputStream
+import dev.aigw.core.util.stringOrNull
 import java.net.HttpURLConnection
-import java.net.URL
 
 /**
  * 用户手动导入的 OpenAI 兼容供应商。
@@ -79,7 +82,7 @@ class CustomProvider(
             return FailedChatCall(0, e.message ?: "连接失败")
         }
         if (status !in 200..299) {
-            val body = runCatching { readLimited(conn.errorStream) }.getOrDefault("")
+            val body = runCatching { HttpSupport.readLimited(conn.errorStream) }.getOrDefault("")
             conn.disconnect()
             return FailedChatCall(status, body)
         }
@@ -101,7 +104,7 @@ class CustomProvider(
             return AggregatedChatCall(status, aggregated)
         }
 
-        val text = runCatching { stream.use { readLimited(it) } }.getOrDefault("")
+        val text = runCatching { stream.use { HttpSupport.readLimited(it) } }.getOrDefault("")
         conn.disconnect()
         // 200 但空 body（代理吞响应、上游静默拒绝）：当成功会让客户端「输出完成却什么都没有」
         if (text.isBlank()) return emptyUpstreamFailure(status, contentType, text)
@@ -138,8 +141,55 @@ class CustomProvider(
         return obj.get("choices")?.isJsonArray == true
     }
 
+    /**
+     * 自定义供应商是 OpenAI 兼容中转，`/audio/transcriptions` 与对话同一个根地址，
+     * 因此转写能力天然可透传；其余基于私有网页协议的上游没有公开转写端点，保持默认 false。
+     */
+    override val supportsAudioTranscription: Boolean get() = true
+
+    override fun transcribeAudio(
+        account: ProviderAccount,
+        request: AudioTranscriptionRequest,
+    ): MediaCall<AudioTranscriptionResult> {
+        val key = parseKey(account) ?: return MediaCall.Failure(401, "凭证无法解析")
+
+        val conn = try {
+            openConnection(audioUrl(config.baseUrl), key, request.rawBody, request.rawContentType, "POST")
+        } catch (e: Exception) {
+            return MediaCall.Failure(0, e.message ?: "连接失败")
+        }
+        val status = try {
+            conn.responseCode
+        } catch (e: Exception) {
+            conn.disconnect()
+            return MediaCall.Failure(0, e.message ?: "连接失败")
+        }
+        if (status !in 200..299) {
+            val body = runCatching { HttpSupport.readLimited(conn.errorStream) }.getOrDefault("")
+            conn.disconnect()
+            return MediaCall.Failure(status, body)
+        }
+
+        val text = runCatching { conn.inputStream.use { HttpSupport.readLimited(it) } }.getOrDefault("")
+        conn.disconnect()
+        if (text.isBlank()) return MediaCall.Failure(status, "上游返回空响应（HTTP $status）")
+
+        // response_format=text 时上游直接回纯文本，没有 JSON 可解
+        val obj = runCatching { JsonParser.parseString(text).asJsonObject }.getOrNull()
+            ?: return MediaCall.Success(AudioTranscriptionResult(text.trim()))
+        val duration = runCatching { obj.get("duration")?.takeIf { it.isJsonPrimitive }?.asDouble }
+            .getOrNull() ?: 0.0
+        return MediaCall.Success(
+            AudioTranscriptionResult(
+                text = obj.stringOrNull("text").orEmpty(),
+                language = obj.stringOrNull("language").orEmpty(),
+                durationSeconds = duration,
+            ),
+        )
+    }
+
     override fun classify(status: Int, body: String): UpstreamError {
-        val message = extractMessage(body).ifEmpty { "上游 HTTP $status" }
+        val message = extractMessage(body).ifEmpty { "上游 HTTP $status" + bodySnippet(body) }
         val kind = when {
             status == 401 || status == 403 -> ErrorKind.SESSION_DEAD
             status == 402 -> ErrorKind.QUOTA
@@ -219,7 +269,7 @@ class CustomProvider(
             }
             return try {
                 if (conn.responseCode !in 200..299) return emptyList()
-                val text = readLimited(conn.inputStream)
+                val text = HttpSupport.readLimited(conn.inputStream)
                 val obj = runCatching { JsonParser.parseString(text).asJsonObject }.getOrNull()
                     ?: return emptyList()
                 val data = obj.arrayOrNull("data") ?: return emptyList()
@@ -239,25 +289,53 @@ class CustomProvider(
             key: String,
             body: String?,
             method: String,
+        ): HttpURLConnection = openConnection(
+            url = url,
+            key = key,
+            body = body?.toByteArray(Charsets.UTF_8),
+            contentType = if (body != null) "application/json" else null,
+            method = method,
+        )
+
+        /**
+         * 字节体版本：语音转写的 multipart 不能按 UTF-8 编码来回倒一手，
+         * 且 Content-Type（含 boundary）必须用客户端原值，不能写死 application/json。
+         */
+        private fun openConnection(
+            url: String,
+            key: String,
+            body: ByteArray?,
+            contentType: String?,
+            method: String,
         ): HttpURLConnection {
-            val conn = (URL(url).openConnection() as HttpURLConnection).apply {
-                requestMethod = method
-                connectTimeout = CONNECT_TIMEOUT_MS
-                readTimeout = READ_TIMEOUT_MS
-                instanceFollowRedirects = false
-                // SSE 必须逐块到达，显式要求不压缩
-                setRequestProperty("Accept-Encoding", "identity")
-                setRequestProperty("Accept", "text/event-stream, application/json")
-                if (key.isNotEmpty()) setRequestProperty("Authorization", "Bearer $key")
+            val conn = HttpSupport.openWithHeaders(
+                url = url,
+                method = method,
+                connectTimeoutMs = CONNECT_TIMEOUT_MS,
+                readTimeoutMs = READ_TIMEOUT_MS,
+                body = null,
+            ) { conn ->
+                conn.setRequestProperty("Accept", "text/event-stream, application/json")
+                if (key.isNotEmpty()) conn.setRequestProperty("Authorization", "Bearer $key")
+                if (contentType != null) conn.setRequestProperty("Content-Type", contentType)
             }
             if (body != null) {
                 conn.doOutput = true
-                conn.setRequestProperty("Content-Type", "application/json")
-                val bytes = body.toByteArray(Charsets.UTF_8)
-                conn.setFixedLengthStreamingMode(bytes.size)
-                conn.outputStream.use { it.write(bytes) }
+                conn.setFixedLengthStreamingMode(body.size)
+                conn.outputStream.use { it.write(body) }
             }
             return conn
+        }
+
+        /** 转写端点：去掉 baseUrl 尾部的对话/模型路径后挂 `/audio/transcriptions`。 */
+        private fun audioUrl(baseUrl: String): String {
+            val base = baseUrl.trim().trimEnd('/')
+            val root = when {
+                base.endsWith("/chat/completions") -> base.removeSuffix("/chat/completions")
+                base.endsWith("/models") -> base.removeSuffix("/models")
+                else -> base
+            }
+            return "$root/audio/transcriptions"
         }
 
         private fun chatUrl(baseUrl: String): String {
@@ -267,27 +345,12 @@ class CustomProvider(
 
         private fun modelsUrl(baseUrl: String): String {
             val base = baseUrl.trim().trimEnd('/')
-            return when {
-                base.endsWith("/chat/completions") -> base.removeSuffix("/chat/completions") + "/models"
-                base.endsWith("/models") -> base
-                else -> "$base/models"
+            val root = when {
+                base.endsWith("/chat/completions") -> base.removeSuffix("/chat/completions")
+                base.endsWith("/models") -> base.removeSuffix("/models")
+                else -> base
             }
-        }
-
-        private fun readLimited(input: InputStream?): String {
-            if (input == null) return ""
-            val out = ByteArrayOutputStream()
-            val buffer = ByteArray(8192)
-            while (true) {
-                val read = input.read(buffer)
-                if (read < 0) break
-                if (out.size() + read > MAX_BODY_BYTES) {
-                    out.write(buffer, 0, MAX_BODY_BYTES - out.size())
-                    break
-                }
-                out.write(buffer, 0, read)
-            }
-            return out.toString("UTF-8")
+            return "$root/models"
         }
 
         /** 自定义供应商的账号 uid 由 key 派生（只用于区分账号，不泄露完整 key）。 */
@@ -299,6 +362,5 @@ class CustomProvider(
 
         private const val CONNECT_TIMEOUT_MS = 30_000
         private const val READ_TIMEOUT_MS = 300_000
-        private const val MAX_BODY_BYTES = 1 shl 20
     }
 }

@@ -1,9 +1,16 @@
 package dev.aigw.core.provider.loomy
 
+import dev.aigw.core.util.arrayOrNull
+import dev.aigw.core.util.bool
+import dev.aigw.core.util.long
+import dev.aigw.core.util.objOrNull
+import dev.aigw.core.util.str
+
 /**
  * 模型目录：从 `GET /api/v1/models` 拉取（需要 session）。
  *
- * 拉不到时回退到内置快照，并如实标注来源，不假装是上游数据。
+ * 拉不到时返回本次运行内缓存的旧列表（没有则空列表），并置 [fromFallback] 与 [lastError]，
+ * 不展示打包的硬编码快照。
  */
 class LoomyModelCatalog(
     private val apiBase: String = LoomyConstants.API_BASE,
@@ -22,22 +29,29 @@ class LoomyModelCatalog(
     var lastError: String = ""
         private set
 
+    /**
+     * 强制下次重新拉取（界面的刷新按钮用）。
+     *
+     * 只让缓存过期（[cachedAt] 归零），保留 [cached] 作失败兜底：
+     * 本方法只保证不再命中缓存，不保证上游此刻可用。
+     */
     fun invalidate() {
-        cached = null
         cachedAt = 0L
-        cachedSession = ""
     }
 
     /**
      * 取模型列表。
      *
-     * [session] 为空（没有可用账号）时直接用内置快照，不发请求。
+     * [session] 为空（没有可用账号）时返回空列表，不发请求，也不算失败——
+     * 登录前本就不该有模型，报错只会在模型页吓人。
      */
     fun models(session: String?): List<LoomyModel> {
+        // 标记描述的是「本次返回的清单怎么来的」，每次调用先重置，
+        // 否则上一次的失败会被后面命中 TTL 缓存的调用沿用。
+        fromFallback = false
+        lastError = ""
         if (session.isNullOrEmpty()) {
-            fromFallback = true
-            lastError = "没有可用账号，无法拉取模型列表"
-            return SNAPSHOT
+            return emptyList()
         }
         val now = nowMillis()
         val fresh = cached != null && cachedSession == session && now - cachedAt < ttlMillis
@@ -48,7 +62,7 @@ class LoomyModelCatalog(
             if (list.isEmpty()) {
                 fromFallback = true
                 lastError = "上游返回了空的模型列表"
-                SNAPSHOT
+                cached ?: emptyList()
             } else {
                 cached = list
                 cachedAt = now
@@ -60,11 +74,11 @@ class LoomyModelCatalog(
         } catch (e: LoomyApiException) {
             fromFallback = true
             lastError = e.message ?: "拉取模型列表失败"
-            SNAPSHOT
+            cached ?: emptyList()
         } catch (e: Exception) {
             fromFallback = true
             lastError = e.message ?: "拉取模型列表失败"
-            SNAPSHOT
+            cached ?: emptyList()
         }
     }
 
@@ -76,18 +90,20 @@ class LoomyModelCatalog(
         )
         val (status, body) = httpJson("$apiBase${LoomyConstants.PATH_MODELS}", "GET", headers)
         val obj = decodeEnvelope(status, body)
-        val array = obj.array("data") ?: return emptyList()
+        val array = obj.arrayOrNull("data") ?: return emptyList()
         val result = ArrayList<LoomyModel>()
         for (element in array) {
             val item = runCatching { element.asJsonObject }.getOrNull() ?: continue
             val id = item.str("id").trim()
             if (id.isEmpty()) continue
-            val limit = item.obj("limit")
+            val limit = item.objOrNull("limit")
             val context = limit?.long("context") ?: item.long("context_length")
             val output = limit?.long("output") ?: item.long("max_output_tokens")
-            val capabilities = item.obj("capabilities")
-            val inputModalities = item.obj("modalities")?.array("input")
+            val capabilities = item.objOrNull("capabilities")
+            val inputModalities = item.objOrNull("modalities")?.arrayOrNull("input")
             val hasImage = inputModalities?.any { it.asString == "image" } == true
+            // 音频能力必须显式采集：不取就丢掉，转写端点只能靠猜
+            val hasAudio = inputModalities?.any { it.asString == "audio" } == true
             result.add(
                 LoomyModel(
                     id = id,
@@ -97,32 +113,10 @@ class LoomyModelCatalog(
                     reasoning = item.bool("reasoning") || item.bool("supports_reasoning"),
                     toolCall = item.bool("tool_call") || capabilities?.bool("function_calling") == true,
                     attachment = item.bool("attachment") || hasImage,
+                    audio = hasAudio,
                 ),
             )
         }
         return result
     }
-
-    companion object {
-        /**
-         * 内置快照。
-         *
-         * 来源：Loomy 官方文档「模型」页列出的默认模型（MiniMax-M2.5 / doubao-seed-2.0-pro /
-         * DeepSeek-v3.2 / qwen3.5-plus）。**上游真正的模型 id 以 `/api/v1/models` 为准**，
-         * 这里只是没账号或拉取失败时的占位，可能过期。
-         */
-        val SNAPSHOT: List<LoomyModel> = listOf(
-            LoomyModel(id = "MiniMax-M2.5", name = "MiniMax-M2.5"),
-            LoomyModel(id = "doubao-seed-2.0-pro", name = "豆包 Seed 2.0 Pro"),
-            LoomyModel(id = "DeepSeek-v3.2", name = "DeepSeek v3.2"),
-            LoomyModel(id = "qwen3.5-plus", name = "通义千问 3.5 Plus"),
-        )
-    }
 }
-
-/** 供界面展示的目录视图。 */
-data class ModelCatalogView(
-    val models: List<LoomyModel>,
-    val fromFallback: Boolean,
-    val error: String,
-)

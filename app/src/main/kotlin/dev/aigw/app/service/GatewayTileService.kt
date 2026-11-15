@@ -1,10 +1,11 @@
 package dev.aigw.app.service
 
 import android.content.Intent
+import android.os.Build
 import android.service.quicksettings.Tile
 import android.service.quicksettings.TileService
+import androidx.core.content.ContextCompat
 import dev.aigw.app.gatewayEngine
-import dev.aigw.core.usage.OperationLog
 
 /**
  * 控制中心的网关开关磁贴。
@@ -23,11 +24,22 @@ class GatewayTileService : TileService() {
         val engine = runCatching { gatewayEngine }.getOrNull() ?: return
         val tile = qsTile ?: return
         if (engine.isRunning()) {
-            GatewayService.stop(applicationContext)
-            engine.operationLog.info(OperationLog.CATEGORY_REQUEST, "控制中心磁贴停止了网关")
+            dev.aigw.app.data.KeepAlivePrefs.setWantRunning(engine.store(), false)
+            engine.stop()
+            applicationContext.stopService(Intent(applicationContext, GatewayService::class.java))
+            engine.requestLog.info("控制中心磁贴停止了网关")
         } else {
-            val error = GatewayService.start(applicationContext)
-            engine.operationLog.info(OperationLog.CATEGORY_REQUEST, if (error == null) "控制中心磁贴启动了网关" else "磁贴启动网关失败")
+            // 磁贴点击允许直接拉前台服务（用户交互），引擎启动失败再撤
+            ContextCompat.startForegroundService(
+                applicationContext,
+                Intent(applicationContext, GatewayService::class.java),
+            )
+            val ok = runCatching { engine.start() }.isSuccess
+            if (!ok) {
+                applicationContext.stopService(Intent(applicationContext, GatewayService::class.java))
+            }
+            if (ok) dev.aigw.app.data.KeepAlivePrefs.setWantRunning(engine.store(), true)
+            engine.requestLog.info(if (ok) "控制中心磁贴启动了网关" else "磁贴启动网关失败")
         }
         updateTile()
         // 主界面可能正开着：让它的状态也刷新
@@ -38,11 +50,18 @@ class GatewayTileService : TileService() {
         val tile = qsTile ?: return
         val running = runCatching { gatewayEngine.isRunning() }.getOrDefault(false)
         tile.state = if (running) Tile.STATE_ACTIVE else Tile.STATE_INACTIVE
-        if (running) {
+        // Tile.subtitle 是 API 29 才有的方法，minSdk 是 26：低版本上直接调用会 NoSuchMethodError。
+        // 低版本改用 label 表达同一信息。
+        val subtitle = if (running) {
             val port = runCatching { gatewayEngine.settings().port }.getOrDefault(0)
-            tile.subtitle = if (port > 0) "端口 $port" else null
+            if (port > 0) "端口 $port" else null
         } else {
-            tile.subtitle = null
+            null
+        }
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+            tile.subtitle = subtitle
+        } else {
+            tile.label = if (subtitle != null) "AI 网关 · $subtitle" else "AI 网关"
         }
         tile.updateTile()
     }

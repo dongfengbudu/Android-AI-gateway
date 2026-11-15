@@ -51,6 +51,19 @@ class ModelsStreamingTest {
         override fun listModels(account: ProviderAccount?): ProviderModelCatalogView = throw RuntimeException(message)
     }
 
+    /** 统计 invalidateModelCache 被调次数，用于验证 forceRefresh 语义。 */
+    private class CountingProvider(id: String) : StubProvider(id) {
+        @Volatile
+        var invalidations: Int = 0
+
+        override fun listModels(account: ProviderAccount?) =
+            ProviderModelCatalogView(listOf(ProviderModel("m1", "m1")), false, "")
+
+        override fun invalidateModelCache() {
+            invalidations++
+        }
+    }
+
     private fun engineWith(vararg providers: Provider): GatewayEngine {
         val engine = GatewayEngine(InMemoryKeyValueStore())
         for (provider in providers) engine.registry.register(provider)
@@ -91,7 +104,37 @@ class ModelsStreamingTest {
             listOf("fast/f1", "fast/f2", "slow/slow-1"),
             result.models.filter { it.providerId == "fast" || it.providerId == "slow" }.map { it.fullId }.sorted(),
         )
-        assertTrue(result.failures.isEmpty())
+        // 内置供应商在无账号时可能自报失败，与本次关注的两家无关
+        assertTrue(result.failures.keys.none { it == "fast" || it == "slow" }, result.failures.toString())
+    }
+
+    @Test
+    fun `无账号时供应商不该自报目录错误`() {
+        // 回归：ChatGPT 的 listModels(null) 曾返回「未登录 ChatGPT 账号」，模型页因此出现红字
+        // 「拉取模型目录时有报错：chatgpt: 未登录 ChatGPT 账号」。没有账号只是尚未登录，不是失败。
+        val engine = GatewayEngine(InMemoryKeyValueStore())
+        var nullAccountError = ""
+        engine.registry.register(
+            object : StubProvider("noaccount") {
+                override fun listModels(account: ProviderAccount?): ProviderModelCatalogView {
+                    if (account == null) nullAccountError = "未登录测试账号"
+                    return ProviderModelCatalogView(emptyList(), false, if (account == null) "未登录测试账号" else "")
+                }
+            },
+        )
+        val catalog = engine.modelsStreaming {}
+        assertEquals(null, catalog.failures["noaccount"], "无账号不应被当成拉取失败：${catalog.failures}")
+        assertEquals("未登录测试账号", nullAccountError, "测试前提：确实是以 null 账号调用")
+    }
+
+    @Test
+    fun `内置供应商在无账号时都不报目录错误`() {
+        // 所有内置供应商共同遵守的约定：未登录只是没有模型，不能报红（用户看到的错误条就来自这里）。
+        val engine = GatewayEngine(InMemoryKeyValueStore())
+        val offenders = engine.registry.all()
+            .filter { it.listModels(null).error.isNotEmpty() }
+            .map { "${it.id}：${it.listModels(null).error}" }
+        assertTrue(offenders.isEmpty(), "这些供应商把「没有账号」报成了错误：$offenders")
     }
 
     @Test
@@ -101,6 +144,10 @@ class ModelsStreamingTest {
             FixedProvider("errv", ProviderModelCatalogView(emptyList(), false, "上游开小差")),
             FixedProvider("ok", ProviderModelCatalogView(listOf(ProviderModel("m1", "m1")), false, "")),
         )
+        // 有账号的供应商报错才算真失败；没有账号时引擎会把错误吞掉（见上一个用例）
+        for (id in listOf("bad", "errv", "ok")) {
+            engine.pool.upsert(ProviderAccount(id, "u1", "账号1", "{}"))
+        }
 
         val chunks = CopyOnWriteArrayList<ProviderModelsChunk>()
         val catalog = engine.modelsStreaming { chunks.add(it) }
@@ -124,23 +171,64 @@ class ModelsStreamingTest {
     }
 
     @Test
-    fun `区域型供应商按区域拆分进 chunk`() {
-        val engine = GatewayEngine(InMemoryKeyValueStore())
-        engine.registry.register(RegionStub())
-        val chunks = CopyOnWriteArrayList<ProviderModelsChunk>()
-        val catalog = engine.modelsStreaming { chunks.add(it) }
+    fun `forceRefresh 才失效模型缓存`() {
+        val provider = CountingProvider("cnt")
+        val engine = engineWith(provider)
 
-        val chunk = chunks.single { it.providerId == "codebuddy" }
-        assertEquals(catalog.models.filter { it.providerId == "codebuddy" }, chunk.models)
-        assertEquals(listOf("codebuddy-cn/glm-5.2", "codebuddy-global/glm-5.2"), chunk.models.map { it.fullId })
+        // 默认不强制：不碰缓存（既有的 modelsStreaming { } 尾随 lambda 调用语义不变）
+        engine.modelsStreaming { }
+        assertEquals(0, provider.invalidations)
+
+        // 显式强制：失效一次，下次 listModels 重打上游
+        engine.modelsStreaming(forceRefresh = true) { }
+        assertEquals(1, provider.invalidations)
     }
 
-    /** 仅用于验证区域拆分：regions 返回 cn/global。 */
-    private class RegionStub : StubProvider("codebuddy"), dev.aigw.core.provider.RegionAwareSupport {
-        override fun listModels(account: ProviderAccount?) =
-            ProviderModelCatalogView(listOf(ProviderModel("glm-5.2", "GLM")), false, "")
+    @Test
+    fun `models 阻塞版不失效缓存`() {
+        val provider = CountingProvider("cnt")
+        val engine = engineWith(provider)
 
-        override fun regionOf(account: ProviderAccount) = "cn"
+        engine.models()
+        assertEquals(0, provider.invalidations)
+    }
+
+    @Test
+    fun `区域型供应商按区域各拉一次目录`() {
+        val engine = GatewayEngine(InMemoryKeyValueStore())
+        engine.registry.register(RegionStub())
+        // 两个区域各有自己的账号：目录必须各拉各的，不能把一次结果复制给所有区域
+        engine.pool.upsert(ProviderAccount("codebuddy", "u-cn", "国内号", "{}"))
+        engine.pool.upsert(ProviderAccount("codebuddy", "u-global", "国际号", "{}"))
+
+        val chunk = engine.modelsStreaming { }.models.filter { it.providerId == "codebuddy" }
+        assertEquals(
+            listOf("codebuddy-cn/glm-5.2", "codebuddy-global/gpt-5.6-sol"),
+            chunk.map { it.fullId },
+        )
+    }
+
+    @Test
+    fun `没有账号的区域不生成模型分组`() {
+        val engine = GatewayEngine(InMemoryKeyValueStore())
+        engine.registry.register(RegionStub())
+        engine.pool.upsert(ProviderAccount("codebuddy", "u-cn", "国内号", "{}"))
+
+        val chunk = engine.modelsStreaming { }.models.filter { it.providerId == "codebuddy" }
+        assertEquals(listOf("codebuddy-cn/glm-5.2"), chunk.map { it.fullId })
+    }
+
+    /**
+     * 仅用于验证区域拆分：regions 返回 cn/global，各区域的账号返回各自的目录。
+     */
+    private class RegionStub : StubProvider("codebuddy"), dev.aigw.core.provider.RegionAwareSupport {
+        override fun listModels(account: ProviderAccount?) = ProviderModelCatalogView(
+            listOf(ProviderModel(if (account?.uid == "u-global") "gpt-5.6-sol" else "glm-5.2", "m")),
+            false,
+            "",
+        )
+
+        override fun regionOf(account: ProviderAccount) = if (account.uid == "u-global") "global" else "cn"
 
         override fun regions() = listOf("cn", "global")
     }

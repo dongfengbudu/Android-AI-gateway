@@ -44,6 +44,10 @@ class AntigravityModelFetchTest {
               "displayName": "Gemini 3.1 Flash Lite",
               "maxTokens": 1048576
             },
+            "gemini-4-argon": {
+              "displayName": "Gemini 4 Argon",
+              "maxTokens": 1048576
+            },
             "chat_20706": {
               "displayName": "Internal Chat"
             }
@@ -67,6 +71,7 @@ class AntigravityModelFetchTest {
             val provider = AntigravityProvider(
                 apiBase = baseUrl,
                 quotaBase = baseUrl,
+                chatBase = baseUrl,
             )
             val account = ProviderAccount("antigravity", "test@gmail.com", "test", accountJson)
             val catalog = provider.listModels(account)
@@ -90,6 +95,18 @@ class AntigravityModelFetchTest {
         assertEquals("gemini-3.7-flash-high", provider.resolveModel("gemini-3.7-flash"))
         assertEquals("gemini-pro-agent", provider.resolveModel("gemini-3.1-pro"))
         assertEquals("claude-opus-4-6-thinking", provider.resolveModel("claude-opus"))
+    }
+
+    @Test
+    fun `列表里存在的模型不被别名规则改写`() {
+        withMockServer(sampleModels) { baseUrl ->
+            val provider = AntigravityProvider(apiBase = baseUrl, quotaBase = baseUrl, chatBase = baseUrl)
+            val account = ProviderAccount("antigravity", "test@gmail.com", "test", accountJson)
+            provider.listModels(account)
+            // gemini-4-argon 含 "pro" 子串，若按 contains 判断会被悄悄改成 gemini-pro-agent
+            assertEquals("gemini-4-argon", provider.resolveModel("gemini-4-argon"))
+            assertEquals("gemini-3.8-flash-high", provider.resolveModel("gemini-3.8-flash-high"))
+        }
     }
 
     @Test

@@ -13,6 +13,7 @@ import dev.aigw.core.provider.ProviderAccount
 import dev.aigw.core.provider.ProviderModel
 import dev.aigw.core.provider.ProviderModelCatalogView
 import dev.aigw.core.provider.UpstreamError
+import dev.aigw.core.usage.CallStatus
 import java.net.HttpURLConnection
 import java.net.URL
 import kotlin.test.Test
@@ -193,9 +194,141 @@ class FailoverIntegrationTest {
         try {
             val (status, resp) = post(server.listeningPort, "my-model")
             assertEquals(400, status, "客户端参数错必须向客户端返回 400")
-            assertTrue(resp.contains("upstream_rejected"))
+            // 错误码按真实分类给（不再是笼统的 upstream_rejected），消息用供应商给的原话
+            assertTrue(resp.contains("\"code\":\"invalid_request\""), resp)
+            assertTrue(resp.contains("invalid_request_error"), resp)
             assertEquals(1, p1Calls)
             assertEquals(0, p2Calls, "客户端错误绝不能污染备选供应商")
+        } finally {
+            server.stop()
+        }
+    }
+
+    @Test
+    fun `客户端错误不计入供应商熔断，健康供应商不被误隔离`() {
+        val engine = GatewayEngine(InMemoryKeyValueStore())
+        var p1Calls = 0
+        var p2Calls = 0
+
+        // p1 对客户端参数错误稳定回 400（CLIENT）：这不是 p1 的故障
+        val p1 = ConfigurableProvider("p1", listOf("m")) { _, _ ->
+            p1Calls++
+            FailedChatCall(400, "{\"error\":{\"code\":\"invalid_request_error\",\"message\":\"bad model\"}}")
+        }
+        val p2 = ConfigurableProvider("p2", listOf("m")) { _, _ ->
+            p2Calls++
+            AggregatedChatCall(200, "{}")
+        }
+
+        engine.registry.register(p1)
+        engine.registry.register(p2)
+        engine.pool.upsert(ProviderAccount("p1", "u1", "账号1", "{}"))
+        engine.pool.upsert(ProviderAccount("p2", "u2", "账号2", "{}"))
+
+        engine.updateFailoverSettings(
+            ModelFailoverSettings(
+                enabled = true,
+                // 阈值设 3：若客户端错误被误计入，第 3 次就会熔断 p1
+                circuitBreaker = CircuitBreakerConfig(failureThreshold = 3, openDurationMs = 60_000L),
+                routes = mapOf(
+                    "my-model" to listOf(
+                        FailoverCandidate("p1", "m", priority = 100),
+                        FailoverCandidate("p2", "m", priority = 50),
+                    ),
+                ),
+            ),
+        )
+
+        val server = GatewayHttpServer(engine, "127.0.0.1", 0).apply { start(0, true) }
+        try {
+            repeat(4) {
+                val (status, _) = post(server.listeningPort, "my-model")
+                assertEquals(400, status)
+            }
+            assertEquals(4, p1Calls, "客户端错误不应导致 p1 被熔断跳过")
+            assertEquals(0, p2Calls, "客户端错误绝不能污染备选供应商")
+            assertEquals(
+                BreakerState.CLOSED,
+                engine.circuitBreakerOf("p1").currentState(),
+                "连续 4 次客户端 400 不应把健康供应商打成熔断",
+            )
+        } finally {
+            server.stop()
+        }
+    }
+
+    @Test
+    fun `上游侧错误仍计入熔断`() {
+        val engine = GatewayEngine(InMemoryKeyValueStore())
+        val p1 = ConfigurableProvider("p1", listOf("m")) { _, _ -> FailedChatCall(500, "p1 down") }
+        val p2 = ConfigurableProvider("p2", listOf("m")) { _, _ -> AggregatedChatCall(200, "{}") }
+
+        engine.registry.register(p1)
+        engine.registry.register(p2)
+        engine.pool.upsert(ProviderAccount("p1", "u1", "账号1", "{}"))
+        engine.pool.upsert(ProviderAccount("p2", "u2", "账号2", "{}"))
+
+        engine.updateFailoverSettings(
+            ModelFailoverSettings(
+                enabled = true,
+                retry = RetryConfig(maxAttempts = 1, initialBackoffMs = 10L),
+                circuitBreaker = CircuitBreakerConfig(failureThreshold = 2, openDurationMs = 60_000L),
+                routes = mapOf(
+                    "my-model" to listOf(
+                        FailoverCandidate("p1", "m", priority = 100),
+                        FailoverCandidate("p2", "m", priority = 50),
+                    ),
+                ),
+            ),
+        )
+
+        val server = GatewayHttpServer(engine, "127.0.0.1", 0).apply { start(0, true) }
+        try {
+            post(server.listeningPort, "my-model")
+            post(server.listeningPort, "my-model")
+            assertEquals(
+                BreakerState.OPEN,
+                engine.circuitBreakerOf("p1").currentState(),
+                "上游 5xx 必须计入熔断",
+            )
+        } finally {
+            server.stop()
+        }
+    }
+
+    @Test
+    fun `上游失败时调用记录带真实 HTTP 状态而非硬编码 200`() {
+        val engine = GatewayEngine(InMemoryKeyValueStore())
+        val p1 = ConfigurableProvider("p1", listOf("m")) { _, _ -> FailedChatCall(500, "p1 down") }
+        val p2 = ConfigurableProvider("p2", listOf("m")) { _, _ -> FailedChatCall(502, "p2 bad gateway") }
+
+        engine.registry.register(p1)
+        engine.registry.register(p2)
+        engine.pool.upsert(ProviderAccount("p1", "u1", "账号1", "{}"))
+        engine.pool.upsert(ProviderAccount("p2", "u2", "账号2", "{}"))
+
+        engine.updateFailoverSettings(
+            ModelFailoverSettings(
+                enabled = true,
+                retry = RetryConfig(maxAttempts = 1, initialBackoffMs = 10L),
+                routes = mapOf(
+                    "my-model" to listOf(
+                        FailoverCandidate("p1", "m", priority = 100),
+                        FailoverCandidate("p2", "m", priority = 50),
+                    ),
+                ),
+            ),
+        )
+
+        val server = GatewayHttpServer(engine, "127.0.0.1", 0).apply { start(0, true) }
+        try {
+            val (status, _) = post(server.listeningPort, "my-model")
+            // 全候选都是上游 5xx：主因是上游故障，回 502 而不是笼统的 503「没有可用账号」
+            assertEquals(502, status)
+            val record = engine.callLogStore.list().firstOrNull()
+            assertTrue(record != null, "全候选失败也应留下一条调用记录")
+            assertEquals(502, record.httpStatus, "应记录最后一次上游的真实状态")
+            assertEquals(CallStatus.FAILED, record.status)
         } finally {
             server.stop()
         }
@@ -252,7 +385,7 @@ class FailoverIntegrationTest {
     }
 
     @Test
-    fun `所有候选供应商均耗尽时聚合报错返回 503`() {
+    fun `所有候选供应商均耗尽时按真实主因返回错误码`() {
         val engine = GatewayEngine(InMemoryKeyValueStore())
         val p1 = ConfigurableProvider("p1", listOf("m")) { _, _ -> FailedChatCall(500, "p1 down") }
         val p2 = ConfigurableProvider("p2", listOf("m")) { _, _ -> FailedChatCall(504, "p2 timeout") }
@@ -278,8 +411,10 @@ class FailoverIntegrationTest {
         val server = GatewayHttpServer(engine, "127.0.0.1", 0).apply { start(0, true) }
         try {
             val (status, resp) = post(server.listeningPort, "my-model")
-            assertEquals(503, status)
-            assertTrue(resp.contains("所有候选供应商均不可用"))
+            // 两家都是 5xx → 主因 SERVER：502 upstream_error，且逐家原因仍要带上
+            assertEquals(502, status)
+            assertTrue(resp.contains("upstream_error"), resp)
+            assertTrue(resp.contains("上游服务异常"), resp)
             assertTrue(resp.contains("p1"))
             assertTrue(resp.contains("p2"))
         } finally {

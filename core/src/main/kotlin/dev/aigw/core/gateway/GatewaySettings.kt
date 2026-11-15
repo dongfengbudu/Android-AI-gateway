@@ -14,27 +14,54 @@ data class GatewaySettings(
     val apiKey: String = "",
     /** 「无 Key 调用」开关：允许客户端不填 Key 直连。 */
     val allowNoKey: Boolean = true,
-    /** 是否同时监听局域网（关闭则只绑 127.0.0.1）。 */
-    val exposeLan: Boolean = true,
+    /**
+     * 是否同时监听局域网（关闭则只绑 127.0.0.1）。
+     *
+     * 默认 false（仅本机）：局域网暴露会把网关端口开给同网段所有设备，
+     * 而默认 allowNoKey=true 时任何设备都能直接调用，风险过大。
+     * [fromJson] 用 [boolOr] 读旧配置：已存过值的用户（无论 true/false）保持原值，
+     * 仅当字段缺失（老版本升级/首次运行）时才落到这个新默认。
+     */
+    val exposeLan: Boolean = false,
     /** 「只看可用模型」开关：隐藏上游的非对话内部条目。 */
     val onlyUsableModels: Boolean = false,
-    /** 对外（API /v1/models 与对话路由）隐藏的模型，元素为 `routePrefix/modelId` 全名。 */
-    val hiddenModels: Set<String> = emptySet(),
-    /** token 预刷新窗口。 */
-    val refreshSkewSeconds: Long = 24L * 3600,
+    /** token 预刷新窗口（秒）：临期多久内才刷新。 */
+    val refreshSkewSeconds: Long = 300L,
     /** 单次请求最多换号次数。 */
     val maxRotate: Int = 3,
     /** 详细日志：记录每次调用的请求/转发/发送/返回全链路原文，用于排查 503 类问题；会增加存储占用。 */
     val verboseLogging: Boolean = false,
     /** 调用记录保留天数（1~3650）；服务运行时每日自动清理超过该天数的记录。 */
     val logRetentionDays: Int = DEFAULT_RETENTION_DAYS,
+    /** 调用记录开关：关闭后不再写入每条调用的记录（含请求/响应原文），已存记录不受影响。 */
+    val callLoggingEnabled: Boolean = true,
+    /** 请求日志环形缓冲容量（条）。 */
+    val requestLogCapacity: Int = DEFAULT_REQUEST_LOG_CAPACITY,
     /** 模型名不带 provider 前缀时落到哪个供应商。 */
     val defaultProvider: String = "trae",
+    /** 对外（API /v1/models 与对话路由）隐藏的模型，元素为 `routePrefix/modelId` 全名。 */
+    val hiddenModels: Set<String> = emptySet(),
 ) {
+    fun toJson(): JsonObject = JsonObject().apply {
+        addProperty("port", port)
+        addProperty("apiKey", apiKey)
+        addProperty("allowNoKey", allowNoKey)
+        addProperty("exposeLan", exposeLan)
+        addProperty("onlyUsableModels", onlyUsableModels)
+        addProperty("refreshSkewSeconds", refreshSkewSeconds)
+        addProperty("maxRotate", maxRotate)
+        addProperty("verboseLogging", verboseLogging)
+        addProperty("logRetentionDays", logRetentionDays)
+        addProperty("callLoggingEnabled", callLoggingEnabled)
+        addProperty("requestLogCapacity", requestLogCapacity)
+        addProperty("defaultProvider", defaultProvider)
+        add("hiddenModels", JsonArray().apply { hiddenModels.forEach { add(it) } })
+    }
+
     /**
      * 把某个模型设为暴露（[exposed]=true）或隐藏（false），返回新设置。
      *
-     * 语义放在这里而不是界面层：界面此前用「隐藏开关」表达「暴露开关」，
+     * 语义放在这里而不是界面层：界面曾用「隐藏开关」表达「暴露开关」，
      * 回调链上连取反两次，点一下等于没点（开关看起来卡死）。
      */
     fun withModelExposed(fullId: String, exposed: Boolean): GatewaySettings =
@@ -44,20 +71,6 @@ data class GatewaySettings(
     fun withAllModelsExposed(exposed: Boolean, modelIds: Collection<String>): GatewaySettings =
         copy(hiddenModels = if (exposed) emptySet() else modelIds.toSet())
 
-    fun toJson(): JsonObject = JsonObject().apply {
-        addProperty("port", port)
-        addProperty("apiKey", apiKey)
-        addProperty("allowNoKey", allowNoKey)
-        addProperty("exposeLan", exposeLan)
-        addProperty("onlyUsableModels", onlyUsableModels)
-        add("hiddenModels", JsonArray().apply { hiddenModels.forEach { add(it) } })
-        addProperty("refreshSkewSeconds", refreshSkewSeconds)
-        addProperty("maxRotate", maxRotate)
-        addProperty("verboseLogging", verboseLogging)
-        addProperty("logRetentionDays", logRetentionDays)
-        addProperty("defaultProvider", defaultProvider)
-    }
-
     companion object {
         const val DEFAULT_PORT = 8790
         const val STORE_KEY = "settings/gateway.json"
@@ -65,6 +78,21 @@ data class GatewaySettings(
         const val DEFAULT_RETENTION_DAYS = 30
         const val MIN_RETENTION_DAYS = 1
         const val MAX_RETENTION_DAYS = 3650
+
+        const val DEFAULT_REQUEST_LOG_CAPACITY = 300
+        const val MIN_REQUEST_LOG_CAPACITY = 50
+        const val MAX_REQUEST_LOG_CAPACITY = 5000
+
+        fun clampRequestLogCapacity(value: Int): Int =
+            value.coerceIn(MIN_REQUEST_LOG_CAPACITY, MAX_REQUEST_LOG_CAPACITY)
+
+        /**
+         * 预刷新窗口上限（秒）。
+         *
+         * 窗口被当成「临期多久内刷新」真实使用后，过大的值会让 CodeBuddy / Raccoon 等
+         * 每次请求都刷新，故存量配置里的 24h 也在读取时收敛到这个上限。
+         */
+        const val MAX_REFRESH_SKEW_SECONDS = 3600L
 
         fun fromJson(raw: String): GatewaySettings {
             val obj = runCatching { JsonParser.parseString(raw).asJsonObject }.getOrNull()
@@ -76,18 +104,23 @@ data class GatewaySettings(
                 allowNoKey = obj.boolOr("allowNoKey", defaults.allowNoKey),
                 exposeLan = obj.boolOr("exposeLan", defaults.exposeLan),
                 onlyUsableModels = obj.boolOr("onlyUsableModels", defaults.onlyUsableModels),
-                hiddenModels = obj.arrayOrNull("hiddenModels")
-                    ?.mapNotNull { runCatching { it.asString }.getOrNull() }?.toSet() ?: defaults.hiddenModels,
-                refreshSkewSeconds = obj.longOr("refreshSkewSeconds", defaults.refreshSkewSeconds),
+                refreshSkewSeconds = clampRefreshSkew(obj.longOr("refreshSkewSeconds", defaults.refreshSkewSeconds)),
                 maxRotate = obj.intOr("maxRotate", defaults.maxRotate),
                 verboseLogging = obj.boolOr("verboseLogging", defaults.verboseLogging),
+                callLoggingEnabled = obj.boolOr("callLoggingEnabled", defaults.callLoggingEnabled),
+                requestLogCapacity = clampRequestLogCapacity(obj.intOr("requestLogCapacity", defaults.requestLogCapacity)),
                 defaultProvider = obj.strOr("defaultProvider", defaults.defaultProvider),
                 logRetentionDays = clampRetentionDays(obj.intOr("logRetentionDays", defaults.logRetentionDays)),
+                hiddenModels = obj.arrayOrNull("hiddenModels")
+                    ?.mapNotNull { runCatching { it.asString }.getOrNull() }?.toSet() ?: defaults.hiddenModels,
             )
         }
 
         /** 保留天数超出范围时夹回合法区间，避免 0 天把记录全删光或天文数字永不清理。 */
         fun clampRetentionDays(days: Int): Int = days.coerceIn(MIN_RETENTION_DAYS, MAX_RETENTION_DAYS)
+
+        /** 预刷新窗口夹回 [0, MAX_REFRESH_SKEW_SECONDS]，避免负值或超大值造成刷新风暴。 */
+        fun clampRefreshSkew(seconds: Long): Long = seconds.coerceIn(0L, MAX_REFRESH_SKEW_SECONDS)
     }
 }
 

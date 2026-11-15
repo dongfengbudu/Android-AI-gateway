@@ -50,6 +50,28 @@ class StorageMaintenanceTest {
     }
 
     @Test
+    fun `日志开关与容量：旧配置回落默认且越界夹回`() {
+        // 存量配置没有这两个字段：必须得到默认值（归档开、容量 300），不得读成 0
+        val legacy = GatewaySettings().toJson().apply {
+            remove("callLoggingEnabled")
+            remove("requestLogCapacity")
+        }.toString()
+        assertEquals(true, GatewaySettings.fromJson(legacy).callLoggingEnabled)
+        assertEquals(GatewaySettings.DEFAULT_REQUEST_LOG_CAPACITY, GatewaySettings.fromJson(legacy).requestLogCapacity)
+
+        // 越界容量夹回合法区间，避免 0 条把日志全丢或天文数字无限占内存
+        assertEquals(GatewaySettings.MIN_REQUEST_LOG_CAPACITY, GatewaySettings.clampRequestLogCapacity(0))
+        assertEquals(GatewaySettings.MAX_REQUEST_LOG_CAPACITY, GatewaySettings.clampRequestLogCapacity(999999))
+
+        // 往返：toJson 后重新解析保持同值
+        val roundtrip = GatewaySettings.fromJson(
+            GatewaySettings(callLoggingEnabled = false, requestLogCapacity = 777).toJson().toString(),
+        )
+        assertEquals(false, roundtrip.callLoggingEnabled)
+        assertEquals(777, roundtrip.requestLogCapacity)
+    }
+
+    @Test
     fun `保留天数会被持久化并读回`() {
         val json = GatewaySettings(logRetentionDays = 7).toJson().toString()
         assertEquals(7, GatewaySettings.fromJson(json).logRetentionDays)
@@ -57,6 +79,46 @@ class StorageMaintenanceTest {
         // 存量配置没有该字段时回落到默认值，不能读成 0（否则一保存就清库）
         val legacy = GatewaySettings().toJson().apply { remove("logRetentionDays") }.toString()
         assertEquals(30, GatewaySettings.fromJson(legacy).logRetentionDays)
+    }
+
+    // ------------------------------------------------------------------ 预刷新窗口
+
+    @Test
+    fun `预刷新窗口默认五分钟并夹在合法区间`() {
+        assertEquals(300L, GatewaySettings().refreshSkewSeconds)
+        assertEquals(0L, GatewaySettings.clampRefreshSkew(-1))
+        assertEquals(3600L, GatewaySettings.clampRefreshSkew(24L * 3600))
+        assertEquals(300L, GatewaySettings.clampRefreshSkew(300))
+    }
+
+    @Test
+    fun `老用户存过的超大预刷新窗口读取时被收敛`() {
+        // 存量配置里的 24h 会把「临期才刷」退化成每次请求都刷，必须收敛到上限
+        val legacy = GatewaySettings().toJson().apply { addProperty("refreshSkewSeconds", 24L * 3600) }.toString()
+        assertEquals(3600L, GatewaySettings.fromJson(legacy).refreshSkewSeconds)
+
+        val normal = GatewaySettings(refreshSkewSeconds = 600).toJson().toString()
+        assertEquals(600L, GatewaySettings.fromJson(normal).refreshSkewSeconds)
+    }
+
+    // ------------------------------------------------------------------ 局域网暴露默认值
+
+    @Test
+    fun `exposeLan 默认关闭仅本机`() {
+        assertEquals(false, GatewaySettings().exposeLan, "新默认应只绑 127.0.0.1")
+        // 字段缺失（老配置/首次运行）才落到新默认
+        val legacy = GatewaySettings().toJson().apply { remove("exposeLan") }.toString()
+        assertEquals(false, GatewaySettings.fromJson(legacy).exposeLan)
+    }
+
+    @Test
+    fun `老用户已存的 exposeLan 值不会被新默认覆盖`() {
+        // 之前存过 true 的用户读回必须还是 true，不能被新默认 false 静默改掉
+        val storedTrue = GatewaySettings(exposeLan = true).toJson().toString()
+        assertEquals(true, GatewaySettings.fromJson(storedTrue).exposeLan)
+
+        val storedFalse = GatewaySettings(exposeLan = false).toJson().toString()
+        assertEquals(false, GatewaySettings.fromJson(storedFalse).exposeLan)
     }
 
     // ------------------------------------------------------------------ 过期清理

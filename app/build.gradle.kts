@@ -1,4 +1,5 @@
 import org.jetbrains.kotlin.gradle.dsl.JvmTarget
+import java.io.File
 import java.util.Properties
 
 plugins {
@@ -21,6 +22,19 @@ val keystoreProps = Properties().apply {
 
 val hasReleaseKeystore = rootProject.file("keystore.properties").exists()
 
+/**
+ * debug 签名用的固定 keystore：从 keystore.properties 的 `debugStoreFile` 读，不存在则不装配。
+ *
+ * 为什么要固定：容器（PRoot rootfs）重置会重新生成 `~/.android/debug.keystore`，
+ * debug 包的签名随之改变，之前装好的 debug 版就再也无法原地升级
+ * （`INSTALL_FAILED_UPDATE_INCOMPATIBLE`，系统提示「应用签名不一致」）。
+ * 把 debug 密钥放到持久位置并在 keystore.properties 里显式指过去，签名就不再随容器重置漂移。
+ *
+ * CI/他人机器不写 `debugStoreFile`，此处为空，回落到 AGP 默认的 debug 签名，不受影响。
+ */
+val debugKeystoreFile: File? =
+    keystoreProps.getProperty("debugStoreFile")?.let { File(it) }?.takeIf { it.isFile }
+
 fun keystoreValue(key: String): String =
     keystoreProps.getProperty(key)
         ?: error("缺少签名配置 $key：请检查根目录 keystore.properties")
@@ -34,8 +48,8 @@ android {
         applicationId = "dev.aigw.app"
         minSdk = 26
         targetSdk = 36
-        versionCode = 107
-        versionName = "1.1.10"
+        versionCode = 231
+        versionName = "2.31.0"
     }
 
     buildFeatures {
@@ -63,6 +77,15 @@ android {
                 keyPassword = keystoreValue("keyPassword")
             }
         }
+        // debug 签名固定到持久 keystore（见上面的 debugKeystoreFile）。
+        if (debugKeystoreFile != null) {
+            create("debugStable") {
+                storeFile = debugKeystoreFile
+                storePassword = keystoreValue("debugStorePassword")
+                keyAlias = keystoreValue("debugKeyAlias")
+                keyPassword = keystoreValue("debugKeyPassword")
+            }
+        }
     }
 
     buildTypes {
@@ -76,6 +99,7 @@ android {
             isMinifyEnabled = true
             isShrinkResources = true
             proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
+            if (debugKeystoreFile != null) signingConfig = signingConfigs.getByName("debugStable")
         }
         // release = 本地备好 keystore.properties 后手动出包；CI 只构建 debug。
         release {
@@ -122,6 +146,8 @@ dependencies {
     // miuix 0.8.8 的弹窗（NavigationBackHandler）依赖它，钉 1.9.3 会让所有 WindowDialog 弹出即崩。
     // 1.13.0 可能要求 compileSdk 37，取 1.12 系最新补丁。
     implementation("androidx.activity:activity-compose:1.12.4")
+    // 上游登录走 Custom Tab，需要 browser 库
+    implementation("androidx.browser:browser:1.8.0")
     implementation("androidx.lifecycle:lifecycle-runtime-compose:2.8.7")
     implementation("androidx.lifecycle:lifecycle-viewmodel-compose:2.8.7")
 

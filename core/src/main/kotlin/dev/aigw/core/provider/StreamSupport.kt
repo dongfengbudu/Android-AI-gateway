@@ -12,6 +12,9 @@ import dev.aigw.core.util.stringOrNull
 import java.io.InputStream
 import java.nio.charset.StandardCharsets
 
+/** OpenAI SSE 的流终止帧，所有供应商翻译器共用同一份字面量。 */
+const val SSE_DONE = "data: [DONE]\n\n"
+
 /**
  * 逐行转换的 SSE 流：把 [source] 每读一行交给 [transform]，
  * 产出的文本按字节写给下游（transform 负责拼好 `data: ...\n\n` 这类帧）。
@@ -79,6 +82,9 @@ class LineTransformStream(
  */
 object OpenAiSseAggregator {
 
+    /** 上游没给消息 id 时用的占位值（调用方据此判断「拿不到真实 id」）。 */
+    const val FALLBACK_ID = "chatcmpl-aggregated"
+
     fun aggregate(stream: InputStream, fallbackModel: String): String {
         var id = ""
         var model = fallbackModel
@@ -128,7 +134,7 @@ object OpenAiSseAggregator {
             addProperty("finish_reason", finishReason)
         }
         return JsonObject().apply {
-            addProperty("id", id.ifEmpty { "chatcmpl-aggregated" })
+            addProperty("id", id.ifEmpty { FALLBACK_ID })
             addProperty("object", "chat.completion")
             addProperty("created", if (created > 0) created else System.currentTimeMillis() / 1000)
             addProperty("model", model)
@@ -214,6 +220,6 @@ object OpenAiSseAggregator {
                 obj.objOrNull("usage")?.let { add("usage", it) }
             }
         }
-        return "data: $chunk\n\ndata: [DONE]\n\n"
+        return "data: $chunk\n\n" + SSE_DONE
     }
 }
