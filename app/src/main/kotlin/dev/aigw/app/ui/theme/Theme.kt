@@ -5,7 +5,6 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.remember
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.luminance
 import dev.aigw.app.ui.glass.GlassFinish
 import dev.aigw.app.ui.glass.GlassScope
 import dev.aigw.app.ui.glass.defaultGlassFinish
@@ -47,18 +46,35 @@ val ThemeAccent.oklchChroma: Float
 /**
  * 在 [bg] 上取一个至少 [min] 对比度的文字色。
  *
- * 先判断底色亮暗，再朝远离底色的方向逐档挪明度——这是「不靠人眼调色」的关键：
- * 强调色换了、底色档位换了，文字自己会找到能读的那一档。
+ * 往暗、往亮两个方向都走一遍再挑，而不是先判断底色亮暗再定方向：实测 tone-74 的主色亮度
+ * 落在判据的模糊带（≈0.41），被误判成深底而配了白字，只剩 2.3:1（配黑字可到 9:1）。
+ *
+ * [faint] 决定取哪一端：正文取高对比端；次要文字取「仍达标但更淡」的一端。两者若从同一端
+ * 出发，会一起收敛到纯黑/纯白，次要文字与正文同色、层级塌平（实测出来的坑）。
  */
-private fun readableOn(bg: Color, hue: Float, min: Float, chroma: Float = 0.02f): Color {
-    val bgIsLight = bg.luminance() > 0.45f
-    return toneMeeting(
-        coord = Oklch(hue, chroma, 0f),
-        background = bg,
-        minContrast = min,
-        startTone = if (bgIsLight) 22f else 98f,
-        direction = if (bgIsLight) -1 else 1,
-    )
+private fun readableOn(
+    bg: Color,
+    hue: Float,
+    min: Float,
+    faint: Boolean = false,
+    chroma: Float = 0.02f,
+): Color {
+    val coord = Oklch(hue, chroma, 0f)
+    val darker = toneMeeting(coord, bg, min, if (faint) 66f else 20f, -1)
+    val lighter = toneMeeting(coord, bg, min, if (faint) 48f else 96f, 1)
+    val darkerContrast = contrastWith(darker, bg)
+    val lighterContrast = contrastWith(lighter, bg)
+    val darkerOk = darkerContrast >= min
+    val lighterOk = lighterContrast >= min
+    return when {
+        // 两端都达标：次要要更淡的那个，正文要更强的那个
+        darkerOk && lighterOk && faint -> if (darkerContrast <= lighterContrast) darker else lighter
+        darkerOk && lighterOk -> if (darkerContrast >= lighterContrast) darker else lighter
+        darkerOk -> darker
+        lighterOk -> lighter
+        // 两端都不达标（极窄色域）：取能达到的最优点
+        else -> if (darkerContrast >= lighterContrast) darker else lighter
+    }
 }
 
 /**
@@ -69,8 +85,9 @@ private fun readableOn(bg: Color, hue: Float, min: Float, chroma: Float = 0.02f)
  * 「纯净」档恒为 0（用户明确要无色偏），主色本身不受此影响（见 AccentChroma）。
  */
 private fun tintChroma(tone: BackgroundTone, dark: Boolean, chroma: Float): Float {
-    if (tone == BackgroundTone.Plain) return 0f
     val base = when (tone) {
+        // 「纯净」档恒为 0：用户明确要无色偏（主色本身不受此影响，见 AccentChroma）
+        BackgroundTone.Plain -> return 0f
         BackgroundTone.Theme -> if (dark) 0.014f else 0.006f
         BackgroundTone.Soft -> if (dark) 0.024f else 0.020f
         BackgroundTone.Rich -> if (dark) 0.052f else 0.050f
@@ -154,18 +171,18 @@ private fun lightScheme(accent: ThemeAccent, tone: BackgroundTone): Colors {
         tertiaryContainerVariant = toneColor(h, c * 0.14f, 96f),
         background = bg,
         onBackground = readableOn(bg, h, 7f),
-        onBackgroundVariant = readableOn(bg, h, ContrastBody),
+        onBackgroundVariant = readableOn(bg, h, ContrastBody, faint = true),
         surface = surface,
         onSurface = readableOn(container, h, 7f),
         surfaceVariant = variant,
         onSurfaceSecondary = readableOn(container, h, 7f),
-        onSurfaceVariantSummary = readableOn(container, h, ContrastBody),
-        onSurfaceVariantActions = readableOn(container, h, ContrastBody),
+        onSurfaceVariantSummary = readableOn(container, h, ContrastBody, faint = true),
+        onSurfaceVariantActions = readableOn(container, h, ContrastBody, faint = true),
         surfaceContainer = container,
         onSurfaceContainer = readableOn(container, h, 7f),
-        onSurfaceContainerVariant = readableOn(container, h, ContrastBody),
+        onSurfaceContainerVariant = readableOn(container, h, ContrastBody, faint = true),
         surfaceContainerHigh = containerHigh,
-        onSurfaceContainerHigh = readableOn(containerHigh, h, ContrastBody),
+        onSurfaceContainerHigh = readableOn(containerHigh, h, ContrastBody, faint = true),
         surfaceContainerHighest = containerHighest,
         onSurfaceContainerHighest = readableOn(containerHighest, h, 7f),
         outline = outline,
@@ -183,7 +200,7 @@ private fun lightScheme(accent: ThemeAccent, tone: BackgroundTone): Colors {
         disabledOnSecondary = toneColor(h, 0.01f, 99f),
         disabledSecondaryVariant = toneColor(h, 0.008f, 97f),
         disabledOnSecondaryVariant = readableOn(toneColor(h, 0.008f, 97f), h, ContrastLarge),
-        disabledOnSurface = readableOn(container, h, ContrastLarge),
+        disabledOnSurface = readableOn(container, h, ContrastLarge, faint = true),
         sliderKeyPoint = primary.copy(alpha = 0.30f),
         sliderKeyPointForeground = primary,
         sliderBackground = toneColor(h, 0.010f, 90f),
@@ -235,18 +252,18 @@ private fun darkScheme(accent: ThemeAccent, tone: BackgroundTone): Colors {
         tertiaryContainerVariant = toneColor(h, c * 0.28f, 24f),
         background = bg,
         onBackground = readableOn(bg, h, 7f),
-        onBackgroundVariant = readableOn(bg, h, ContrastBody),
+        onBackgroundVariant = readableOn(bg, h, ContrastBody, faint = true),
         surface = surface,
         onSurface = readableOn(container, h, 7f),
         surfaceVariant = variant,
         onSurfaceSecondary = readableOn(container, h, 7f),
-        onSurfaceVariantSummary = readableOn(container, h, ContrastBody),
-        onSurfaceVariantActions = readableOn(container, h, ContrastBody),
+        onSurfaceVariantSummary = readableOn(container, h, ContrastBody, faint = true),
+        onSurfaceVariantActions = readableOn(container, h, ContrastBody, faint = true),
         surfaceContainer = container,
         onSurfaceContainer = readableOn(container, h, 7f),
-        onSurfaceContainerVariant = readableOn(container, h, ContrastBody),
+        onSurfaceContainerVariant = readableOn(container, h, ContrastBody, faint = true),
         surfaceContainerHigh = containerHigh,
-        onSurfaceContainerHigh = readableOn(containerHigh, h, ContrastBody),
+        onSurfaceContainerHigh = readableOn(containerHigh, h, ContrastBody, faint = true),
         surfaceContainerHighest = containerHighest,
         onSurfaceContainerHighest = readableOn(containerHighest, h, 7f),
         outline = outline,
@@ -264,7 +281,7 @@ private fun darkScheme(accent: ThemeAccent, tone: BackgroundTone): Colors {
         disabledOnSecondary = toneColor(h, 0.012f, 55f),
         disabledSecondaryVariant = toneColor(h, 0.012f, 24f),
         disabledOnSecondaryVariant = readableOn(toneColor(h, 0.012f, 24f), h, ContrastLarge),
-        disabledOnSurface = readableOn(container, h, ContrastLarge),
+        disabledOnSurface = readableOn(container, h, ContrastLarge, faint = true),
         sliderKeyPoint = primary.copy(alpha = 0.34f),
         sliderKeyPointForeground = primary,
         sliderBackground = toneColor(h, 0.016f, 32f),

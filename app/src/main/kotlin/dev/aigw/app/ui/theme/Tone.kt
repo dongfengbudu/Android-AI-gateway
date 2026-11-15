@@ -38,9 +38,9 @@ internal fun toneColor(hue: Float, chroma: Float, tone: Float): Color {
         guard++
     }
     return Color(
-        red = gammaEncode(result[0]),
-        green = gammaEncode(result[1]),
-        blue = gammaEncode(result[2]),
+        red = gammaEncode(result.r),
+        green = gammaEncode(result.g),
+        blue = gammaEncode(result.b),
     )
 }
 
